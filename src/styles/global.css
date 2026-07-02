@@ -513,6 +513,59 @@ code {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* --- Login page ----------------------------------------------------------- */
+.login-shell {
+  display: grid;
+  place-items: center;
+  min-height: calc(100vh - 60px);
+  padding: 24px 16px;
+}
+
+.login-panel {
+  display: grid;
+  gap: 10px;
+  width: min(380px, 100%);
+  border: 1px solid var(--ss-border);
+  border-radius: var(--ss-radius-lg);
+  background: var(--ss-surface);
+  box-shadow: var(--ss-shadow);
+  padding: 34px 32px 32px;
+}
+
+.login-brand {
+  margin-bottom: 8px;
+}
+
+.login-panel h1 {
+  margin: 0;
+  color: var(--ss-ink);
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.login-panel p {
+  margin: 0;
+  color: var(--ss-text-soft);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.login-error {
+  border-radius: var(--ss-radius-sm);
+  background: #fef2f2;
+  padding: 9px 12px;
+  color: #b91c1c;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.login-panel form {
+  display: grid;
+  gap: 16px;
+  margin-top: 10px;
+}
+
 .logo-preview {
   display: grid;
   align-content: start;

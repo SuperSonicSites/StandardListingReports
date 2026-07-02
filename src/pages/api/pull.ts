@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { canAccessClient } from "../../lib/auth";
 import { readClient } from "../../lib/storage";
 import { fetchFacebookPostMetrics, fetchInstagramMediaMetrics } from "../../lib/meta";
 import { fetchRybbitListingViews } from "../../lib/rybbit";
@@ -20,6 +21,10 @@ export const POST: APIRoute = async ({ request }) => {
     client = await readClient(slug);
   } catch {
     return new Response("Client profile not found.", { status: 404 });
+  }
+
+  if (!canAccessClient(request, client)) {
+    return new Response("Sign-in required.", { status: 401 });
   }
 
   const listingUrl = String(body.listing_url ?? "");

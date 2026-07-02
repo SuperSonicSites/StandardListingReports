@@ -8,7 +8,10 @@ export type ClientProfile = {
   brokerage_name: string;
   brokerage_address: string;
   brokerage_contact: string;
-  // --- v0.2 integration IDs (optional; committed to git; NON-SECRET) ---
+  // sha256 of the coordinator password set in the admin form. Optional so
+  // pre-auth profiles still parse; without it the client link is admin-only.
+  password_hash?: string;
+  // --- v0.2 integration IDs (optional; NON-SECRET addressing ids) ---
   meta_page_id?: string;
   meta_instagram_id?: string;
   rybbit_site_id?: string;

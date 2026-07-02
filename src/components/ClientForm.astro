@@ -81,6 +81,24 @@ const logoUrlValue = client?.logo_url.startsWith("data:") ? "" : (client?.logo_u
   </section>
 
   <section class="form-section">
+    <h2>Access</h2>
+    <div class="field-grid two">
+      <label>
+        Coordinator password
+        <input
+          type="password"
+          name="password"
+          autocomplete="new-password"
+          minlength="8"
+          required={!isEdit}
+          placeholder={isEdit ? "Leave blank to keep current password" : ""}
+        />
+        <span>Coordinators use this to open /c/{client?.slug ?? "<slug>"}/. At least 8 characters.</span>
+      </label>
+    </div>
+  </section>
+
+  <section class="form-section">
     <h2>Integrations (optional)</h2>
     <div class="field-grid two">
       <label>

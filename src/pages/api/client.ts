@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import type { APIRoute } from "astro";
+import { isAdmin, sha256 } from "../../lib/auth";
 import { clientExists, readClient, slugify, writeClient } from "../../lib/storage";
 import type { ClientProfile } from "../../lib/types";
 
@@ -36,6 +37,11 @@ function errorPage(status: number, message: string) {
 }
 
 export const POST: APIRoute = async ({ request }) => {
+  // Creating/editing clients is agency-only (self-guarded — see middleware).
+  if (!isAdmin(request)) {
+    return errorPage(401, "Admin sign-in required.");
+  }
+
   const form = await request.formData();
   const name = field(form, "name");
   const slug = slugify(field(form, "slug") || name);
@@ -48,6 +54,18 @@ export const POST: APIRoute = async ({ request }) => {
   // Creating must not silently overwrite an existing profile; edits declare themselves.
   if (!isEdit && (await clientExists(slug))) {
     return errorPage(409, `A client with the slug "${slug}" already exists. Edit it from the home page instead.`);
+  }
+
+  const existing = isEdit ? await readClient(slug).catch(() => undefined) : undefined;
+
+  // Coordinator password: required on create; blank on edit keeps the current one.
+  const password = field(form, "password");
+  if (password && password.length < 8) {
+    return errorPage(400, "Coordinator password must be at least 8 characters.");
+  }
+  const passwordHash = password ? sha256(password) : existing?.password_hash;
+  if (!passwordHash) {
+    return errorPage(400, "A coordinator password is required — it protects this client's report link.");
   }
 
   // Logo resolution order: uploaded file > pasted URL > (on edit) the existing logo.
@@ -64,12 +82,8 @@ export const POST: APIRoute = async ({ request }) => {
     const bytes = Buffer.from(await logoFile.arrayBuffer());
     logoUrl = `data:${logoFile.type};base64,${bytes.toString("base64")}`;
   }
-  if (!logoUrl && isEdit) {
-    try {
-      logoUrl = (await readClient(slug)).logo_url;
-    } catch {
-      // fall through to the required-logo error below
-    }
+  if (!logoUrl && existing) {
+    logoUrl = existing.logo_url;
   }
   if (!logoUrl) {
     return errorPage(400, "A logo is required — upload an image file or paste an https link.");
@@ -100,6 +114,7 @@ export const POST: APIRoute = async ({ request }) => {
     brokerage_name: field(form, "brokerage_name") || name,
     brokerage_address: field(form, "brokerage_address"),
     brokerage_contact: field(form, "brokerage_contact"),
+    password_hash: passwordHash,
     ...(metaPageId ? { meta_page_id: metaPageId } : {}),
     ...(metaInstagramId ? { meta_instagram_id: metaInstagramId } : {}),
     ...(rybbitSiteId ? { rybbit_site_id: rybbitSiteId } : {})

@@ -43,10 +43,14 @@ The end-to-end flow, and the files that own each step:
 
 All disk I/O goes through [src/lib/storage.ts](src/lib/storage.ts) — never read/write `data/` files directly elsewhere. Two stores, both plain JSON files, written atomically (temp file + rename):
 
-- `data/clients/<slug>.json` — client brand profiles (**committed** to git).
+- `data/clients/<slug>.json` — client brand profiles (**gitignored** — runtime data on the production volume; they carry coordinator password hashes and uploaded-logo data URIs).
 - `data/snapshots/<id>.json` — frozen reports (**gitignored** except `.gitkeep`).
 
 Every id/slug that becomes a file path is validated by `assertSafeId` against `^[a-z0-9-]+$`. Preserve this — it is the path-traversal guard for user-supplied ids.
+
+### Access control (v0.2.1)
+
+[src/middleware.ts](src/middleware.ts) gates every route through [src/lib/auth.ts](src/lib/auth.ts): `ADMIN_PASSWORD` (env) opens everything; each client profile stores a `password_hash` (sha256, set in the admin form) that opens only `/c/<slug>/` and that client's reports/PDFs. Cookie tokens are derived hashes, never the password. `/login` + `/api/login` are open; `/api/pull|snapshot|client` authorize inside the route after parsing the slug from the body. The PDF route forwards the caller's cookie to its loopback self-fetch — remove that and PDFs print the login page.
 
 ### The snapshot is the source of truth
 

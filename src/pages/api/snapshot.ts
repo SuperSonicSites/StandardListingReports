@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import type { APIRoute } from "astro";
+import { canAccessClient } from "../../lib/auth";
 import { createSnapshotId, readClient, writeSnapshot } from "../../lib/storage";
 import type { MetricSource, ReportSnapshot } from "../../lib/types";
 
@@ -126,6 +127,10 @@ export const POST: APIRoute = async ({ request }) => {
     client = await readClient(clientSlug);
   } catch {
     return errorPage(404, "Client profile not found.", "/");
+  }
+
+  if (!canAccessClient(request, client)) {
+    return errorPage(401, "Sign-in required.", `/c/${client.slug}/`);
   }
 
   const backHref = `/c/${client.slug}/`;

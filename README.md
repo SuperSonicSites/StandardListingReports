@@ -170,15 +170,18 @@ The code is host-agnostic; these are the moving parts:
 
 1. Set the start command to `npm run start` **before** the first deploy
    (Railpack cannot infer it for `output: "server"`).
-2. Service variables: `HOST=0.0.0.0`, `META_SYSTEM_USER_TOKEN`, `RYBBIT_API_KEY`,
-   `CHROME_PATH=/usr/bin/chromium`, and
+2. Service variables: `HOST=0.0.0.0`, `ADMIN_PASSWORD`, `META_SYSTEM_USER_TOKEN`,
+   `RYBBIT_API_KEY`, `CHROME_PATH=/usr/bin/chromium`, and
    `RAILPACK_DEPLOY_APT_PACKAGES=chromium` (installs Chrome for the PDF route).
    The built server never loads `.env` — platform env vars are the only source.
-3. Mount a volume at `/app/data`. The empty volume masks the git-committed
-   `data/clients/*.json`, so re-create clients via `/admin/clients/new` once.
-4. Put an access gate in front before sharing the URL — Cloudflare Access
-   (free tier, email OTP) on a custom domain is the intended setup. The app
-   itself has no login.
+3. Mount a volume at `/app/data`. Client profiles and snapshots are runtime
+   data that live only on this volume (gitignored) — deploys never touch them.
+   Create clients via `/admin/clients/new` after the first deploy.
+4. Access: `/login` gates everything. `ADMIN_PASSWORD` opens the admin area
+   and every client workspace; each client gets its own coordinator password,
+   set in the admin form, that opens only `/c/<slug>/` and its reports. For
+   defense in depth, Cloudflare Access on a custom domain can still be added
+   in front.
 
 ## Core Concepts
 

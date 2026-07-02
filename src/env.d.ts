@@ -10,6 +10,7 @@ interface ImportMetaEnv {
   readonly META_SYSTEM_USER_TOKEN?: string;
   readonly CHROME_PATH?: string;
   readonly DEMO_MODE?: string;
+  readonly ADMIN_PASSWORD?: string;
 }
 
 interface ImportMeta {

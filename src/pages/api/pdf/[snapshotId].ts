@@ -24,7 +24,7 @@ function browserPath() {
   return chromeCandidates.find((candidate) => existsSync(candidate));
 }
 
-export const GET: APIRoute = async ({ params }) => {
+export const GET: APIRoute = async ({ params, request }) => {
   const snapshotId = params.snapshotId ?? "";
 
   let snapshot;
@@ -56,6 +56,10 @@ export const GET: APIRoute = async ({ params }) => {
     });
     const page = await browser.newPage();
     await page.setViewport({ width: 1240, height: 1600, deviceScaleFactor: 1 });
+    // The loopback self-fetch must carry the caller's auth cookie, or the
+    // middleware would bounce the report page to /login and we'd print that.
+    const cookie = request.headers.get("cookie");
+    if (cookie) await page.setExtraHTTPHeaders({ cookie });
     await page.goto(reportUrl, { waitUntil: "networkidle0", timeout: 30_000 });
     await page.emulateMediaType("print");
     const pdf = await page.pdf({

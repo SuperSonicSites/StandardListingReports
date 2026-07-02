@@ -1451,9 +1451,8 @@ textarea {
 .report-cover-header {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 22px;
-  align-items: end;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
   padding: 2px 0 4px;
 }
 
@@ -1492,7 +1491,7 @@ textarea {
 /* Lighter "REPORT PERIOD" pill, replaces the boxed dt/dd date band. */
 .report-period-pill {
   display: inline-flex;
-  align-self: end;
+  justify-self: start;
   align-items: center;
   gap: 9px;
   border-radius: 999px;
@@ -1610,6 +1609,11 @@ textarea {
   line-height: 1;
 }
 
+/* Values that carry a text unit ("36 days") run wider than bare numbers — 20% smaller. */
+.report-widget strong.with-unit {
+  font-size: 1.38rem;
+}
+
 /* Shared panel system: borderless, no shadow. A soft neutral surface
    provides grouping; whitespace does the rest. */
 .report-outline-panel,
@@ -1626,7 +1630,7 @@ textarea {
 
 .report-detail-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 

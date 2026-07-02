@@ -211,7 +211,12 @@ const Icon = ({ name, size = 18 }: IconProps) =>
             </div>
             <div class="report-summary-card">
               <span class="report-outline-label">Summary</span>
-              <p>{snapshot.report.notes || "Numbers are saved to this report and remain fixed for the selected reporting period."}</p>
+              <p>
+                In this report you will find all the stats about the {snapshot.report.address} listing,
+                including the number of times your listing was viewed, the age of the listing, showings,
+                and inquiries.
+              </p>
+              {snapshot.report.notes && <p>{snapshot.report.notes}</p>}
             </div>
           </section>
         </section>
@@ -243,8 +248,8 @@ const Icon = ({ name, size = 18 }: IconProps) =>
             <article class="report-widget">
               <span class="report-widget-icon"><Fragment set:html={Icon({ name: "clock" })} /></span>
               <div class="report-widget-body">
-                <span>Time on listing</span>
-                <strong>{formatNumber(snapshot.manual.days_on_market)} days</strong>
+                <span>Listing age</span>
+                <strong class="with-unit">{formatNumber(snapshot.manual.days_on_market)} days</strong>
               </div>
             </article>
             <article class="report-widget">
@@ -266,7 +271,7 @@ const Icon = ({ name, size = 18 }: IconProps) =>
           <section class="report-table-card" aria-label="Marketing source breakdown">
             <div class="report-table-row report-table-head">
               <span class="report-table-icon" aria-hidden="true"></span>
-              <span>Source</span>
+              <span>Sources</span>
               <span>Metric</span>
               <span>Value</span>
             </div>
@@ -283,10 +288,10 @@ const Icon = ({ name, size = 18 }: IconProps) =>
               <strong>{formatNumber(snapshot.manual.realtor_listing_views)}</strong>
             </div>
             <div class="report-table-row">
-              <span class="report-table-icon"><Fragment set:html={Icon({ name: "calendar", size: 16 })} /></span>
-              <span>Showing activity</span>
-              <span>Showings</span>
-              <strong>{formatNumber(snapshot.manual.showings)}</strong>
+              <span class="report-table-icon"><Fragment set:html={Icon({ name: "camera", size: 16 })} /></span>
+              <span>Meta</span>
+              <span>Social post views</span>
+              <strong>{formatNumber(socialViews)}</strong>
             </div>
           </section>
 

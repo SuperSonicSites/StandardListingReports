@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { mkdirSync, statSync } from "node:fs";
 import { access, mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ClientProfile, ReportSnapshot } from "./types";
@@ -7,6 +8,27 @@ const dataDir = path.join(process.cwd(), "data");
 const clientsDir = path.join(dataDir, "clients");
 const snapshotsDir = path.join(dataDir, "snapshots");
 const safeId = /^[a-z0-9-]+$/;
+
+// Everything under data/ is created at runtime (client profiles, snapshots) and is
+// NOT in git — on a hosted container it survives deploys ONLY if a persistent volume
+// is mounted at data/. A mounted volume lives on a different device than the app dir,
+// so equal st_dev in a hosted environment means every deploy wipes the client list.
+// Shout at boot rather than letting the loss be discovered after the fact.
+if (process.env.RAILWAY_ENVIRONMENT ?? process.env.KUBERNETES_SERVICE_HOST) {
+  try {
+    mkdirSync(dataDir, { recursive: true });
+    if (statSync(process.cwd()).dev === statSync(dataDir).dev) {
+      console.warn(
+        "[storage] WARNING: data/ is on the container filesystem, NOT a mounted volume. " +
+          "Clients and reports WILL BE LOST on every deploy. Mount a volume at /app/data."
+      );
+    } else {
+      console.log("[storage] data/ is on a mounted volume — clients and reports persist across deploys.");
+    }
+  } catch (error) {
+    console.warn("[storage] Could not verify the data volume:", error);
+  }
+}
 
 export function slugify(value: string) {
   return value

@@ -1379,8 +1379,8 @@ textarea {
   --ink: #1b1b1b;
   --muted: #837c6f;
   --hairline: #e4e1da;
-  --surface: #f6f5f1;
-  --surface-2: #faf9f6;
+  --surface: #f2f2f2;
+  --surface-2: #f7f7f7;
   --radius: 12px;
   --radius-sm: 9px;
   width: min(var(--report-sheet-width), calc(100vw - 32px));
@@ -1712,7 +1712,6 @@ textarea {
 .report-table-card,
 .report-post-panel,
 .report-disclaimer-card,
-.report-total-strip,
 .report-readout-grid article,
 .report-inputs-card {
   border-radius: var(--radius);
@@ -1764,7 +1763,7 @@ textarea {
   display: grid;
   align-content: start;
   gap: 9px;
-  background: color-mix(in srgb, var(--client-accent) 12%, #ffffff);
+  background: var(--surface);
   padding: 18px 20px;
 }
 
@@ -1980,7 +1979,7 @@ textarea {
   line-height: 1.55;
 }
 
-/* Icon-led badge metrics for Reach / Engagements, replaces the plain
+/* Icon-led badge metric for Views, replaces the plain
    bordered <dl class="report-mini-metrics"> table. */
 .report-badge-row {
   display: grid;
@@ -2024,31 +2023,6 @@ textarea {
   margin: 2px 0 0;
   color: var(--ink);
   font-size: 1.1rem;
-  font-weight: 780;
-}
-
-.report-total-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 18px 22px;
-}
-
-.report-total-strip span {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.report-total-strip strong {
-  color: var(--ink);
-  font-size: 1.4rem;
   font-weight: 780;
 }
 
@@ -2324,7 +2298,6 @@ textarea {
   .report-table-card,
   .report-post-panel,
   .report-disclaimer-card,
-  .report-total-strip,
   .report-readout-grid article,
   .report-inputs-card {
     box-shadow: none;

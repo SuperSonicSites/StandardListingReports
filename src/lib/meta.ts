@@ -12,7 +12,6 @@ const BROWSER_UA =
 export type MetaSocialResult = {
   source: "meta_api" | "manual" | "mock";
   views: number; // distribution: IG total views / FB video views (0 on failure or FB non-video post)
-  engagements: number; // interactions: reactions+comments+shares (FB) / total_interactions (IG)
   caption?: string;
   media_url?: string;
   warning?: string;
@@ -32,7 +31,6 @@ function notConfigured(kind: "Facebook" | "Instagram", reason = "Meta is not con
   return {
     source: "manual",
     views: 0,
-    engagements: 0,
     warning: `${reason}. Enter ${kind} numbers manually.`
   };
 }
@@ -42,7 +40,6 @@ function noMatch(kind: "Facebook" | "Instagram"): MetaSocialResult {
   return {
     source: "manual",
     views: 0,
-    engagements: 0,
     warning: `${kind} post not found in the ${owner}. Older posts can't be auto-matched — check the link or enter numbers manually.`
   };
 }
@@ -51,7 +48,6 @@ function graphError(kind: "Facebook" | "Instagram"): MetaSocialResult {
   return {
     source: "manual",
     views: 0,
-    engagements: 0,
     warning: `${kind} auto-fetch unavailable. Please enter numbers manually.`
   };
 }
@@ -124,9 +120,9 @@ function instagramShortcode(value: string): string | undefined {
 }
 
 /**
- * Fetch views/engagements for an organic Facebook post. NEVER throws. Distribution is video views
+ * Fetch views for an organic Facebook post. NEVER throws. Distribution is video views
  * (post_video_views): a real count for video posts, 0 for photo/text posts (Meta returns no view
- * metric for those). Engagement is reactions+comments+shares. Organic posts only.
+ * metric for those). Organic posts only.
  */
 export async function fetchFacebookPostMetrics(
   pageId: string | undefined,
@@ -135,7 +131,7 @@ export async function fetchFacebookPostMetrics(
   const token = metaToken();
   if (!token) {
     // Demo stub: fabricated data labeled "mock", only when explicitly opted in (see rybbit.ts).
-    if (demoMode()) return { source: "mock", views: 512, engagements: 2 };
+    if (demoMode()) return { source: "mock", views: 512 };
     return notConfigured("Facebook", "Meta token is not configured");
   }
   if (!pageId || !postUrl) {
@@ -154,13 +150,7 @@ export async function fetchFacebookPostMetrics(
     }
 
     const postId = `${pageId}_${numericId}`;
-    const fields =
-      "message,full_picture,reactions.summary(true).limit(0),comments.summary(true).limit(0),shares";
-    const post = await fetchJson(`${GRAPH}/${postId}?fields=${fields}`, pageToken);
-
-    const reactions = post?.reactions?.summary?.total_count ?? 0;
-    const comments = post?.comments?.summary?.total_count ?? 0;
-    const shares = post?.shares?.count ?? 0;
+    const post = await fetchJson(`${GRAPH}/${postId}?fields=message,full_picture`, pageToken);
 
     // Distribution ("Views"): report the largest available number (client-facing reporting).
     // post_video_views is a real count on videos and 0 (not an error) on non-video posts; post_clicks
@@ -183,7 +173,6 @@ export async function fetchFacebookPostMetrics(
     return {
       source: "meta_api",
       views,
-      engagements: reactions + comments + shares,
       caption: post?.message,
       media_url: post?.full_picture
     };
@@ -193,9 +182,8 @@ export async function fetchFacebookPostMetrics(
 }
 
 /**
- * Fetch views/engagements for an organic Instagram media item matched by shortcode. NEVER throws.
- * Distribution is `views` (total); engagement is `total_interactions` (organic figure - do not
- * substitute total_likes/total_comments/total_views, which may include boosted counts).
+ * Fetch views for an organic Instagram media item matched by shortcode. NEVER throws.
+ * Distribution is `views` (total).
  */
 export async function fetchInstagramMediaMetrics(
   igUserId: string | undefined,
@@ -204,7 +192,7 @@ export async function fetchInstagramMediaMetrics(
   const token = metaToken();
   if (!token) {
     // Demo stub: fabricated data labeled "mock", only when explicitly opted in (see rybbit.ts).
-    if (demoMode()) return { source: "mock", views: 167, engagements: 0 };
+    if (demoMode()) return { source: "mock", views: 167 };
     return notConfigured("Instagram", "Meta token is not configured");
   }
   if (!igUserId || !mediaUrl) {
@@ -226,10 +214,7 @@ export async function fetchInstagramMediaMetrics(
       return noMatch("Instagram");
     }
 
-    // Query views (distribution) and total_interactions (engagement) independently so one
-    // unavailable metric doesn't void the other.
     let views = 0;
-    let engagements = 0;
     let warning: string | undefined;
     try {
       const viewsInsights = await fetchJson(`${GRAPH}/${match.id}/insights?metric=views`, token);
@@ -237,20 +222,10 @@ export async function fetchInstagramMediaMetrics(
     } catch {
       warning = "Instagram views metric unavailable for this media.";
     }
-    try {
-      const engagementInsights = await fetchJson(
-        `${GRAPH}/${match.id}/insights?metric=total_interactions`,
-        token
-      );
-      engagements = engagementInsights?.data?.[0]?.values?.[0]?.value ?? 0;
-    } catch {
-      warning = warning ?? "Instagram engagement metric unavailable for this media.";
-    }
 
     return {
       source: "meta_api",
       views,
-      engagements,
       caption: match.caption,
       // Reels/videos return the video file in media_url; thumbnail_url is the poster image and is
       // present only for videos, so preferring it yields a still image for any media type.

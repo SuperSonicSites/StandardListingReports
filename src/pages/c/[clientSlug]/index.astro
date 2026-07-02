@@ -178,7 +178,7 @@ try {
                   <div>
                     <span class="source-badge" data-source-badge="social">Meta</span>
                     <h3>Social performance</h3>
-                    <p>Post-level views and engagement pulled from the provided links. Captions and images appear on the report — review them.</p>
+                    <p>Post-level views pulled from the provided links. Captions and images appear on the report — review them.</p>
                   </div>
                 </div>
                 <div class="post-review-list">
@@ -198,12 +198,6 @@ try {
                           <input class="import-metric-input" type="number" min="0" name="facebook_views" value="0" required />
                         </dd>
                       </div>
-                      <div>
-                        <dt>Engagements</dt>
-                        <dd>
-                          <input class="import-metric-input" type="number" min="0" name="facebook_engagements" value="0" required />
-                        </dd>
-                      </div>
                     </dl>
                   </div>
                   <div class="post-review-row">
@@ -220,12 +214,6 @@ try {
                         <dt>Views</dt>
                         <dd>
                           <input class="import-metric-input" type="number" min="0" name="instagram_views" value="0" required />
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Engagements</dt>
-                        <dd>
-                          <input class="import-metric-input" type="number" min="0" name="instagram_engagements" value="0" required />
                         </dd>
                       </div>
                     </dl>
@@ -275,8 +263,8 @@ try {
 
         const groups: Record<string, string[]> = {
           website: ["website_views"],
-          facebook: ["facebook_views", "facebook_engagements"],
-          instagram: ["instagram_views", "instagram_engagements"]
+          facebook: ["facebook_views"],
+          instagram: ["instagram_views"]
         };
 
         function field(name: string): HTMLInputElement | null {
@@ -389,8 +377,7 @@ try {
               setWebsiteBadge(data.website.source);
 
               const facebookFills: Record<string, unknown> = {
-                facebook_views: data.facebook.views,
-                facebook_engagements: data.facebook.engagements
+                facebook_views: data.facebook.views
               };
               applyBlock("facebook", data.facebook.source, facebookFills, data.facebook.warnings?.[0] ?? null);
               if (data.facebook.source !== "manual") {
@@ -402,8 +389,7 @@ try {
               }
 
               const instagramFills: Record<string, unknown> = {
-                instagram_views: data.instagram.views,
-                instagram_engagements: data.instagram.engagements
+                instagram_views: data.instagram.views
               };
               applyBlock("instagram", data.instagram.source, instagramFills, data.instagram.warnings?.[0] ?? null);
               if (data.instagram.source !== "manual") {

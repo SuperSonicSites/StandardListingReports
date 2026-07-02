@@ -170,9 +170,7 @@ export const POST: APIRoute = async ({ request }) => {
   const numbers = {
     website_views: numberField(form, "website_views"),
     facebook_views: numberField(form, "facebook_views"),
-    facebook_engagements: numberField(form, "facebook_engagements"),
     instagram_views: numberField(form, "instagram_views"),
-    instagram_engagements: numberField(form, "instagram_engagements"),
     realtor_listing_views: numberField(form, "realtor_listing_views"),
     inquiries: numberField(form, "inquiries"),
     showings: numberField(form, "showings"),
@@ -224,16 +222,14 @@ export const POST: APIRoute = async ({ request }) => {
       post_url: facebookPostUrl,
       caption: (field(form, "facebook_caption") || "Facebook listing post").slice(0, MAX_CAPTION_CHARS),
       media_url: facebookMedia,
-      views: numbers.facebook_views!,
-      engagements: numbers.facebook_engagements!
+      views: numbers.facebook_views!
     },
     instagram: {
       source: sourceField(form, "instagram_source"),
       post_url: instagramPostUrl,
       caption: (field(form, "instagram_caption") || "Instagram listing post").slice(0, MAX_CAPTION_CHARS),
       media_url: instagramMedia,
-      views: numbers.instagram_views!,
-      engagements: numbers.instagram_engagements!
+      views: numbers.instagram_views!
     },
     manual: {
       realtor_listing_views: numbers.realtor_listing_views!,

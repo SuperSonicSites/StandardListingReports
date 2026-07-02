@@ -20,7 +20,6 @@ try {
 }
 
 const socialViews = snapshot ? snapshot.facebook.views + snapshot.instagram.views : 0;
-const totalEngagements = snapshot ? snapshot.facebook.engagements + snapshot.instagram.engagements : 0;
 const dateRange = snapshot ? formatDateRange(snapshot.report.start_date, snapshot.report.end_date) : "";
 // Only meaningful once the listing has been on market at least a day — hidden otherwise.
 const daysOnMarket = snapshot?.manual.days_on_market ?? 0;
@@ -295,8 +294,8 @@ const Icon = ({ name, size = 18 }: IconProps) =>
             <div class="report-table-row">
               <span class="report-table-icon"><Fragment set:html={Icon({ name: "camera", size: 16 })} /></span>
               <span>Meta</span>
-              <span>Views and engagements</span>
-              <strong>{formatNumber(socialViews + totalEngagements)}</strong>
+              <span>Views</span>
+              <strong>{formatNumber(socialViews)}</strong>
             </div>
           </section>
 
@@ -344,13 +343,6 @@ const Icon = ({ name, size = 18 }: IconProps) =>
                       <dd>{formatNumber(snapshot.facebook.views)}</dd>
                     </div>
                   </div>
-                  <div class="report-badge">
-                    <span class="report-badge-icon"><Fragment set:html={Icon({ name: "message", size: 15 })} /></span>
-                    <div>
-                      <dt>Engagements</dt>
-                      <dd>{formatNumber(snapshot.facebook.engagements)}</dd>
-                    </div>
-                  </div>
                 </dl>
               </div>
             </article>
@@ -375,22 +367,11 @@ const Icon = ({ name, size = 18 }: IconProps) =>
                       <dd>{formatNumber(snapshot.instagram.views)}</dd>
                     </div>
                   </div>
-                  <div class="report-badge">
-                    <span class="report-badge-icon"><Fragment set:html={Icon({ name: "message", size: 15 })} /></span>
-                    <div>
-                      <dt>Engagements</dt>
-                      <dd>{formatNumber(snapshot.instagram.engagements)}</dd>
-                    </div>
-                  </div>
                 </dl>
               </div>
             </article>
           </section>
 
-          <section class="report-total-strip">
-            <span><Fragment set:html={Icon({ name: "trending-up", size: 16 })} />Total social engagements</span>
-            <strong>{formatNumber(totalEngagements)}</strong>
-          </section>
         </section>
 
         <section class="report-sheet report-notes-sheet">

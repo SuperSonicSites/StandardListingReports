@@ -49,7 +49,6 @@ export type ReportSnapshot = {
     caption: string;
     media_url: string;
     views: number;
-    engagements: number;
   };
   instagram: {
     source: MetricSource;
@@ -57,7 +56,6 @@ export type ReportSnapshot = {
     caption: string;
     media_url: string;
     views: number;
-    engagements: number;
   };
   manual: {
     realtor_listing_views: number;

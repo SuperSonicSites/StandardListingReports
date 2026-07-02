@@ -50,7 +50,6 @@ export const POST: APIRoute = async ({ request }) => {
   const facebook = {
     source: fb.source,
     views: fb.views,
-    engagements: fb.engagements,
     caption: fb.caption ?? "",
     media_url: fb.media_url ?? "",
     warnings: fb.warning ? [fb.warning] : []
@@ -58,7 +57,6 @@ export const POST: APIRoute = async ({ request }) => {
   const instagram = {
     source: ig.source,
     views: ig.views,
-    engagements: ig.engagements,
     caption: ig.caption ?? "",
     media_url: ig.media_url ?? "",
     warnings: ig.warning ? [ig.warning] : []

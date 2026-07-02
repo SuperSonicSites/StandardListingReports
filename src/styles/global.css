@@ -839,7 +839,8 @@ textarea {
   font-weight: 600;
 }
 
-.client-field.wide {
+.client-field.wide,
+.client-field-grid > .wide {
   grid-column: 1 / -1;
 }
 

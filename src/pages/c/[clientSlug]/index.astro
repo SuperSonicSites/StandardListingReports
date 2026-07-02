@@ -128,15 +128,17 @@ try {
             </div>
           </div>
           <div class="client-field-grid two">
-            <label class="client-field">
-              <span>Showings</span>
-              <input type="number" min="0" name="showings" placeholder="0" required />
-            </label>
+            <div>
+              <label class="client-field">
+                <span>Showings</span>
+                <input type="number" min="0" name="showings" placeholder="0" required />
+              </label>
+              <label class="client-toggle">
+                <input type="checkbox" name="hide_showings" value="yes" />
+                <span>Do not display showings on the report</span>
+              </label>
+            </div>
           </div>
-          <label class="client-toggle">
-            <input type="checkbox" name="hide_showings" value="yes" />
-            <span>Do not display showings on the report</span>
-          </label>
         </section>
 
         <section class="client-form-card client-pull-card" data-pull-card>
@@ -274,15 +276,17 @@ try {
             </div>
           </div>
           <div class="client-field-grid two">
-            <label class="client-field wide">
-              <span>Notes</span>
-              <textarea name="notes" rows="4" maxlength="600" placeholder="Optional notes shown on the report's performance page."></textarea>
-            </label>
+            <div class="wide">
+              <label class="client-field wide">
+                <span>Notes</span>
+                <textarea name="notes" rows="4" maxlength="600" placeholder="Optional notes shown on the report's performance page."></textarea>
+              </label>
+              <label class="client-toggle">
+                <input type="checkbox" name="hide_notes" value="yes" />
+                <span>Do not display notes on the report</span>
+              </label>
+            </div>
           </div>
-          <label class="client-toggle">
-            <input type="checkbox" name="hide_notes" value="yes" />
-            <span>Do not display notes on the report</span>
-          </label>
         </section>
 
         <div class="client-submit-panel">

@@ -85,7 +85,12 @@ export async function fetchRealtorAdminStats(adminUrl: string): Promise<RealtorS
     // filters to visible widgets and takes the max (all-time >= any window).
     await pillsTab.click().catch(() => {});
 
-    let stats = { totalViews: null as number | null, daysOnMarket: null as number | null, listingHref: "" };
+    let stats = {
+      totalViews: null as number | null,
+      daysOnMarket: null as number | null,
+      listingHref: "",
+      adminImage: ""
+    };
     for (let attempt = 0; attempt < 10; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, 700));
       stats = await page.evaluate(() => {
@@ -103,19 +108,30 @@ export async function fetchRealtorAdminStats(adminUrl: string): Promise<RealtorS
           .filter((n): n is number => n !== null);
         const dom = document.querySelector('[id^="data_report_"][id$="_daysOnRealtor"]');
         const link = document.querySelector<HTMLAnchorElement>("#hyp_reportRight_viewOnRealtor");
+        // The stats page shows the listing photo itself (images.realtor.ca) — capturing
+        // it here usually saves the public-page navigation. naturalWidth > 0 guards
+        // against the src that 404'd into the element's no-image fallback.
+        const imgEl = document.querySelector<HTMLImageElement>('[id^="img_report_"][id$="_propertyImage"]');
+        const imgSrc = imgEl ? imgEl.currentSrc || imgEl.src : "";
+        const adminImage =
+          imgEl && imgEl.naturalWidth > 0 && /^https:\/\/(images|cdn)\.realtor\.ca\//i.test(imgSrc)
+            ? imgSrc.split("?")[0]
+            : "";
         return {
           totalViews: counts.length ? Math.max(...counts) : null,
           daysOnMarket: dom ? parseCount(dom.textContent) : null,
-          listingHref: link?.href ?? ""
+          listingHref: link?.href ?? "",
+          adminImage
         };
       });
-      if (stats.totalViews !== null && stats.daysOnMarket !== null && stats.listingHref) break;
+      if (stats.totalViews !== null && stats.daysOnMarket !== null && stats.adminImage) break;
     }
 
     // Follow "view on REALTOR.ca" to the public listing page for the hero photo
     // (and days on market, if the stats page didn't have it).
-    let imageUrl = "";
-    if (stats.listingHref) {
+    // The public page is only a fallback — usually the stats page has everything.
+    let imageUrl = stats.adminImage;
+    if (stats.listingHref && (!imageUrl || stats.daysOnMarket === null)) {
       try {
         // The link resolves at ".../text" and then CLIENT-SIDE redirects to the
         // canonical listing URL — an evaluate racing that redirect throws

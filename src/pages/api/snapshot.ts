@@ -75,7 +75,8 @@ function allowedMediaHost(url: string) {
       host.endsWith(".fbcdn.net") ||
       host === "cdninstagram.com" ||
       host.endsWith(".cdninstagram.com") ||
-      host === "cdn.realtor.ca"
+      host === "cdn.realtor.ca" ||
+      host === "images.realtor.ca"
     );
   } catch {
     return false;

@@ -301,6 +301,14 @@ try {
         </div>
       </form>
 
+      <div class="pull-modal" data-pull-modal hidden role="status" aria-live="polite">
+        <div class="pull-modal-card">
+          <span class="pull-spinner" aria-hidden="true"></span>
+          <strong>Pulling performance data&hellip;</strong>
+          <p>Reading REALTOR.ca stats, Meta posts, and website analytics. This can take up to a minute.</p>
+        </div>
+      </div>
+
       <script>
         const form = document.getElementById("report-form") as HTMLFormElement | null;
         const pullButtons = document.querySelectorAll("[data-pull-trigger]");
@@ -398,9 +406,12 @@ try {
           }
         }
 
+        const pullModal = document.querySelector("[data-pull-modal]") as HTMLElement | null;
+
         async function pull(button: HTMLButtonElement) {
           button.disabled = true;
           button.textContent = "Pulling...";
+          if (pullModal) pullModal.hidden = false;
 
           const payload = {
             client_slug: field("client_slug")?.value ?? "",
@@ -494,6 +505,7 @@ try {
               if (statusDetail) statusDetail.textContent = "The data sources could not be reached. Enter the numbers manually below.";
             }
           } finally {
+            if (pullModal) pullModal.hidden = true;
             pullButtons.forEach((trigger) => {
               if (trigger instanceof HTMLButtonElement) {
                 trigger.disabled = false;

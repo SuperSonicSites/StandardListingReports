@@ -1,5 +1,6 @@
 ---
 import AppLayout from "../../../layouts/AppLayout.astro";
+import SiteHeader from "../../../components/SiteHeader.astro";
 import { readClient } from "../../../lib/storage";
 
 const clientSlug = Astro.params.clientSlug ?? "";
@@ -14,9 +15,12 @@ try {
 
 <AppLayout title={client ? `New Report | ${client.name}` : "Client Not Found"} className="client-form-body">
   {client ? (
+    <>
+    <SiteHeader context={client.name} />
     <main class="client-workspace">
       <header class="client-form-hero">
         <div>
+          <p class="eyebrow">Listing report</p>
           <h1>Create Listing Report</h1>
           <p>
             Follow the steps below: add the listing details, pull the
@@ -467,14 +471,20 @@ try {
         });
       </script>
     </main>
+    </>
   ) : (
+    <>
+    <SiteHeader />
     <main class="form-shell">
       <section class="panel">
         <p class="eyebrow">Missing client</p>
         <h1>Client not found</h1>
         <p>No local client profile exists for <code>{clientSlug}</code>.</p>
-        <a class="button primary" href="/admin/clients/new">Create client</a>
+        <div class="form-actions" style="justify-content: flex-start; padding-top: 20px;">
+          <a class="button primary" href="/admin/clients/new">Create client</a>
+        </div>
       </section>
     </main>
+    </>
   )}
 </AppLayout>

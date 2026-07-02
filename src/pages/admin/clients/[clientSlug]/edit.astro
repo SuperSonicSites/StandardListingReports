@@ -1,5 +1,6 @@
 ---
 import AppLayout from "../../../../layouts/AppLayout.astro";
+import SiteHeader from "../../../../components/SiteHeader.astro";
 import ClientForm from "../../../../components/ClientForm.astro";
 import { readClient } from "../../../../lib/storage";
 
@@ -14,12 +15,16 @@ try {
 ---
 
 <AppLayout title={client ? `Edit ${client.name} | Seller Report Generator` : "Client Not Found"} className="app-body">
+  <SiteHeader context={client?.name}>
+    <a class="nav-link" href="/">All clients</a>
+  </SiteHeader>
+
   <main class="form-shell">
     {client ? (
       <>
         <header class="page-header">
-          <a class="back-link" href="/">Back to clients</a>
-          <p class="eyebrow">Local setup</p>
+          <a class="back-link" href="/">&larr; Back to clients</a>
+          <p class="eyebrow">Client setup</p>
           <h1>Edit client</h1>
           <p>
             This updates the JSON profile at <code>data/clients/{client.slug}.json</code>.
@@ -34,7 +39,9 @@ try {
         <p class="eyebrow">Missing client</p>
         <h1>Client not found</h1>
         <p>No local client profile exists for <code>{clientSlug}</code>.</p>
-        <a class="button primary" href="/">Back to clients</a>
+        <div class="form-actions" style="justify-content: flex-start; padding-top: 20px;">
+          <a class="button primary" href="/">Back to clients</a>
+        </div>
       </section>
     )}
   </main>

@@ -6,6 +6,11 @@ export default defineConfig({
   adapter: node({
     mode: "standalone"
   }),
+  // The built standalone server already honors PORT; this makes `astro dev`
+  // honor it too so multiple dev instances can coexist.
+  server: {
+    port: Number(process.env.PORT ?? 4321)
+  },
   security: {
     // Behind a TLS-terminating proxy (Railway, Cloudflare) Astro reconstructs an
     // http:// origin that never matches the browser's https Origin header, so the

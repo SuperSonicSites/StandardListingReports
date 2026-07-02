@@ -1,5 +1,6 @@
 ---
 import AppLayout from "../../layouts/AppLayout.astro";
+import SupersonicBrand from "../../components/SupersonicBrand.astro";
 import { formatDateRange, formatNumber } from "../../lib/format";
 import { readSnapshot } from "../../lib/storage";
 
@@ -107,7 +108,13 @@ const Icon = ({ name, size = 18 }: IconProps) =>
     <main class="report-frame" style={reportBrandStyle}>
       {!printMode && (
         <div class="report-toolbar">
-          <a class="back-link" href={clientReportHref}>Back</a>
+          <div class="report-toolbar-left">
+            <a class="back-link" href={clientReportHref}>&larr; Back</a>
+            <span class="report-toolbar-label">
+              <SupersonicBrand wordmark={false} size={18} />
+              Report preview
+            </span>
+          </div>
           <a class="button primary" href={`/api/pdf/${snapshotId}`} data-pdf-button>Download PDF</a>
         </div>
       )}

@@ -178,42 +178,6 @@ const Icon = ({ name, size = 18 }: IconProps) =>
             </figure>
           )}
 
-          <section
-            class:list={["report-widget-row", { "report-widget-row-3": !showShowings }]}
-            aria-label="Key report metrics"
-          >
-            <article class="report-widget">
-              <span class="report-widget-icon"><Fragment set:html={Icon({ name: "eye" })} /></span>
-              <div class="report-widget-body">
-                <span>Website views</span>
-                <strong>{formatNumber(snapshot.website.listing_views)}</strong>
-              </div>
-            </article>
-            <article class="report-widget">
-              <span class="report-widget-icon"><Fragment set:html={Icon({ name: "globe" })} /></span>
-              <div class="report-widget-body">
-                <span>Social views</span>
-                <strong>{formatNumber(socialViews)}</strong>
-              </div>
-            </article>
-            {showShowings && (
-              <article class="report-widget">
-                <span class="report-widget-icon"><Fragment set:html={Icon({ name: "people" })} /></span>
-                <div class="report-widget-body">
-                  <span>Showings</span>
-                  <strong>{formatNumber(snapshot.manual.showings)}</strong>
-                </div>
-              </article>
-            )}
-            <article class="report-widget">
-              <span class="report-widget-icon"><Fragment set:html={Icon({ name: "clock" })} /></span>
-              <div class="report-widget-body">
-                <span>Days on market</span>
-                <strong>{formatNumber(snapshot.manual.days_on_market)}</strong>
-              </div>
-            </article>
-          </section>
-
           <section class="report-detail-row">
             <div class="report-summary-card">
               <span class="report-outline-label">Summary</span>

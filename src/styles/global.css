@@ -1805,26 +1805,6 @@ textarea {
   border-radius: var(--radius);
 }
 
-/* Cover-only widget compaction: the saved height goes to the property photo. */
-.report-cover-sheet .report-widget {
-  min-height: 0;
-  gap: 8px;
-  padding: 12px 14px;
-}
-
-.report-cover-sheet .report-widget-icon {
-  width: 26px;
-  height: 26px;
-}
-
-.report-cover-sheet .report-widget-icon svg {
-  width: 15px;
-  height: 15px;
-}
-
-.report-cover-sheet .report-widget strong {
-  font-size: 1.45rem;
-}
 
 /* Shared panel system: borderless, no shadow. A soft neutral surface
    provides grouping; whitespace does the rest. */

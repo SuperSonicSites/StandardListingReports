@@ -514,6 +514,24 @@ code {
   margin-top: 18px;
 }
 
+/* Per-report display toggles on the coordinator form. */
+.client-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  color: var(--ss-text-soft);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.client-toggle input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--ss-accent-deep);
+}
+
 /* --- Danger zone (client deletion) ---------------------------------------- */
 .danger-zone {
   display: flex;
@@ -1655,8 +1673,13 @@ textarea {
   gap: 12px;
 }
 
-.report-widget-row.report-widget-row-5 {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+/* Column count follows the report's display toggles (e.g. showings hidden -> 3-up). */
+.report-widget-row.report-widget-row-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.report-widget-row.report-widget-row-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .report-widget {
@@ -1700,9 +1723,22 @@ textarea {
   line-height: 1;
 }
 
-/* The five activity-summary stats share one size (the cover widgets stay larger). */
-.report-widget-row-5 .report-widget strong {
+/* The activity-summary stats share one size (the cover widgets stay larger). */
+.report-performance-sheet .report-widget strong {
   font-size: 1.38rem;
+}
+
+/* First REALTOR.ca photo, captured at pull time and frozen into the snapshot. */
+.report-property-photo {
+  margin: 0;
+}
+
+.report-property-photo img {
+  display: block;
+  width: 100%;
+  height: 2.2in;
+  object-fit: cover;
+  border-radius: var(--radius);
 }
 
 /* Shared panel system: borderless, no shadow. A soft neutral surface
@@ -2190,7 +2226,8 @@ textarea {
   }
 
   .report-widget-row,
-  .report-widget-row.report-widget-row-5,
+  .report-widget-row.report-widget-row-3,
+  .report-widget-row.report-widget-row-4,
   .report-badge-row,
   .report-post-panel,
   .report-readout-grid,

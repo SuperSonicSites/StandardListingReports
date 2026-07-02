@@ -122,3 +122,55 @@ export async function fetchRybbitListingViews(
     return fetchFailed();
   }
 }
+
+export type RybbitSiteTotalResult = {
+  source: "rybbit_api" | "manual" | "mock";
+  site_total_views: number;
+  warning?: string;
+};
+
+/**
+ * Fetch SITE-WIDE pageviews for the reporting window (the whole client website,
+ * not just the listing page) — used by the report summary to frame the audience
+ * the client's site brings. NEVER throws; degrades to 0 with a warning, and the
+ * summary simply omits the sentence. /overview's data.pageviews is the site
+ * total (verified live against site 8725, 2026-07).
+ */
+export async function fetchRybbitSiteTotalViews(
+  siteId: string | undefined,
+  startDate: string,
+  endDate: string
+): Promise<RybbitSiteTotalResult> {
+  const apiKey = process.env.RYBBIT_API_KEY ?? import.meta.env.RYBBIT_API_KEY;
+  if (!apiKey) {
+    if ((process.env.DEMO_MODE ?? import.meta.env.DEMO_MODE) === "1") {
+      return { source: "mock", site_total_views: 38101 };
+    }
+    return { source: "manual", site_total_views: 0, warning: "Rybbit API key is not configured — site-traffic summary will be omitted." };
+  }
+  if (!siteId) {
+    return { source: "manual", site_total_views: 0, warning: "Rybbit is not configured for this client — site-traffic summary will be omitted." };
+  }
+
+  const apiUrl = (
+    process.env.RYBBIT_API_URL ??
+    import.meta.env.RYBBIT_API_URL ??
+    DEFAULT_RYBBIT_API_URL
+  ).replace(/\/+$/, "");
+  const params = new URLSearchParams({ start_date: startDate, end_date: endDate, time_zone: "UTC" });
+  const url = `${apiUrl}/api/sites/${siteId}/overview?${params.toString()}`;
+
+  try {
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+    if (!response.ok) throw new Error(`overview ${response.status}`);
+    const body = await response.json();
+    const pageviews = body?.data?.pageviews;
+    if (typeof pageviews !== "number" || !Number.isFinite(pageviews)) throw new Error("no pageviews");
+    return { source: "rybbit_api", site_total_views: Math.round(pageviews) };
+  } catch {
+    return { source: "manual", site_total_views: 0, warning: "Rybbit site-traffic fetch unavailable — the summary will omit it." };
+  }
+}

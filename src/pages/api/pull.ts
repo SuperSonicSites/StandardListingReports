@@ -2,7 +2,8 @@ import type { APIRoute } from "astro";
 import { canAccessClient } from "../../lib/auth";
 import { readClient } from "../../lib/storage";
 import { fetchFacebookPostMetrics, fetchInstagramMediaMetrics } from "../../lib/meta";
-import { fetchRybbitListingViews } from "../../lib/rybbit";
+import { fetchRealtorListingPhoto } from "../../lib/realtor";
+import { fetchRybbitListingViews, fetchRybbitSiteTotalViews } from "../../lib/rybbit";
 
 export const prerender = false;
 
@@ -30,22 +31,26 @@ export const POST: APIRoute = async ({ request }) => {
   const listingUrl = String(body.listing_url ?? "");
   const facebookUrl = String(body.facebook_post_url ?? "");
   const instagramUrl = String(body.instagram_post_url ?? "");
+  const realtorUrl = String(body.realtor_url ?? "");
   const startDate = String(body.start_date ?? "");
   const endDate = String(body.end_date ?? "");
 
   // Each adapter call NEVER throws; it returns a typed result carrying its own `source` +
-  // optional warning. Run all three concurrently — sequentially their per-request timeouts
-  // stack up to a ~60s worst-case hang behind the form's "Pulling..." button.
-  const [web, fb, ig] = await Promise.all([
+  // optional warning. Run everything concurrently — sequentially the per-request timeouts
+  // stack up to a minute-plus hang behind the form's "Pulling..." button.
+  const [web, siteTotal, fb, ig, photo] = await Promise.all([
     fetchRybbitListingViews(client.rybbit_site_id, listingUrl, startDate, endDate),
+    fetchRybbitSiteTotalViews(client.rybbit_site_id, startDate, endDate),
     fetchFacebookPostMetrics(client.meta_page_id, facebookUrl),
-    fetchInstagramMediaMetrics(client.meta_instagram_id, instagramUrl)
+    fetchInstagramMediaMetrics(client.meta_instagram_id, instagramUrl),
+    fetchRealtorListingPhoto(realtorUrl)
   ]);
 
   const website = {
     source: web.source,
     listing_views: web.listing_views,
-    warnings: web.warning ? [web.warning] : []
+    site_total_views: siteTotal.site_total_views,
+    warnings: [web.warning, siteTotal.warning].filter((w): w is string => Boolean(w))
   };
   const facebook = {
     source: fb.source,
@@ -61,13 +66,19 @@ export const POST: APIRoute = async ({ request }) => {
     media_url: ig.media_url ?? "",
     warnings: ig.warning ? [ig.warning] : []
   };
+  const realtor = {
+    source: photo.source,
+    image_url: photo.image_url,
+    warnings: photo.warning ? [photo.warning] : []
+  };
 
   return new Response(
     JSON.stringify({
       website,
       facebook,
       instagram,
-      warnings: [...website.warnings, ...facebook.warnings, ...instagram.warnings]
+      realtor,
+      warnings: [...website.warnings, ...facebook.warnings, ...instagram.warnings, ...realtor.warnings]
     }),
     { headers: { "Content-Type": "application/json" } }
   );

@@ -38,10 +38,20 @@ export type ReportSnapshot = {
     listing_url: string;
     created_at: string;
     notes: string;
+    // REALTOR.ca listing page + its first photo, frozen as a data URI like the
+    // social media images. Empty string when capture failed/was unavailable.
+    realtor_url: string;
+    property_image: string;
+    // Per-report display toggles set by the coordinator at creation time.
+    show_showings: boolean;
+    show_notes: boolean;
   };
   website: {
     source: MetricSource;
     listing_views: number;
+    // Site-wide pageviews for the window (whole client site) — powers the
+    // audience-opportunity sentence in the summary. 0 = unknown, omit sentence.
+    site_total_views: number;
   };
   facebook: {
     source: MetricSource;
@@ -59,7 +69,6 @@ export type ReportSnapshot = {
   };
   manual: {
     realtor_listing_views: number;
-    inquiries: number;
     showings: number;
     days_on_market: number;
   };

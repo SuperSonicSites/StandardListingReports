@@ -21,10 +21,19 @@ try {
 
 const socialViews = snapshot ? snapshot.facebook.views + snapshot.instagram.views : 0;
 const dateRange = snapshot ? formatDateRange(snapshot.report.start_date, snapshot.report.end_date) : "";
+// Per-report display toggles; older snapshots predate them and default to shown.
+const showShowings = snapshot?.report.show_showings ?? true;
+const showNotes = (snapshot?.report.show_notes ?? true) && Boolean(snapshot?.report.notes);
+const propertyImage = snapshot?.report.property_image ?? "";
 // Only meaningful once the listing has been on market at least a day — hidden otherwise.
 const daysOnMarket = snapshot?.manual.days_on_market ?? 0;
-const averageDailyViews = snapshot && daysOnMarket > 0 ? Math.round(snapshot.website.listing_views / daysOnMarket) : 0;
-const inquiries = snapshot?.manual.inquiries ?? 0;
+// "Views" for the daily average = every channel combined: website + REALTOR.ca + social.
+const totalViews = snapshot
+  ? snapshot.website.listing_views + snapshot.manual.realtor_listing_views + socialViews
+  : 0;
+const averageDailyViews = snapshot && daysOnMarket > 0 ? Math.round(totalViews / daysOnMarket) : 0;
+// Site-wide traffic for the audience-opportunity line; 0 (unknown) omits the sentence.
+const siteTotalViews = snapshot?.website.site_total_views ?? 0;
 const clientReportHref = snapshot?.client.slug ? `/c/${snapshot.client.slug}/` : "/";
 const brokerageName = snapshot?.client.brokerage_name || snapshot?.client.name || "";
 const brokerageAddress = snapshot?.client.brokerage_address || "";
@@ -166,7 +175,16 @@ const Icon = ({ name, size = 18 }: IconProps) =>
             </div>
           </header>
 
-          <section class="report-widget-row" aria-label="Key report metrics">
+          {propertyImage && (
+            <figure class="report-property-photo">
+              <img src={propertyImage} alt={`${snapshot.report.address} — listing photo`} />
+            </figure>
+          )}
+
+          <section
+            class:list={["report-widget-row", { "report-widget-row-3": !showShowings }]}
+            aria-label="Key report metrics"
+          >
             <article class="report-widget">
               <span class="report-widget-icon"><Fragment set:html={Icon({ name: "eye" })} /></span>
               <div class="report-widget-body">
@@ -181,13 +199,15 @@ const Icon = ({ name, size = 18 }: IconProps) =>
                 <strong>{formatNumber(socialViews)}</strong>
               </div>
             </article>
-            <article class="report-widget">
-              <span class="report-widget-icon"><Fragment set:html={Icon({ name: "people" })} /></span>
-              <div class="report-widget-body">
-                <span>Showings</span>
-                <strong>{formatNumber(snapshot.manual.showings)}</strong>
-              </div>
-            </article>
+            {showShowings && (
+              <article class="report-widget">
+                <span class="report-widget-icon"><Fragment set:html={Icon({ name: "people" })} /></span>
+                <div class="report-widget-body">
+                  <span>Showings</span>
+                  <strong>{formatNumber(snapshot.manual.showings)}</strong>
+                </div>
+              </article>
+            )}
             <article class="report-widget">
               <span class="report-widget-icon"><Fragment set:html={Icon({ name: "clock" })} /></span>
               <div class="report-widget-body">
@@ -198,30 +218,21 @@ const Icon = ({ name, size = 18 }: IconProps) =>
           </section>
 
           <section class="report-detail-row">
-            <div class="report-outline-panel">
-              <span class="report-outline-label">
-                <Fragment set:html={Icon({ name: "globe", size: 14 })} />
-                Listing URL
-              </span>
-              <a href={snapshot.report.listing_url}>
-                <Fragment set:html={Icon({ name: "external-link", size: 14 })} />
-                {snapshot.report.listing_url}
-              </a>
-            </div>
             <div class="report-summary-card">
               <span class="report-outline-label">Summary</span>
               <p>
                 In this report you will find all the stats about the {snapshot.report.address} listing,
-                including the number of times your listing was viewed, the age of the listing, showings,
-                and inquiries.
+                including how many times it was viewed across the web, REALTOR.ca, and social
+                media{showShowings ? ", along with showings," : ""} and how long it has been on the market.
               </p>
+              {siteTotalViews > 0 && (
+                <p>
+                  Over the same period, the {snapshot.client.name} website attracted{" "}
+                  {formatNumber(siteTotalViews)} page views — a built-in audience of active buyers your
+                  listing is positioned in front of from day one.
+                </p>
+              )}
             </div>
-            {snapshot.report.notes && (
-              <div class="report-notes-card">
-                <span class="report-outline-label">Notes</span>
-                <p>{snapshot.report.notes}</p>
-              </div>
-            )}
           </section>
         </section>
 
@@ -234,7 +245,17 @@ const Icon = ({ name, size = 18 }: IconProps) =>
             </div>
           </header>
 
-          <section class="report-widget-row report-widget-row-5" aria-label="Listing activity metrics">
+          {showNotes && (
+            <section class="report-notes-card" aria-label="Coordinator notes">
+              <span class="report-outline-label">Notes</span>
+              <p>{snapshot.report.notes}</p>
+            </section>
+          )}
+
+          <section
+            class:list={["report-widget-row", showShowings ? "report-widget-row-4" : "report-widget-row-3"]}
+            aria-label="Listing activity metrics"
+          >
             <article class="report-widget">
               <span class="report-widget-icon"><Fragment set:html={Icon({ name: "eye" })} /></span>
               <div class="report-widget-body">
@@ -256,20 +277,15 @@ const Icon = ({ name, size = 18 }: IconProps) =>
                 <strong>{formatNumber(snapshot.manual.days_on_market)} days</strong>
               </div>
             </article>
-            <article class="report-widget">
-              <span class="report-widget-icon"><Fragment set:html={Icon({ name: "people" })} /></span>
-              <div class="report-widget-body">
-                <span>Showings</span>
-                <strong>{formatNumber(snapshot.manual.showings)}</strong>
-              </div>
-            </article>
-            <article class="report-widget">
-              <span class="report-widget-icon"><Fragment set:html={Icon({ name: "message" })} /></span>
-              <div class="report-widget-body">
-                <span>Inquiries</span>
-                <strong>{formatNumber(inquiries)}</strong>
-              </div>
-            </article>
+            {showShowings && (
+              <article class="report-widget">
+                <span class="report-widget-icon"><Fragment set:html={Icon({ name: "people" })} /></span>
+                <div class="report-widget-body">
+                  <span>Showings</span>
+                  <strong>{formatNumber(snapshot.manual.showings)}</strong>
+                </div>
+              </article>
+            )}
           </section>
 
           <section class="report-table-card" aria-label="Marketing source breakdown">
@@ -307,7 +323,7 @@ const Icon = ({ name, size = 18 }: IconProps) =>
                   <strong>{formatNumber(averageDailyViews)}</strong>
                   <span class="report-readout-trend"><Fragment set:html={Icon({ name: "trending-up", size: 20 })} /></span>
                 </div>
-                <p>Listing page views distributed across the current days on market.</p>
+                <p>Combined website, REALTOR.ca, and social views averaged across the days on market.</p>
               </article>
             </section>
           )}

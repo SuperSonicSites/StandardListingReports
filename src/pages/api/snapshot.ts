@@ -74,7 +74,8 @@ function allowedMediaHost(url: string) {
       host === "fbcdn.net" ||
       host.endsWith(".fbcdn.net") ||
       host === "cdninstagram.com" ||
-      host.endsWith(".cdninstagram.com")
+      host.endsWith(".cdninstagram.com") ||
+      host === "cdn.realtor.ca"
     );
   } catch {
     return false;
@@ -140,6 +141,7 @@ export const POST: APIRoute = async ({ request }) => {
   const endDate = field(form, "end_date");
   const facebookPostUrl = field(form, "facebook_post_url");
   const instagramPostUrl = field(form, "instagram_post_url");
+  const realtorUrl = field(form, "realtor_url");
 
   if (!address || !listingUrl || !startDate || !endDate) {
     return errorPage(400, "Address, listing URL, start date, and end date are required.", backHref);
@@ -166,13 +168,16 @@ export const POST: APIRoute = async ({ request }) => {
       return errorPage(400, `${label} must be a valid http(s) link.`, backHref);
     }
   }
+  if (realtorUrl && !isHttpUrl(realtorUrl)) {
+    return errorPage(400, "REALTOR.ca URL must be a valid http(s) link.", backHref);
+  }
 
   const numbers = {
     website_views: numberField(form, "website_views"),
     facebook_views: numberField(form, "facebook_views"),
     instagram_views: numberField(form, "instagram_views"),
+    site_total_views: numberField(form, "site_total_views"),
     realtor_listing_views: numberField(form, "realtor_listing_views"),
-    inquiries: numberField(form, "inquiries"),
     showings: numberField(form, "showings"),
     days_on_market: numberField(form, "days_on_market")
   };
@@ -187,10 +192,11 @@ export const POST: APIRoute = async ({ request }) => {
     return errorPage(400, "Report data must be reviewed and approved before creation.", backHref);
   }
 
-  const [logo, facebookMedia, instagramMedia] = await Promise.all([
+  const [logo, facebookMedia, instagramMedia, propertyImage] = await Promise.all([
     embedImage(client.logo_url, true),
     embedImage(field(form, "facebook_media_url")),
-    embedImage(field(form, "instagram_media_url"))
+    embedImage(field(form, "instagram_media_url")),
+    embedImage(field(form, "property_image_url"))
   ]);
 
   const snapshot: ReportSnapshot = {
@@ -211,11 +217,17 @@ export const POST: APIRoute = async ({ request }) => {
       end_date: endDate,
       listing_url: listingUrl,
       created_at: new Date().toISOString(),
-      notes: field(form, "notes").slice(0, MAX_NOTES_CHARS)
+      notes: field(form, "notes").slice(0, MAX_NOTES_CHARS),
+      realtor_url: realtorUrl,
+      property_image: propertyImage,
+      // Checkboxes are "hide" so an unticked (absent) box means "display".
+      show_showings: field(form, "hide_showings") !== "yes",
+      show_notes: field(form, "hide_notes") !== "yes"
     },
     website: {
       source: sourceField(form, "website_source"),
-      listing_views: numbers.website_views!
+      listing_views: numbers.website_views!,
+      site_total_views: numbers.site_total_views!
     },
     facebook: {
       source: sourceField(form, "facebook_source"),
@@ -233,7 +245,6 @@ export const POST: APIRoute = async ({ request }) => {
     },
     manual: {
       realtor_listing_views: numbers.realtor_listing_views!,
-      inquiries: numbers.inquiries!,
       showings: numbers.showings!,
       days_on_market: numbers.days_on_market!
     },

@@ -1,28 +1,9 @@
-import { existsSync } from "node:fs";
 import type { APIRoute } from "astro";
 import puppeteer from "puppeteer-core";
+import { browserPath } from "../../../lib/chrome";
 import { readSnapshot, slugify } from "../../../lib/storage";
 
 export const prerender = false;
-
-const chromeCandidates = [
-  // .env values land on import.meta.env under Astro/Vite; process.env only holds real
-  // runtime env vars (the built server never loads .env). Check both.
-  process.env.CHROME_PATH,
-  import.meta.env.CHROME_PATH,
-  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-  "/usr/bin/google-chrome",
-  "/usr/bin/chromium",
-  "/usr/bin/chromium-browser"
-].filter(Boolean) as string[];
-
-function browserPath() {
-  return chromeCandidates.find((candidate) => existsSync(candidate));
-}
 
 export const GET: APIRoute = async ({ params, request }) => {
   const snapshotId = params.snapshotId ?? "";

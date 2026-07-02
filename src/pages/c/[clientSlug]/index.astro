@@ -33,6 +33,8 @@ try {
         <input type="hidden" name="client_slug" value={client.slug} />
         <input type="hidden" name="facebook_media_url" value="" />
         <input type="hidden" name="instagram_media_url" value="" />
+        <input type="hidden" name="property_image_url" value="" />
+        <input type="hidden" name="site_total_views" value="0" />
         <input type="hidden" name="website_source" value="manual" />
         <input type="hidden" name="facebook_source" value="manual" />
         <input type="hidden" name="instagram_source" value="manual" />
@@ -100,6 +102,16 @@ try {
                 required
               />
             </label>
+            <label class="client-field wide">
+              <span>REALTOR.ca URL</span>
+              <input
+                class="client-url-input"
+                type="url"
+                name="realtor_url"
+                placeholder="https://www.realtor.ca/real-estate/..."
+              />
+              <small>Pull data captures the listing's first photo from this page for the report cover.</small>
+            </label>
           </div>
         </section>
 
@@ -117,10 +129,6 @@ try {
               <input type="number" min="0" name="showings" placeholder="0" required />
             </label>
             <label class="client-field">
-              <span>Inquiries</span>
-              <input type="number" min="0" name="inquiries" placeholder="0" required />
-            </label>
-            <label class="client-field">
               <span>Days on market</span>
               <input type="number" min="0" name="days_on_market" placeholder="0" required />
             </label>
@@ -129,6 +137,10 @@ try {
               <input type="number" min="0" name="realtor_listing_views" placeholder="0" required />
             </label>
           </div>
+          <label class="client-toggle">
+            <input type="checkbox" name="hide_showings" value="yes" />
+            <span>Do not display showings on the report</span>
+          </label>
         </section>
 
         <section class="client-form-card client-pull-card" data-pull-card>
@@ -169,6 +181,17 @@ try {
                       required
                     />
                     <small>listing page views</small>
+                  </div>
+                </div>
+              </article>
+
+              <article class="import-review-card" data-notice-anchor="realtor">
+                <div class="import-review-head">
+                  <div>
+                    <span class="source-badge" data-source-badge="realtor">REALTOR.ca</span>
+                    <h3>Listing photo</h3>
+                    <p>The listing's first REALTOR.ca photo, shown on the report cover.</p>
+                    <img class="post-media-preview" data-media-preview="realtor" alt="REALTOR.ca listing photo (appears on the report cover)" hidden />
                   </div>
                 </div>
               </article>
@@ -235,9 +258,13 @@ try {
           <div class="client-field-grid two">
             <label class="client-field wide">
               <span>Notes</span>
-              <textarea name="notes" rows="4" maxlength="600" placeholder="Optional summary shown on the report cover."></textarea>
+              <textarea name="notes" rows="4" maxlength="600" placeholder="Optional notes shown on the report's performance page."></textarea>
             </label>
           </div>
+          <label class="client-toggle">
+            <input type="checkbox" name="hide_notes" value="yes" />
+            <span>Do not display notes on the report</span>
+          </label>
         </section>
 
         <div class="client-submit-panel">
@@ -282,8 +309,11 @@ try {
         }
 
         // One notice element per block, updated in place so refreshes replace stale text.
+        // Blocks without metric inputs (the REALTOR.ca photo) anchor via data-notice-anchor.
         function setNotice(key: string, message: string | null) {
-          const target = noticeTarget(groups[key][0]);
+          const target =
+            document.querySelector(`[data-notice-anchor="${key}"]`) ??
+            (groups[key]?.length ? noticeTarget(groups[key][0]) : null);
           if (!target) return;
           let notice = target.querySelector("[data-fetch-notice]") as HTMLElement | null;
           if (!message) {
@@ -305,6 +335,11 @@ try {
           if (source === "mock") badge.textContent = "Rybbit — demo data";
           else if (source === "manual") badge.textContent = "Rybbit — manual";
           else badge.textContent = "Rybbit — pulled";
+        }
+
+        function setRealtorBadge(found: boolean) {
+          const badge = document.querySelector('[data-source-badge="realtor"]');
+          if (badge) badge.textContent = found ? "REALTOR.ca — photo captured" : "REALTOR.ca — no photo";
         }
 
         // Facebook and Instagram share one card (and one badge) — reflect BOTH results,
@@ -350,6 +385,7 @@ try {
             listing_url: field("listing_url")?.value ?? "",
             facebook_post_url: field("facebook_post_url")?.value ?? "",
             instagram_post_url: field("instagram_post_url")?.value ?? "",
+            realtor_url: field("realtor_url")?.value ?? "",
             start_date: field("start_date")?.value ?? "",
             end_date: field("end_date")?.value ?? ""
           };
@@ -371,10 +407,18 @@ try {
               applyBlock(
                 "website",
                 data.website.source,
-                { website_views: data.website.listing_views },
+                { website_views: data.website.listing_views, site_total_views: data.website.site_total_views },
                 data.website.warnings?.[0] ?? null
               );
               setWebsiteBadge(data.website.source);
+
+              // REALTOR.ca photo: hidden URL field + visible preview; no numbers to fill.
+              if (data.realtor?.image_url) {
+                setVal("property_image_url", data.realtor.image_url);
+                setMediaPreview("realtor", data.realtor.image_url);
+              }
+              setRealtorBadge(Boolean(data.realtor?.image_url));
+              setNotice("realtor", data.realtor?.warnings?.[0] ?? null);
 
               const facebookFills: Record<string, unknown> = {
                 facebook_views: data.facebook.views
@@ -418,6 +462,8 @@ try {
               });
               setWebsiteBadge("manual");
               setSocialBadge("manual", "manual");
+              setRealtorBadge(false);
+              setNotice("realtor", "Photo capture unavailable — the report will render without a listing photo.");
               if (statusText) statusText.textContent = "Pull failed";
               if (statusDetail) statusDetail.textContent = "The data sources could not be reached. Enter the numbers manually below.";
             }

@@ -239,7 +239,7 @@ const Icon = ({ name, size = 18 }: IconProps) =>
             <article class="report-widget">
               <span class="report-widget-icon"><Fragment set:html={Icon({ name: "eye" })} /></span>
               <div class="report-widget-body">
-                <span>Website views</span>
+                <span>Website</span>
                 <strong>{formatNumber(snapshot.website.listing_views)}</strong>
               </div>
             </article>
@@ -253,7 +253,7 @@ const Icon = ({ name, size = 18 }: IconProps) =>
             <article class="report-widget">
               <span class="report-widget-icon"><Fragment set:html={Icon({ name: "clock" })} /></span>
               <div class="report-widget-body">
-                <span>Days on market</span>
+                <span>On market</span>
                 <strong>{formatNumber(snapshot.manual.days_on_market)} days</strong>
               </div>
             </article>

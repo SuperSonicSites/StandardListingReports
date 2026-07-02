@@ -513,6 +513,28 @@ code {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.logo-preview {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.logo-preview span {
+  color: var(--ss-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.logo-preview img {
+  max-width: 180px;
+  max-height: 64px;
+  object-fit: contain;
+  border: 1px solid var(--ss-border);
+  border-radius: var(--ss-radius-sm);
+  padding: 8px;
+  background: #ffffff;
+}
+
 label {
   display: grid;
   gap: 7px;

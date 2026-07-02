@@ -7,9 +7,11 @@ interface Props {
 
 const { client } = Astro.props;
 const isEdit = Boolean(client);
+// Uploaded logos are stored as data URIs — never prefill those into the URL input.
+const logoUrlValue = client?.logo_url.startsWith("data:") ? "" : (client?.logo_url ?? "");
 ---
 
-<form class="entry-form" method="post" action="/api/client">
+<form class="entry-form" method="post" action="/api/client" enctype="multipart/form-data">
   <input type="hidden" name="mode" value={isEdit ? "edit" : "create"} />
   <section class="form-section">
     <h2>Brand</h2>
@@ -31,9 +33,20 @@ const isEdit = Boolean(client);
         <span>{isEdit ? "Slug can't be changed after creation." : "Lowercase letters, numbers, and hyphens."}</span>
       </label>
       <label>
-        Logo URL
-        <input name="logo_url" value={client?.logo_url ?? ""} placeholder="/clients/acme-realty/logo.svg" required />
+        Logo upload
+        <input type="file" name="logo_file" accept="image/png,image/jpeg,image/svg+xml,image/webp" />
+        <span>PNG, JPEG, SVG, or WebP, up to 1 MB.{isEdit && " Leave empty to keep the current logo."}</span>
       </label>
+      <label>
+        Logo URL (alternative to upload)
+        <input name="logo_url" value={logoUrlValue} placeholder="https://acmerealty.com/logo.svg" />
+      </label>
+      {isEdit && client?.logo_url && (
+        <div class="logo-preview">
+          <span>Current logo</span>
+          <img src={client.logo_url} alt={`${client.name} logo`} />
+        </div>
+      )}
       <label>
         Footer text
         <input name="footer_text" value={client?.footer_text ?? ""} placeholder="Acme Realty Team | Kelowna, BC" required />

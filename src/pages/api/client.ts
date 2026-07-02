@@ -1,11 +1,18 @@
+import { Buffer } from "node:buffer";
 import type { APIRoute } from "astro";
-import { clientExists, slugify, writeClient } from "../../lib/storage";
+import { clientExists, readClient, slugify, writeClient } from "../../lib/storage";
 import type { ClientProfile } from "../../lib/types";
 
 export const prerender = false;
 
 const hex = /^#[0-9a-fA-F]{6}$/;
 const digits = /^[0-9]{1,32}$/;
+
+// Uploaded logos are stored as data URIs inside the client profile JSON itself:
+// data/clients/ already lives on the persistent volume, and snapshot creation passes
+// data URIs through untouched, so frozen reports keep the exact logo bytes forever.
+const LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/svg+xml", "image/webp"]);
+const MAX_LOGO_BYTES = 1_000_000;
 
 function field(form: FormData, name: string) {
   return String(form.get(name) ?? "").trim();
@@ -32,20 +39,40 @@ export const POST: APIRoute = async ({ request }) => {
   const form = await request.formData();
   const name = field(form, "name");
   const slug = slugify(field(form, "slug") || name);
-  const logoUrl = field(form, "logo_url");
+  const isEdit = field(form, "mode") === "edit";
 
   if (!name || !slug) {
     return errorPage(400, "Client name and slug are required.");
   }
 
-  // A white-label profile must carry its own logo — never another client's.
-  if (!logoUrl) {
-    return errorPage(400, "Logo URL is required (a local /clients/... path or an https link).");
+  // Creating must not silently overwrite an existing profile; edits declare themselves.
+  if (!isEdit && (await clientExists(slug))) {
+    return errorPage(409, `A client with the slug "${slug}" already exists. Edit it from the home page instead.`);
   }
 
-  // Creating must not silently overwrite an existing profile; edits declare themselves.
-  if (field(form, "mode") !== "edit" && (await clientExists(slug))) {
-    return errorPage(409, `A client with the slug "${slug}" already exists. Edit it from the home page instead.`);
+  // Logo resolution order: uploaded file > pasted URL > (on edit) the existing logo.
+  // A white-label profile must carry its own logo — never another client's.
+  let logoUrl = field(form, "logo_url");
+  const logoFile = form.get("logo_file");
+  if (logoFile instanceof File && logoFile.size > 0) {
+    if (!LOGO_TYPES.has(logoFile.type)) {
+      return errorPage(400, "Logo must be a PNG, JPEG, SVG, or WebP image.");
+    }
+    if (logoFile.size > MAX_LOGO_BYTES) {
+      return errorPage(400, "Logo file is too large — keep it under 1 MB.");
+    }
+    const bytes = Buffer.from(await logoFile.arrayBuffer());
+    logoUrl = `data:${logoFile.type};base64,${bytes.toString("base64")}`;
+  }
+  if (!logoUrl && isEdit) {
+    try {
+      logoUrl = (await readClient(slug)).logo_url;
+    } catch {
+      // fall through to the required-logo error below
+    }
+  }
+  if (!logoUrl) {
+    return errorPage(400, "A logo is required — upload an image file or paste an https link.");
   }
 
   // A malformed integration ID must be rejected, not silently dropped — otherwise the

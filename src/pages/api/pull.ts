@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { canAccessClient } from "../../lib/auth";
 import { readClient } from "../../lib/storage";
 import { fetchFacebookPostMetrics, fetchInstagramMediaMetrics } from "../../lib/meta";
-import { fetchRealtorListingPhoto } from "../../lib/realtor";
+import { fetchRealtorAdminStats } from "../../lib/realtor";
 import { fetchRybbitListingViews, fetchRybbitSiteTotalViews } from "../../lib/rybbit";
 
 export const prerender = false;
@@ -31,19 +31,19 @@ export const POST: APIRoute = async ({ request }) => {
   const listingUrl = String(body.listing_url ?? "");
   const facebookUrl = String(body.facebook_post_url ?? "");
   const instagramUrl = String(body.instagram_post_url ?? "");
-  const realtorUrl = String(body.realtor_url ?? "");
+  const realtorAdminUrl = String(body.realtor_admin_url ?? "");
   const startDate = String(body.start_date ?? "");
   const endDate = String(body.end_date ?? "");
 
   // Each adapter call NEVER throws; it returns a typed result carrying its own `source` +
   // optional warning. Run everything concurrently — sequentially the per-request timeouts
   // stack up to a minute-plus hang behind the form's "Pulling..." button.
-  const [web, siteTotal, fb, ig, photo] = await Promise.all([
+  const [web, siteTotal, fb, ig, realtorStats] = await Promise.all([
     fetchRybbitListingViews(client.rybbit_site_id, listingUrl, startDate, endDate),
     fetchRybbitSiteTotalViews(client.rybbit_site_id, startDate, endDate),
     fetchFacebookPostMetrics(client.meta_page_id, facebookUrl),
     fetchInstagramMediaMetrics(client.meta_instagram_id, instagramUrl),
-    fetchRealtorListingPhoto(realtorUrl)
+    fetchRealtorAdminStats(realtorAdminUrl)
   ]);
 
   const website = {
@@ -67,9 +67,11 @@ export const POST: APIRoute = async ({ request }) => {
     warnings: ig.warning ? [ig.warning] : []
   };
   const realtor = {
-    source: photo.source,
-    image_url: photo.image_url,
-    warnings: photo.warning ? [photo.warning] : []
+    source: realtorStats.source,
+    total_views: realtorStats.total_views,
+    days_on_market: realtorStats.days_on_market,
+    image_url: realtorStats.image_url,
+    warnings: realtorStats.warning ? [realtorStats.warning] : []
   };
 
   return new Response(

@@ -103,14 +103,18 @@ try {
               />
             </label>
             <label class="client-field wide">
-              <span>REALTOR.ca URL</span>
+              <span>REALTOR.ca Admin URL</span>
               <input
                 class="client-url-input"
                 type="url"
-                name="realtor_url"
-                placeholder="https://www.realtor.ca/real-estate/..."
+                name="realtor_admin_url"
+                placeholder="https://member.realtor.ca/Reports/ListingDestination/..."
               />
-              <small>Pull data captures the listing's first photo from this page for the report cover.</small>
+              <small>
+                Tip: signed in to REALTOR.ca, the top-right corner of your listing has a SHARE LISTING
+                button — you can share the link with yourself and then paste it here. Pull data reads
+                total views, days on market, and the listing photo from it.
+              </small>
             </label>
           </div>
         </section>
@@ -127,14 +131,6 @@ try {
             <label class="client-field">
               <span>Showings</span>
               <input type="number" min="0" name="showings" placeholder="0" required />
-            </label>
-            <label class="client-field">
-              <span>Days on market</span>
-              <input type="number" min="0" name="days_on_market" placeholder="0" required />
-            </label>
-            <label class="client-field">
-              <span>REALTOR.ca views</span>
-              <input type="number" min="0" name="realtor_listing_views" placeholder="0" required />
             </label>
           </div>
           <label class="client-toggle">
@@ -189,9 +185,31 @@ try {
                 <div class="import-review-head">
                   <div>
                     <span class="source-badge" data-source-badge="realtor">REALTOR.ca</span>
-                    <h3>Listing photo</h3>
-                    <p>The listing's first REALTOR.ca photo, shown on the report cover.</p>
+                    <h3>REALTOR.ca performance</h3>
+                    <p>All-time listing views, days on market, and the listing's first photo (shown on the report cover) — pulled from the Admin URL.</p>
                     <img class="post-media-preview" data-media-preview="realtor" alt="REALTOR.ca listing photo (appears on the report cover)" hidden />
+                  </div>
+                </div>
+                <div class="post-review-list">
+                  <div class="post-review-row">
+                    <div>
+                      <strong>Listing stats</strong>
+                      <p>Total views is all-time, regardless of the report period.</p>
+                    </div>
+                    <dl>
+                      <div>
+                        <dt>Total views</dt>
+                        <dd>
+                          <input class="import-metric-input" type="number" min="0" name="realtor_listing_views" value="0" required />
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Days on market</dt>
+                        <dd>
+                          <input class="import-metric-input" type="number" min="0" name="days_on_market" value="0" required />
+                        </dd>
+                      </div>
+                    </dl>
                   </div>
                 </div>
               </article>
@@ -337,9 +355,9 @@ try {
           else badge.textContent = "Rybbit — pulled";
         }
 
-        function setRealtorBadge(found: boolean) {
+        function setRealtorBadge(pulled: boolean) {
           const badge = document.querySelector('[data-source-badge="realtor"]');
-          if (badge) badge.textContent = found ? "REALTOR.ca — photo captured" : "REALTOR.ca — no photo";
+          if (badge) badge.textContent = pulled ? "REALTOR.ca — pulled" : "REALTOR.ca — manual";
         }
 
         // Facebook and Instagram share one card (and one badge) — reflect BOTH results,
@@ -385,7 +403,7 @@ try {
             listing_url: field("listing_url")?.value ?? "",
             facebook_post_url: field("facebook_post_url")?.value ?? "",
             instagram_post_url: field("instagram_post_url")?.value ?? "",
-            realtor_url: field("realtor_url")?.value ?? "",
+            realtor_admin_url: field("realtor_admin_url")?.value ?? "",
             start_date: field("start_date")?.value ?? "",
             end_date: field("end_date")?.value ?? ""
           };
@@ -412,13 +430,17 @@ try {
               );
               setWebsiteBadge(data.website.source);
 
-              // REALTOR.ca photo: hidden URL field + visible preview; no numbers to fill.
-              if (data.realtor?.image_url) {
-                setVal("property_image_url", data.realtor.image_url);
-                setMediaPreview("realtor", data.realtor.image_url);
+              // REALTOR.ca: partial capture is normal — only overwrite what was actually
+              // read (null means "not captured", never wipe a typed value back to 0).
+              const realtor = data.realtor ?? {};
+              if (realtor.total_views != null) setVal("realtor_listing_views", realtor.total_views);
+              if (realtor.days_on_market != null) setVal("days_on_market", realtor.days_on_market);
+              if (realtor.image_url) {
+                setVal("property_image_url", realtor.image_url);
+                setMediaPreview("realtor", realtor.image_url);
               }
-              setRealtorBadge(Boolean(data.realtor?.image_url));
-              setNotice("realtor", data.realtor?.warnings?.[0] ?? null);
+              setRealtorBadge(realtor.source === "realtor_page");
+              setNotice("realtor", realtor.warnings?.[0] ?? null);
 
               const facebookFills: Record<string, unknown> = {
                 facebook_views: data.facebook.views
@@ -463,7 +485,7 @@ try {
               setWebsiteBadge("manual");
               setSocialBadge("manual", "manual");
               setRealtorBadge(false);
-              setNotice("realtor", "Photo capture unavailable — the report will render without a listing photo.");
+              setNotice("realtor", "REALTOR.ca capture unavailable — enter views and days on market manually.");
               if (statusText) statusText.textContent = "Pull failed";
               if (statusDetail) statusDetail.textContent = "The data sources could not be reached. Enter the numbers manually below.";
             }

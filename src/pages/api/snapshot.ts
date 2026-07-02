@@ -141,7 +141,7 @@ export const POST: APIRoute = async ({ request }) => {
   const endDate = field(form, "end_date");
   const facebookPostUrl = field(form, "facebook_post_url");
   const instagramPostUrl = field(form, "instagram_post_url");
-  const realtorUrl = field(form, "realtor_url");
+  const realtorUrl = field(form, "realtor_admin_url");
 
   if (!address || !listingUrl || !startDate || !endDate) {
     return errorPage(400, "Address, listing URL, start date, and end date are required.", backHref);
@@ -169,7 +169,7 @@ export const POST: APIRoute = async ({ request }) => {
     }
   }
   if (realtorUrl && !isHttpUrl(realtorUrl)) {
-    return errorPage(400, "REALTOR.ca URL must be a valid http(s) link.", backHref);
+    return errorPage(400, "REALTOR.ca Admin URL must be a valid http(s) link.", backHref);
   }
 
   const numbers = {

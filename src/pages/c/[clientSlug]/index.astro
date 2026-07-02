@@ -1,0 +1,480 @@
+---
+import AppLayout from "../../../layouts/AppLayout.astro";
+import { readClient } from "../../../lib/storage";
+
+const clientSlug = Astro.params.clientSlug ?? "";
+let client;
+
+try {
+  client = await readClient(clientSlug);
+} catch {
+  Astro.response.status = 404;
+}
+---
+
+<AppLayout title={client ? `New Report | ${client.name}` : "Client Not Found"} className="client-form-body">
+  {client ? (
+    <main class="client-workspace">
+      <header class="client-form-hero">
+        <div>
+          <h1>Create Listing Report</h1>
+          <p>
+            Follow the steps below: add the listing details, pull the
+            performance data (or enter it by hand), then review and create the report.
+          </p>
+        </div>
+      </header>
+
+      <form id="report-form" class="client-report-form" method="post" action="/api/snapshot">
+        <input type="hidden" name="client_slug" value={client.slug} />
+        <input type="hidden" name="facebook_media_url" value="" />
+        <input type="hidden" name="instagram_media_url" value="" />
+        <input type="hidden" name="website_source" value="manual" />
+        <input type="hidden" name="facebook_source" value="manual" />
+        <input type="hidden" name="instagram_source" value="manual" />
+
+        <section class="client-form-card">
+          <div class="client-section-header">
+            <span>01</span>
+            <div>
+              <h2>Listing</h2>
+              <p>The property and reporting window for this seller report.</p>
+            </div>
+          </div>
+          <div class="client-field-grid two">
+            <label class="client-field wide">
+              <span>Address</span>
+              <input name="address" placeholder="985 Academy Way Unit 208" required />
+            </label>
+            <label class="client-field">
+              <span>Start date</span>
+              <input type="date" name="start_date" required />
+            </label>
+            <label class="client-field">
+              <span>End date</span>
+              <input type="date" name="end_date" required />
+            </label>
+          </div>
+        </section>
+
+        <section class="client-form-card">
+          <div class="client-section-header">
+            <span>02</span>
+            <div>
+              <h2>Links</h2>
+              <p>Website and social post URLs used to pull performance.</p>
+            </div>
+          </div>
+          <div class="client-field-grid two">
+            <label class="client-field wide">
+              <span>Website URL</span>
+              <input
+                class="client-url-input"
+                type="url"
+                name="listing_url"
+                placeholder="https://your-site.com/listings/985-academy-way-unit-208"
+                required
+              />
+            </label>
+            <label class="client-field wide">
+              <span>Facebook URL</span>
+              <input
+                class="client-url-input"
+                type="url"
+                name="facebook_post_url"
+                placeholder="https://www.facebook.com/share/p/..."
+                required
+              />
+            </label>
+            <label class="client-field wide">
+              <span>Instagram URL</span>
+              <input
+                class="client-url-input"
+                type="url"
+                name="instagram_post_url"
+                placeholder="https://www.instagram.com/p/..."
+                required
+              />
+            </label>
+          </div>
+        </section>
+
+        <section class="client-form-card">
+          <div class="client-section-header">
+            <span>03</span>
+            <div>
+              <h2>Manually entered data</h2>
+              <p>Numbers entered by hand for this reporting period.</p>
+            </div>
+          </div>
+          <div class="client-field-grid two">
+            <label class="client-field">
+              <span>Showings</span>
+              <input type="number" min="0" name="showings" placeholder="0" required />
+            </label>
+            <label class="client-field">
+              <span>Inquiries</span>
+              <input type="number" min="0" name="inquiries" placeholder="0" required />
+            </label>
+            <label class="client-field">
+              <span>Days on market</span>
+              <input type="number" min="0" name="days_on_market" placeholder="0" required />
+            </label>
+            <label class="client-field">
+              <span>REALTOR.ca views</span>
+              <input type="number" min="0" name="realtor_listing_views" placeholder="0" required />
+            </label>
+          </div>
+        </section>
+
+        <section class="client-form-card client-pull-card" data-pull-card>
+          <div class="client-section-header">
+            <span>04</span>
+            <div>
+              <h2>Performance data</h2>
+              <p>Pull the numbers from the listing and social sources, or type them in directly.</p>
+            </div>
+          </div>
+          <div class="client-review-area">
+            <div class="client-pull-strip">
+              <div class="client-pull-status">
+                <span aria-hidden="true"></span>
+                <div>
+                  <strong data-pull-status>Ready to pull data</strong>
+                  <small data-pull-detail>Pull website and social performance, then review and correct the numbers below. You can also enter everything manually.</small>
+                </div>
+              </div>
+              <button class="client-pull-button" type="button" data-pull-trigger>Pull data</button>
+            </div>
+
+            <div class="import-review-stack" data-review-stack>
+              <article class="import-review-card">
+                <div class="import-review-head">
+                  <div>
+                    <span class="source-badge" data-source-badge="website">Rybbit</span>
+                    <h3>Website analytics</h3>
+                    <p>Listing traffic for the selected reporting window.</p>
+                  </div>
+                  <div class="import-primary-metric">
+                    <input
+                      class="import-metric-input"
+                      type="number"
+                      min="0"
+                      name="website_views"
+                      value="0"
+                      required
+                    />
+                    <small>listing page views</small>
+                  </div>
+                </div>
+              </article>
+
+              <article class="import-review-card">
+                <div class="import-review-head">
+                  <div>
+                    <span class="source-badge" data-source-badge="social">Meta</span>
+                    <h3>Social performance</h3>
+                    <p>Post-level views and engagement pulled from the provided links. Captions and images appear on the report — review them.</p>
+                  </div>
+                </div>
+                <div class="post-review-list">
+                  <div class="post-review-row">
+                    <div>
+                      <strong>Facebook post</strong>
+                      <img class="post-media-preview" data-media-preview="facebook" alt="Facebook post image (appears on the report)" hidden />
+                      <label class="post-caption-field">
+                        <span>Caption (appears on the report)</span>
+                        <textarea name="facebook_caption" rows="2" maxlength="300" placeholder="Filled by Pull data, or write your own."></textarea>
+                      </label>
+                    </div>
+                    <dl>
+                      <div>
+                        <dt>Views</dt>
+                        <dd>
+                          <input class="import-metric-input" type="number" min="0" name="facebook_views" value="0" required />
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Engagements</dt>
+                        <dd>
+                          <input class="import-metric-input" type="number" min="0" name="facebook_engagements" value="0" required />
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                  <div class="post-review-row">
+                    <div>
+                      <strong>Instagram post</strong>
+                      <img class="post-media-preview" data-media-preview="instagram" alt="Instagram post image (appears on the report)" hidden />
+                      <label class="post-caption-field">
+                        <span>Caption (appears on the report)</span>
+                        <textarea name="instagram_caption" rows="2" maxlength="300" placeholder="Filled by Pull data, or write your own."></textarea>
+                      </label>
+                    </div>
+                    <dl>
+                      <div>
+                        <dt>Views</dt>
+                        <dd>
+                          <input class="import-metric-input" type="number" min="0" name="instagram_views" value="0" required />
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Engagements</dt>
+                        <dd>
+                          <input class="import-metric-input" type="number" min="0" name="instagram_engagements" value="0" required />
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="client-form-card">
+          <div class="client-section-header">
+            <span>05</span>
+            <div>
+              <h2>Notes</h2>
+              <p>Seller-facing context added before approval.</p>
+            </div>
+          </div>
+          <div class="client-field-grid two">
+            <label class="client-field wide">
+              <span>Notes</span>
+              <textarea name="notes" rows="4" maxlength="600" placeholder="Optional summary shown on the report cover."></textarea>
+            </label>
+          </div>
+        </section>
+
+        <div class="client-submit-panel">
+          <label class="client-approval">
+            <input type="checkbox" name="approved" value="yes" required />
+            <span>
+              <strong>Review and approve</strong>
+              <small>I have reviewed the numbers, captions, images, and notes above.</small>
+            </span>
+          </label>
+          <button class="client-submit-button" type="submit" data-submit-button>Create Report</button>
+        </div>
+      </form>
+
+      <script>
+        const form = document.getElementById("report-form") as HTMLFormElement | null;
+        const pullButtons = document.querySelectorAll("[data-pull-trigger]");
+        const pullCard = document.querySelector("[data-pull-card]");
+        const statusText = document.querySelector("[data-pull-status]");
+        const statusDetail = document.querySelector("[data-pull-detail]");
+        const submitButton = document.querySelector("[data-submit-button]") as HTMLButtonElement | null;
+        const MAX_CAPTION = 300;
+
+        const groups: Record<string, string[]> = {
+          website: ["website_views"],
+          facebook: ["facebook_views", "facebook_engagements"],
+          instagram: ["instagram_views", "instagram_engagements"]
+        };
+
+        function field(name: string): HTMLInputElement | null {
+          return (form?.querySelector(`[name="${name}"]`) as HTMLInputElement | null) ?? null;
+        }
+
+        function setVal(name: string, value: unknown) {
+          const el = field(name);
+          if (el) el.value = String(value ?? 0);
+        }
+
+        function noticeTarget(name: string) {
+          const el = field(name);
+          return el?.closest(".post-review-row") ?? el?.closest(".import-review-card") ?? null;
+        }
+
+        // One notice element per block, updated in place so refreshes replace stale text.
+        function setNotice(key: string, message: string | null) {
+          const target = noticeTarget(groups[key][0]);
+          if (!target) return;
+          let notice = target.querySelector("[data-fetch-notice]") as HTMLElement | null;
+          if (!message) {
+            notice?.remove();
+            return;
+          }
+          if (!notice) {
+            notice = document.createElement("p");
+            notice.dataset.fetchNotice = "";
+            notice.className = "import-fetch-notice";
+            target.appendChild(notice);
+          }
+          notice.textContent = message;
+        }
+
+        function setWebsiteBadge(source: string) {
+          const badge = document.querySelector('[data-source-badge="website"]');
+          if (!badge) return;
+          if (source === "mock") badge.textContent = "Rybbit — demo data";
+          else if (source === "manual") badge.textContent = "Rybbit — manual";
+          else badge.textContent = "Rybbit — pulled";
+        }
+
+        // Facebook and Instagram share one card (and one badge) — reflect BOTH results,
+        // never let the second block's status overwrite the first's.
+        function setSocialBadge(fbSource: string, igSource: string) {
+          const badge = document.querySelector('[data-source-badge="social"]');
+          if (!badge) return;
+          if (fbSource === "mock" || igSource === "mock") badge.textContent = "Meta — demo data";
+          else if (fbSource === "manual" && igSource === "manual") badge.textContent = "Meta — manual";
+          else if (fbSource === "manual" || igSource === "manual") badge.textContent = "Meta — partial";
+          else badge.textContent = "Meta — pulled";
+        }
+
+        function setMediaPreview(key: string, url: string) {
+          const preview = document.querySelector(`[data-media-preview="${key}"]`) as HTMLImageElement | null;
+          if (preview && url) {
+            preview.src = url;
+            preview.hidden = false;
+          }
+        }
+
+        function applyBlock(key: string, source: string, fills: Record<string, unknown>, warning: string | null) {
+          // A degraded block ("manual") keeps whatever the coordinator already typed —
+          // a failed refresh must never wipe corrections back to 0.
+          if (source !== "manual") {
+            Object.entries(fills).forEach(([name, value]) => setVal(name, value));
+          }
+          const sourceInput = field(`${key}_source`);
+          if (sourceInput) sourceInput.value = source;
+          if (source === "mock") {
+            setNotice(key, "Demo numbers — not pulled from real analytics.");
+          } else {
+            setNotice(key, warning);
+          }
+        }
+
+        async function pull(button: HTMLButtonElement) {
+          button.disabled = true;
+          button.textContent = "Pulling...";
+
+          const payload = {
+            client_slug: field("client_slug")?.value ?? "",
+            listing_url: field("listing_url")?.value ?? "",
+            facebook_post_url: field("facebook_post_url")?.value ?? "",
+            instagram_post_url: field("instagram_post_url")?.value ?? "",
+            start_date: field("start_date")?.value ?? "",
+            end_date: field("end_date")?.value ?? ""
+          };
+
+          let data: any = null;
+          try {
+            const response = await fetch("/api/pull", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            });
+            if (response.ok) data = await response.json();
+          } catch {
+            // swallow — degrade below
+          }
+
+          try {
+            if (data) {
+              applyBlock(
+                "website",
+                data.website.source,
+                { website_views: data.website.listing_views },
+                data.website.warnings?.[0] ?? null
+              );
+              setWebsiteBadge(data.website.source);
+
+              const facebookFills: Record<string, unknown> = {
+                facebook_views: data.facebook.views,
+                facebook_engagements: data.facebook.engagements
+              };
+              applyBlock("facebook", data.facebook.source, facebookFills, data.facebook.warnings?.[0] ?? null);
+              if (data.facebook.source !== "manual") {
+                if (data.facebook.caption) setVal("facebook_caption", String(data.facebook.caption).slice(0, MAX_CAPTION));
+                if (data.facebook.media_url) {
+                  setVal("facebook_media_url", data.facebook.media_url);
+                  setMediaPreview("facebook", data.facebook.media_url);
+                }
+              }
+
+              const instagramFills: Record<string, unknown> = {
+                instagram_views: data.instagram.views,
+                instagram_engagements: data.instagram.engagements
+              };
+              applyBlock("instagram", data.instagram.source, instagramFills, data.instagram.warnings?.[0] ?? null);
+              if (data.instagram.source !== "manual") {
+                if (data.instagram.caption) setVal("instagram_caption", String(data.instagram.caption).slice(0, MAX_CAPTION));
+                if (data.instagram.media_url) {
+                  setVal("instagram_media_url", data.instagram.media_url);
+                  setMediaPreview("instagram", data.instagram.media_url);
+                }
+              }
+              setSocialBadge(data.facebook.source, data.instagram.source);
+
+              const warned = (data.warnings ?? []).length > 0;
+              pullCard?.classList.add("is-pulled");
+              if (statusText) statusText.textContent = warned ? "Data pulled — with warnings" : "Data pulled";
+              if (statusDetail) {
+                statusDetail.textContent = warned
+                  ? "Some sources could not be fetched — see the notes below and fill those numbers in manually."
+                  : "Review the values below, edit anything that looks off, then create the report.";
+              }
+            } else {
+              // Total failure (network/HTTP): everything stays editable; say so honestly.
+              Object.keys(groups).forEach((key) => {
+                const sourceInput = field(`${key}_source`);
+                if (sourceInput) sourceInput.value = "manual";
+                setNotice(key, "Auto-fetch unavailable. Please enter numbers manually.");
+              });
+              setWebsiteBadge("manual");
+              setSocialBadge("manual", "manual");
+              if (statusText) statusText.textContent = "Pull failed";
+              if (statusDetail) statusDetail.textContent = "The data sources could not be reached. Enter the numbers manually below.";
+            }
+          } finally {
+            pullButtons.forEach((trigger) => {
+              if (trigger instanceof HTMLButtonElement) {
+                trigger.disabled = false;
+                trigger.textContent = "Refresh data";
+              }
+            });
+          }
+        }
+
+        pullButtons.forEach((button) => {
+          button.addEventListener("click", () => {
+            if (button instanceof HTMLButtonElement) pull(button);
+          });
+        });
+
+        // Snapshot creation embeds images server-side and can take several seconds —
+        // block the double-submit that would create duplicate reports.
+        form?.addEventListener("submit", () => {
+          if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.textContent = "Creating report...";
+          }
+        });
+
+        // Coming back from a server-side validation error restores this page from the
+        // bfcache WITH the disabled button state — re-enable so the coordinator can fix
+        // the problem and resubmit.
+        window.addEventListener("pageshow", () => {
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = "Create Report";
+          }
+        });
+      </script>
+    </main>
+  ) : (
+    <main class="form-shell">
+      <section class="panel">
+        <p class="eyebrow">Missing client</p>
+        <h1>Client not found</h1>
+        <p>No local client profile exists for <code>{clientSlug}</code>.</p>
+        <a class="button primary" href="/admin/clients/new">Create client</a>
+      </section>
+    </main>
+  )}
+</AppLayout>

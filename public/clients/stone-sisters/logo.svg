@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="120" viewBox="0 0 420 120" role="img" aria-labelledby="title">
+  <title id="title">Stone Sisters placeholder logo</title>
+  <rect width="420" height="120" fill="#111111"/>
+  <path d="M54 78 L86 34 L118 78 Z" fill="none" stroke="#c9a86a" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M78 78 L102 46 L126 78 Z" fill="none" stroke="#ffffff" stroke-width="4" stroke-linejoin="round"/>
+  <text x="150" y="58" fill="#ffffff" font-family="Georgia, serif" font-size="28" letter-spacing="0">Stone Sisters</text>
+  <text x="152" y="82" fill="#c9a86a" font-family="Arial, sans-serif" font-size="13" letter-spacing="0">REAL ESTATE TEAM</text>
+</svg>

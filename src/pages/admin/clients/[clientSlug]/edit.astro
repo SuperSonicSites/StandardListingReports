@@ -1,0 +1,41 @@
+---
+import AppLayout from "../../../../layouts/AppLayout.astro";
+import ClientForm from "../../../../components/ClientForm.astro";
+import { readClient } from "../../../../lib/storage";
+
+const clientSlug = Astro.params.clientSlug ?? "";
+let client;
+
+try {
+  client = await readClient(clientSlug);
+} catch {
+  Astro.response.status = 404;
+}
+---
+
+<AppLayout title={client ? `Edit ${client.name} | Seller Report Generator` : "Client Not Found"} className="app-body">
+  <main class="form-shell">
+    {client ? (
+      <>
+        <header class="page-header">
+          <a class="back-link" href="/">Back to clients</a>
+          <p class="eyebrow">Local setup</p>
+          <h1>Edit client</h1>
+          <p>
+            This updates the JSON profile at <code>data/clients/{client.slug}.json</code>.
+            Reports already generated for this client keep their original branding.
+          </p>
+        </header>
+
+        <ClientForm client={client} />
+      </>
+    ) : (
+      <section class="panel">
+        <p class="eyebrow">Missing client</p>
+        <h1>Client not found</h1>
+        <p>No local client profile exists for <code>{clientSlug}</code>.</p>
+        <a class="button primary" href="/">Back to clients</a>
+      </section>
+    )}
+  </main>
+</AppLayout>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title">
+  <title id="title">Instagram listing post placeholder</title>
+  <defs>
+    <linearGradient id="wall" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#eef2f6"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#bfd0dd"/>
+      <stop offset="1" stop-color="#6f8798"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="760" fill="url(#wall)"/>
+  <rect x="112" y="96" width="976" height="568" rx="28" fill="#111111"/>
+  <rect x="152" y="136" width="896" height="488" rx="18" fill="#f8fafc"/>
+  <rect x="198" y="182" width="416" height="374" rx="12" fill="url(#glass)"/>
+  <path d="M228 515 C305 438 382 474 448 398 C506 332 548 343 614 276 L614 556 L198 556 Z" fill="#ffffff" opacity="0.86"/>
+  <rect x="672" y="196" width="290" height="34" rx="6" fill="#c9a86a"/>
+  <rect x="672" y="256" width="244" height="18" rx="4" fill="#2a3441" opacity="0.88"/>
+  <rect x="672" y="292" width="318" height="18" rx="4" fill="#2a3441" opacity="0.3"/>
+  <rect x="672" y="328" width="270" height="18" rx="4" fill="#2a3441" opacity="0.3"/>
+  <rect x="672" y="430" width="138" height="76" rx="10" fill="#f6efe2"/>
+  <rect x="836" y="430" width="138" height="76" rx="10" fill="#f6efe2"/>
+  <text x="702" y="478" fill="#111111" font-family="Arial, sans-serif" font-size="26" font-weight="700">Reach</text>
+  <text x="866" y="478" fill="#111111" font-family="Arial, sans-serif" font-size="26" font-weight="700">Saved</text>
+</svg>

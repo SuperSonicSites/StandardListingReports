@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title">
+  <title id="title">Facebook listing post placeholder</title>
+  <defs>
+    <linearGradient id="sky" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f7fbff"/>
+      <stop offset="1" stop-color="#d9e5ef"/>
+    </linearGradient>
+    <linearGradient id="home" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#2a3441"/>
+      <stop offset="1" stop-color="#111111"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="760" fill="url(#sky)"/>
+  <rect x="0" y="560" width="1200" height="200" fill="#c9a86a" opacity="0.22"/>
+  <path d="M90 585 C230 520 360 545 500 490 C675 420 835 450 1110 360 L1110 760 L90 760 Z" fill="#ffffff" opacity="0.88"/>
+  <path d="M260 430 L600 230 L940 430 L900 430 L900 620 L300 620 L300 430 Z" fill="url(#home)"/>
+  <path d="M230 436 L600 202 L970 436" fill="none" stroke="#c9a86a" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="382" y="462" width="118" height="158" fill="#f7f1e6"/>
+  <rect x="560" y="462" width="220" height="116" fill="#e6edf4"/>
+  <rect x="585" y="486" width="170" height="68" fill="#9fb4c4"/>
+  <rect x="90" y="88" width="282" height="76" rx="10" fill="#ffffff" opacity="0.94"/>
+  <text x="120" y="134" fill="#111111" font-family="Arial, sans-serif" font-size="28" font-weight="700">Just listed</text>
+  <text x="120" y="170" fill="#53606f" font-family="Arial, sans-serif" font-size="20">985 Academy Way Unit 208</text>
+</svg>

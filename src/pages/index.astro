@@ -1,0 +1,49 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+import { listClients } from "../lib/storage";
+
+const clients = await listClients();
+---
+
+<AppLayout title="Seller Report Generator" className="app-body">
+  <main class="app-shell">
+    <section class="app-hero">
+      <div>
+        <p class="eyebrow">Seller reports</p>
+        <h1>Seller Report Generator</h1>
+        <p>
+          Capture report details, freeze the numbers into a JSON snapshot,
+          and render a branded seller report that can be downloaded as a PDF.
+        </p>
+      </div>
+      <div class="hero-actions">
+        <a class="button primary" href="/admin/clients/new">Create client</a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Clients</p>
+          <h2>Available report endpoints</h2>
+        </div>
+      </div>
+
+      <div class="client-grid">
+        {clients.map((client) => (
+          <article class="client-card">
+            <img src={client.logo_url} alt={`${client.name} logo`} />
+            <div>
+              <h3>{client.name}</h3>
+              <p>{client.footer_text}</p>
+              <div class="client-card-links">
+                <a href={`/c/${client.slug}/`}>/c/{client.slug}/</a>
+                <a href={`/admin/clients/${client.slug}/edit`}>Edit</a>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  </main>
+</AppLayout>

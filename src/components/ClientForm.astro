@@ -1,0 +1,91 @@
+---
+import type { ClientProfile } from "../lib/types";
+
+interface Props {
+  client?: ClientProfile;
+}
+
+const { client } = Astro.props;
+const isEdit = Boolean(client);
+---
+
+<form class="entry-form" method="post" action="/api/client">
+  <input type="hidden" name="mode" value={isEdit ? "edit" : "create"} />
+  <section class="form-section">
+    <h2>Brand</h2>
+    <div class="field-grid two">
+      <label>
+        Client name
+        <input name="name" value={client?.name ?? ""} placeholder="Stone Sisters" required />
+      </label>
+      <label>
+        Client slug
+        <input
+          name="slug"
+          value={client?.slug ?? ""}
+          placeholder="stone-sisters"
+          pattern="[a-z0-9-]+"
+          required
+          readonly={isEdit}
+        />
+        <span>{isEdit ? "Slug can't be changed after creation." : "Lowercase letters, numbers, and hyphens."}</span>
+      </label>
+      <label>
+        Logo URL
+        <input name="logo_url" value={client?.logo_url ?? ""} placeholder="/clients/acme-realty/logo.svg" required />
+      </label>
+      <label>
+        Footer text
+        <input name="footer_text" value={client?.footer_text ?? ""} placeholder="Acme Realty Team | Kelowna, BC" required />
+      </label>
+      <label>
+        Primary color
+        <input type="color" name="brand_primary" value={client?.brand_primary ?? "#111111"} required />
+      </label>
+      <label>
+        Accent color
+        <input type="color" name="brand_accent" value={client?.brand_accent ?? "#c9a86a"} required />
+      </label>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <h2>Brokerage disclaimer</h2>
+    <div class="field-grid two">
+      <label>
+        Brokerage
+        <input name="brokerage_name" value={client?.brokerage_name ?? ""} placeholder="RE/MAX Kelowna" required />
+      </label>
+      <label>
+        Contact
+        <input name="brokerage_contact" value={client?.brokerage_contact ?? ""} placeholder="Acme Realty Team" required />
+      </label>
+      <label class="wide">
+        Brokerage address
+        <input name="brokerage_address" value={client?.brokerage_address ?? ""} placeholder="100-1553 Harvey Avenue, Kelowna, BC" required />
+      </label>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <h2>Integrations (optional)</h2>
+    <div class="field-grid two">
+      <label>
+        Facebook Page ID
+        <input name="meta_page_id" value={client?.meta_page_id ?? ""} pattern="[0-9]*" inputmode="numeric" />
+      </label>
+      <label>
+        Instagram account ID
+        <input name="meta_instagram_id" value={client?.meta_instagram_id ?? ""} pattern="[0-9]*" inputmode="numeric" />
+      </label>
+      <label>
+        Rybbit site ID
+        <input name="rybbit_site_id" value={client?.rybbit_site_id ?? ""} pattern="[0-9]*" inputmode="numeric" />
+      </label>
+    </div>
+  </section>
+
+  <div class="form-actions">
+    <button class="button primary" type="submit">{isEdit ? "Save changes" : "Create endpoint"}</button>
+  </div>
+</form>

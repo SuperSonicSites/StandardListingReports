@@ -1,0 +1,469 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import { formatDateRange, formatNumber } from "../../lib/format";
+import { readSnapshot } from "../../lib/storage";
+
+const snapshotId = Astro.params.snapshotId ?? "";
+const printMode = Astro.url.searchParams.get("print") === "1";
+let snapshot;
+
+try {
+  snapshot = await readSnapshot(snapshotId);
+  // Legacy snapshots (pre-Meta-reach-deprecation) stored the social metric as `reach`
+  // and have no `views` key — normalize at read time so old frozen reports still render.
+  for (const block of [snapshot.facebook, snapshot.instagram]) {
+    block.views ??= (block as unknown as { reach?: number }).reach ?? 0;
+  }
+} catch {
+  Astro.response.status = 404;
+}
+
+const socialViews = snapshot ? snapshot.facebook.views + snapshot.instagram.views : 0;
+const totalEngagements = snapshot ? snapshot.facebook.engagements + snapshot.instagram.engagements : 0;
+const dateRange = snapshot ? formatDateRange(snapshot.report.start_date, snapshot.report.end_date) : "";
+// Only meaningful once the listing has been on market at least a day — hidden otherwise.
+const daysOnMarket = snapshot?.manual.days_on_market ?? 0;
+const averageDailyViews = snapshot && daysOnMarket > 0 ? Math.round(snapshot.website.listing_views / daysOnMarket) : 0;
+const inquiries = snapshot?.manual.inquiries ?? 0;
+const clientReportHref = snapshot?.client.slug ? `/c/${snapshot.client.slug}/` : "/";
+const brokerageName = snapshot?.client.brokerage_name || snapshot?.client.name || "";
+const brokerageAddress = snapshot?.client.brokerage_address || "";
+const brokerageContact = snapshot?.client.brokerage_contact || snapshot?.client.footer_text || "";
+const hexColor = (value: string | undefined, fallback: string) =>
+  value && /^#[0-9a-fA-F]{6}$/.test(value) ? value : fallback;
+
+// Brand colors print as text/icons on white sheets. A light brand color (say #f2e3c6)
+// passes the hex check but is unreadable on paper — darken until it clears the
+// large-text contrast threshold (3:1 against white).
+function readableOnWhite(hex: string): string {
+  let [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const luminance = () => {
+    const chan = (c: number) => {
+      const s = c / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * chan(r) + 0.7152 * chan(g) + 0.0722 * chan(b);
+  };
+  while (1.05 / (luminance() + 0.05) < 3 && (r > 0 || g > 0 || b > 0)) {
+    r = Math.floor(r * 0.9);
+    g = Math.floor(g * 0.9);
+    b = Math.floor(b * 0.9);
+  }
+  const to2 = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${to2(r)}${to2(g)}${to2(b)}`;
+}
+
+const reportBrandStyle = snapshot
+  ? [
+      `--client-primary: ${readableOnWhite(hexColor(snapshot.client.brand_primary, "#222222"))}`,
+      `--client-accent: ${readableOnWhite(hexColor(snapshot.client.brand_accent, "#c9a86a"))}`
+    ].join("; ")
+  : undefined;
+
+// --- Small hand-authored inline icon set. Generic geometric line icons
+// only (no Facebook/Instagram logomarks) — sized via the `size`
+// prop, stroke-based, inherit color via currentColor. ---
+type IconName =
+  | "eye"
+  | "people"
+  | "calendar"
+  | "clock"
+  | "home"
+  | "message"
+  | "external-link"
+  | "globe"
+  | "trending-up"
+  | "camera"
+  | "building";
+
+const iconPaths: Record<IconName, string> = {
+  eye: '<path d="M1.5 9S4.5 3.5 9 3.5 16.5 9 16.5 9 13.5 14.5 9 14.5 1.5 9 1.5 9Z"/><circle cx="9" cy="9" r="2.5"/>',
+  people:
+    '<circle cx="6.5" cy="6" r="2.5"/><path d="M2 15c0-2.49 2.01-4.5 4.5-4.5S11 12.51 11 15"/><circle cx="13" cy="7" r="2"/><path d="M12 10.6c1.97.32 3.5 1.94 3.5 4.4"/>',
+  calendar:
+    '<rect x="2.25" y="3.5" width="13.5" height="12" rx="1.5"/><path d="M2.25 7.25h13.5"/><path d="M6 1.75v3"/><path d="M12 1.75v3"/>',
+  clock: '<circle cx="9" cy="9" r="7.25"/><path d="M9 5v4l2.75 1.75"/>',
+  home: '<path d="M2.5 8.5 9 2.75l6.5 5.75"/><path d="M4.25 7v8.25h9.5V7"/><path d="M7.25 15.25v-4.5h3.5v4.5"/>',
+  message:
+    '<path d="M2.5 4.25h13v8.5h-7.4L4.5 15v-2.25H2.5Z" stroke-linejoin="round"/>',
+  "external-link":
+    '<path d="M7.5 3.5h-4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-4"/><path d="M10.5 2.5h5v5"/><path d="M15.25 2.75 8.5 9.5"/>',
+  globe:
+    '<circle cx="9" cy="9" r="7.25"/><path d="M1.75 9h14.5"/><path d="M9 1.75c2.1 2.05 3.25 4.6 3.25 7.25s-1.15 5.2-3.25 7.25C6.9 14.2 5.75 11.65 5.75 9S6.9 3.8 9 1.75Z"/>',
+  "trending-up": '<path d="M2 13.5 7.25 8l3 3 5.75-6.5"/><path d="M12.5 4.25H16v3.5"/>',
+  camera:
+    '<rect x="1.75" y="5" width="14.5" height="10" rx="1.75"/><path d="M6 5l1.25-2h3.5L12 5"/><circle cx="9" cy="10" r="3"/>',
+  building:
+    '<rect x="3.5" y="2" width="11" height="14.25" rx="1"/><path d="M6.25 5.25h1.5M10.25 5.25h1.5M6.25 8.5h1.5M10.25 8.5h1.5M6.25 11.75h1.5M10.25 11.75h1.5"/><path d="M7.25 16.25V13.5h3.5v2.75"/>'
+};
+
+type IconProps = { name: IconName; size?: number };
+const Icon = ({ name, size = 18 }: IconProps) =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[name]}</svg>`;
+---
+
+<AppLayout title={snapshot ? `${snapshot.report.address} | Seller Report` : "Report Not Found"} className="report-body">
+  {snapshot ? (
+    <main class="report-frame" style={reportBrandStyle}>
+      {!printMode && (
+        <div class="report-toolbar">
+          <a class="back-link" href={clientReportHref}>Back</a>
+          <a class="button primary" href={`/api/pdf/${snapshotId}`} data-pdf-button>Download PDF</a>
+        </div>
+      )}
+      {!printMode && (
+        <script>
+          // PDF generation launches a headless browser and takes several seconds with no
+          // native feedback — show a busy state and swallow impatient repeat clicks.
+          const pdfButton = document.querySelector("[data-pdf-button]") as HTMLAnchorElement | null;
+          let busy = false;
+          pdfButton?.addEventListener("click", (event) => {
+            if (busy) {
+              event.preventDefault();
+              return;
+            }
+            busy = true;
+            pdfButton.classList.add("is-busy");
+            pdfButton.textContent = "Preparing PDF...";
+            setTimeout(() => {
+              busy = false;
+              pdfButton.classList.remove("is-busy");
+              pdfButton.textContent = "Download PDF";
+            }, 30_000);
+          });
+        </script>
+      )}
+
+      <article class="report-document" aria-label="Seller marketing report">
+        <section class="report-sheet report-cover-sheet">
+          <div class="report-sheet-topline">
+            <div class="report-brand-lockup">
+              {snapshot.client.logo_url ? (
+                <img src={snapshot.client.logo_url} alt={snapshot.client.name} />
+              ) : (
+                <span class="report-brand-name">{snapshot.client.name}</span>
+              )}
+            </div>
+            <p class="report-eyebrow-label">Listing Report</p>
+          </div>
+
+          <header class="report-cover-header">
+            <div class="report-cover-title">
+              <h1>{snapshot.report.address}</h1>
+            </div>
+            <div class="report-period-pill">
+              <Fragment set:html={Icon({ name: "calendar", size: 16 })} />
+              <div class="report-period-text">
+                <span class="report-period-label">Report period</span>
+                <span class="report-period-value">{dateRange}</span>
+              </div>
+            </div>
+          </header>
+
+          <section class="report-widget-row" aria-label="Key report metrics">
+            <article class="report-widget">
+              <span class="report-widget-icon"><Fragment set:html={Icon({ name: "eye" })} /></span>
+              <div class="report-widget-body">
+                <span>Website views</span>
+                <strong>{formatNumber(snapshot.website.listing_views)}</strong>
+              </div>
+            </article>
+            <article class="report-widget">
+              <span class="report-widget-icon"><Fragment set:html={Icon({ name: "globe" })} /></span>
+              <div class="report-widget-body">
+                <span>Social views</span>
+                <strong>{formatNumber(socialViews)}</strong>
+              </div>
+            </article>
+            <article class="report-widget">
+              <span class="report-widget-icon"><Fragment set:html={Icon({ name: "people" })} /></span>
+              <div class="report-widget-body">
+                <span>Showings</span>
+                <strong>{formatNumber(snapshot.manual.showings)}</strong>
+              </div>
+            </article>
+            <article class="report-widget">
+              <span class="report-widget-icon"><Fragment set:html={Icon({ name: "clock" })} /></span>
+              <div class="report-widget-body">
+                <span>Days on market</span>
+                <strong>{formatNumber(snapshot.manual.days_on_market)}</strong>
+              </div>
+            </article>
+          </section>
+
+          <section class="report-detail-row">
+            <div class="report-outline-panel">
+              <span class="report-outline-label">
+                <Fragment set:html={Icon({ name: "globe", size: 14 })} />
+                Listing URL
+              </span>
+              <a href={snapshot.report.listing_url}>
+                <Fragment set:html={Icon({ name: "external-link", size: 14 })} />
+                {snapshot.report.listing_url}
+              </a>
+            </div>
+            <div class="report-summary-card">
+              <span class="report-outline-label">Summary</span>
+              <p>{snapshot.report.notes || "Numbers are saved to this report and remain fixed for the selected reporting period."}</p>
+            </div>
+          </section>
+        </section>
+
+        <section class="report-sheet report-performance-sheet">
+          <header class="report-section-heading">
+            <span>01</span>
+            <div>
+              <p>Listing performance</p>
+              <h2>Activity summary</h2>
+            </div>
+          </header>
+
+          <section class="report-widget-row report-widget-row-5" aria-label="Listing activity metrics">
+            <article class="report-widget">
+              <span class="report-widget-icon"><Fragment set:html={Icon({ name: "eye" })} /></span>
+              <div class="report-widget-body">
+                <span>Listing page views</span>
+                <strong>{formatNumber(snapshot.website.listing_views)}</strong>
+              </div>
+            </article>
+            <article class="report-widget">
+              <span class="report-widget-icon"><Fragment set:html={Icon({ name: "home" })} /></span>
+              <div class="report-widget-body">
+                <span>REALTOR.ca views</span>
+                <strong>{formatNumber(snapshot.manual.realtor_listing_views)}</strong>
+              </div>
+            </article>
+            <article class="report-widget">
+              <span class="report-widget-icon"><Fragment set:html={Icon({ name: "clock" })} /></span>
+              <div class="report-widget-body">
+                <span>Time on listing</span>
+                <strong>{formatNumber(snapshot.manual.days_on_market)} days</strong>
+              </div>
+            </article>
+            <article class="report-widget">
+              <span class="report-widget-icon"><Fragment set:html={Icon({ name: "people" })} /></span>
+              <div class="report-widget-body">
+                <span>Showings</span>
+                <strong>{formatNumber(snapshot.manual.showings)}</strong>
+              </div>
+            </article>
+            <article class="report-widget">
+              <span class="report-widget-icon"><Fragment set:html={Icon({ name: "message" })} /></span>
+              <div class="report-widget-body">
+                <span>Inquiries</span>
+                <strong>{formatNumber(inquiries)}</strong>
+              </div>
+            </article>
+          </section>
+
+          <section class="report-table-card" aria-label="Marketing source breakdown">
+            <div class="report-table-row report-table-head">
+              <span class="report-table-icon" aria-hidden="true"></span>
+              <span>Source</span>
+              <span>Metric</span>
+              <span>Value</span>
+            </div>
+            <div class="report-table-row">
+              <span class="report-table-icon"><Fragment set:html={Icon({ name: "globe", size: 16 })} /></span>
+              <span>Website</span>
+              <span>Listing page views</span>
+              <strong>{formatNumber(snapshot.website.listing_views)}</strong>
+            </div>
+            <div class="report-table-row">
+              <span class="report-table-icon"><Fragment set:html={Icon({ name: "building", size: 16 })} /></span>
+              <span>REALTOR.ca</span>
+              <span>Listing views</span>
+              <strong>{formatNumber(snapshot.manual.realtor_listing_views)}</strong>
+            </div>
+            <div class="report-table-row">
+              <span class="report-table-icon"><Fragment set:html={Icon({ name: "calendar", size: 16 })} /></span>
+              <span>Showing activity</span>
+              <span>Showings</span>
+              <strong>{formatNumber(snapshot.manual.showings)}</strong>
+            </div>
+          </section>
+
+          {daysOnMarket > 0 && (
+            <section class="report-readout-grid" aria-label="Listing performance readout">
+              <article>
+                <span>Average daily listing views</span>
+                <div class="report-readout-figure">
+                  <strong>{formatNumber(averageDailyViews)}</strong>
+                  <span class="report-readout-trend"><Fragment set:html={Icon({ name: "trending-up", size: 20 })} /></span>
+                </div>
+                <p>Listing page views distributed across the current days on market.</p>
+              </article>
+            </section>
+          )}
+        </section>
+
+        <section class="report-sheet report-social-sheet">
+          <header class="report-section-heading">
+            <span>02</span>
+            <div>
+              <p>Social performance</p>
+              <h2>Post activity</h2>
+            </div>
+          </header>
+
+          <section class="report-social-stack" aria-label="Social post activity">
+            <article class="report-post-panel">
+              {snapshot.facebook.media_url ? (
+                <img class="report-post-media" src={snapshot.facebook.media_url} alt={`Facebook post: ${snapshot.facebook.caption}`} />
+              ) : (
+                <div class="report-post-media report-post-media-empty" aria-hidden="true"><Fragment set:html={Icon({ name: "camera", size: 28 })} /></div>
+              )}
+              <div class="report-post-content">
+                <div>
+                  <span><Fragment set:html={Icon({ name: "camera", size: 14 })} />Facebook</span>
+                  <h3>Post performance</h3>
+                  <p>{snapshot.facebook.caption}</p>
+                </div>
+                <dl class="report-badge-row">
+                  <div class="report-badge">
+                    <span class="report-badge-icon"><Fragment set:html={Icon({ name: "eye", size: 15 })} /></span>
+                    <div>
+                      <dt>Views</dt>
+                      <dd>{formatNumber(snapshot.facebook.views)}</dd>
+                    </div>
+                  </div>
+                  <div class="report-badge">
+                    <span class="report-badge-icon"><Fragment set:html={Icon({ name: "message", size: 15 })} /></span>
+                    <div>
+                      <dt>Engagements</dt>
+                      <dd>{formatNumber(snapshot.facebook.engagements)}</dd>
+                    </div>
+                  </div>
+                </dl>
+              </div>
+            </article>
+
+            <article class="report-post-panel">
+              {snapshot.instagram.media_url ? (
+                <img class="report-post-media" src={snapshot.instagram.media_url} alt={`Instagram post: ${snapshot.instagram.caption}`} />
+              ) : (
+                <div class="report-post-media report-post-media-empty" aria-hidden="true"><Fragment set:html={Icon({ name: "camera", size: 28 })} /></div>
+              )}
+              <div class="report-post-content">
+                <div>
+                  <span><Fragment set:html={Icon({ name: "camera", size: 14 })} />Instagram</span>
+                  <h3>Post performance</h3>
+                  <p>{snapshot.instagram.caption}</p>
+                </div>
+                <dl class="report-badge-row">
+                  <div class="report-badge">
+                    <span class="report-badge-icon"><Fragment set:html={Icon({ name: "eye", size: 15 })} /></span>
+                    <div>
+                      <dt>Views</dt>
+                      <dd>{formatNumber(snapshot.instagram.views)}</dd>
+                    </div>
+                  </div>
+                  <div class="report-badge">
+                    <span class="report-badge-icon"><Fragment set:html={Icon({ name: "message", size: 15 })} /></span>
+                    <div>
+                      <dt>Engagements</dt>
+                      <dd>{formatNumber(snapshot.instagram.engagements)}</dd>
+                    </div>
+                  </div>
+                </dl>
+              </div>
+            </article>
+          </section>
+
+          <section class="report-total-strip">
+            <span><Fragment set:html={Icon({ name: "trending-up", size: 16 })} />Total social engagements</span>
+            <strong>{formatNumber(totalEngagements)}</strong>
+          </section>
+        </section>
+
+        <section class="report-sheet report-notes-sheet">
+          <header class="report-section-heading">
+            <span>03</span>
+            <div>
+              <p>Compliance</p>
+              <h2>Disclaimer</h2>
+            </div>
+          </header>
+
+          <section class="report-inputs-card" aria-label="Reviewed report inputs">
+            <div class="report-inputs-head">
+              <span>Reviewed inputs</span>
+              <strong>Approved</strong>
+            </div>
+            <dl class="report-input-list">
+              <div>
+                <dt>Listing</dt>
+                <dd><a href={snapshot.report.listing_url}><Fragment set:html={Icon({ name: "external-link", size: 14 })} />{snapshot.report.listing_url}</a></dd>
+              </div>
+              <div>
+                <dt>Facebook post</dt>
+                <dd>
+                  {snapshot.facebook.post_url ? (
+                    <a href={snapshot.facebook.post_url}><Fragment set:html={Icon({ name: "external-link", size: 14 })} />{snapshot.facebook.post_url}</a>
+                  ) : (
+                    <span>Post link reviewed</span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>Instagram post</dt>
+                <dd>
+                  {snapshot.instagram.post_url ? (
+                    <a href={snapshot.instagram.post_url}><Fragment set:html={Icon({ name: "external-link", size: 14 })} />{snapshot.instagram.post_url}</a>
+                  ) : (
+                    <span>Post link reviewed</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="report-disclaimer-card" aria-label="Report disclaimer">
+            <p>
+              This report is intended solely for the designated recipient and is provided for informational
+              purposes only. All data is believed to be accurate at the time of publication but is subject to
+              change. This document may contain personal information and should be handled in accordance with
+              Provincial and Federal personal privacy laws.
+            </p>
+            <p>
+              This report includes real estate advertising or listing content and complies with applicable
+              regulations under the Real Estate Services Act.
+            </p>
+            <dl>
+              <div>
+                <dt>Prepared by</dt>
+                <dd>{brokerageName}</dd>
+              </div>
+              {brokerageAddress && (
+                <div>
+                  <dt>Brokerage address</dt>
+                  <dd>{brokerageAddress}</dd>
+                </div>
+              )}
+              {brokerageContact && (
+                <div>
+                  <dt>Contact</dt>
+                  <dd>{brokerageContact}</dd>
+                </div>
+              )}
+            </dl>
+          </section>
+
+          <footer class="report-footer">
+            <span>{snapshot.client.footer_text}</span>
+            <span>{snapshot.report.address}</span>
+          </footer>
+        </section>
+      </article>
+    </main>
+  ) : (
+    <main class="form-shell">
+      <section class="panel">
+        <p class="eyebrow">Missing snapshot</p>
+        <h1>Report not found</h1>
+        <p>No local snapshot exists for <code>{snapshotId}</code>.</p>
+        <a class="button primary" href="/">Back to clients</a>
+      </section>
+    </main>
+  )}
+</AppLayout>

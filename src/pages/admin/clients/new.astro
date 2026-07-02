@@ -1,0 +1,20 @@
+---
+import AppLayout from "../../../layouts/AppLayout.astro";
+import ClientForm from "../../../components/ClientForm.astro";
+---
+
+<AppLayout title="Create Client | Seller Report Generator" className="app-body">
+  <main class="form-shell">
+    <header class="page-header">
+      <a class="back-link" href="/">Back to clients</a>
+      <p class="eyebrow">Local setup</p>
+      <h1>Create client</h1>
+      <p>
+        This writes a JSON profile to <code>data/clients</code> and creates the
+        local report form endpoint for that client.
+      </p>
+    </header>
+
+    <ClientForm />
+  </main>
+</AppLayout>

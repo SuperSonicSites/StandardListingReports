@@ -26,7 +26,7 @@ async function slugForPath(path: string): Promise<string | undefined> {
 
 export const POST: APIRoute = async ({ request }) => {
   const form = await request.formData();
-  const password = String(form.get("password") ?? "");
+  const password = String(form.get("password") ?? "").trim();
   let next = String(form.get("next") ?? "/");
   // Same-origin relative paths only — never an open redirect.
   if (!next.startsWith("/") || next.startsWith("//")) next = "/";
@@ -34,7 +34,7 @@ export const POST: APIRoute = async ({ request }) => {
   let cookie: string | undefined;
 
   // The admin password unlocks every scope.
-  const adminPassword = process.env.ADMIN_PASSWORD ?? import.meta.env.ADMIN_PASSWORD;
+  const adminPassword = (process.env.ADMIN_PASSWORD ?? import.meta.env.ADMIN_PASSWORD)?.trim();
   if (adminPassword && password === adminPassword) {
     cookie = adminCookieValue();
   } else {

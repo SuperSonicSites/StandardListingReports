@@ -17,8 +17,14 @@ export function sha256(value: string) {
 }
 
 function adminPassword(): string | undefined {
-  return process.env.ADMIN_PASSWORD ?? import.meta.env.ADMIN_PASSWORD;
+  // Trim: platform variable UIs love to smuggle in trailing whitespace/newlines.
+  const value = (process.env.ADMIN_PASSWORD ?? import.meta.env.ADMIN_PASSWORD)?.trim();
+  return value || undefined;
 }
+
+// One log line at boot so "is the variable actually set on this deployment?"
+// is answerable from the host logs without guessing. Never logs the value.
+console.log(`[auth] ADMIN_PASSWORD is ${adminPassword() ? "set" : "NOT set — admin sign-in will always fail"}`);
 
 export function adminCookieValue(): string | undefined {
   const password = adminPassword();

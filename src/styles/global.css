@@ -141,6 +141,11 @@ code {
   gap: 9px;
 }
 
+.ss-brand-logo {
+  display: block;
+  width: auto;
+}
+
 .ss-brand-mark {
   flex: 0 0 auto;
 }

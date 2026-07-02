@@ -1648,9 +1648,9 @@ textarea {
 
 .report-cover-title h1 {
   max-width: 6.6in;
-  font-size: 2.7rem;
+  font-size: 1.9rem;
   font-weight: 780;
-  line-height: 1.02;
+  line-height: 1.05;
   text-wrap: balance;
 }
 
@@ -1786,16 +1786,44 @@ textarea {
 }
 
 /* First REALTOR.ca photo, captured at pull time and frozen into the snapshot. */
+/* The photo is the cover's flexible element: it absorbs whatever height the
+   other content leaves free (bigger hero on sparse covers, floor of 2.2in when
+   a long address / summary / notes take room) — the sheet can never overflow. */
 .report-property-photo {
+  display: flex;
+  min-height: 2.2in;
+  flex: 1 1 auto;
   margin: 0;
 }
 
 .report-property-photo img {
   display: block;
   width: 100%;
-  height: 2.2in;
+  min-height: 2.2in;
+  flex: 1 1 auto;
   object-fit: cover;
   border-radius: var(--radius);
+}
+
+/* Cover-only widget compaction: the saved height goes to the property photo. */
+.report-cover-sheet .report-widget {
+  min-height: 0;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.report-cover-sheet .report-widget-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.report-cover-sheet .report-widget-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.report-cover-sheet .report-widget strong {
+  font-size: 1.45rem;
 }
 
 /* Shared panel system: borderless, no shadow. A soft neutral surface

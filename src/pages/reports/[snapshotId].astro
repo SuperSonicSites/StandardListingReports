@@ -25,13 +25,10 @@ const dateRange = snapshot ? formatDateRange(snapshot.report.start_date, snapsho
 const showShowings = snapshot?.report.show_showings ?? true;
 const showNotes = (snapshot?.report.show_notes ?? true) && Boolean(snapshot?.report.notes);
 const propertyImage = snapshot?.report.property_image ?? "";
-// Only meaningful once the listing has been on market at least a day — hidden otherwise.
-const daysOnMarket = snapshot?.manual.days_on_market ?? 0;
-// "Views" for the daily average = every channel combined: website + REALTOR.ca + social.
+// Headline readout: every channel combined — website + REALTOR.ca + social.
 const totalViews = snapshot
   ? snapshot.website.listing_views + snapshot.manual.realtor_listing_views + socialViews
   : 0;
-const averageDailyViews = snapshot && daysOnMarket > 0 ? Math.round(totalViews / daysOnMarket) : 0;
 // Site-wide traffic for the audience-opportunity line; 0 (unknown) omits the sentence.
 const siteTotalViews = snapshot?.website.site_total_views ?? 0;
 const clientReportHref = snapshot?.client.slug ? `/c/${snapshot.client.slug}/` : "/";
@@ -315,18 +312,16 @@ const Icon = ({ name, size = 18 }: IconProps) =>
             </div>
           </section>
 
-          {daysOnMarket > 0 && (
-            <section class="report-readout-grid" aria-label="Listing performance readout">
-              <article>
-                <span>Average daily listing views</span>
-                <div class="report-readout-figure">
-                  <strong>{formatNumber(averageDailyViews)}</strong>
-                  <span class="report-readout-trend"><Fragment set:html={Icon({ name: "trending-up", size: 20 })} /></span>
-                </div>
-                <p>Combined website, REALTOR.ca, and social views averaged across the days on market.</p>
-              </article>
-            </section>
-          )}
+          <section class="report-readout-grid" aria-label="Listing performance readout">
+            <article>
+              <span>Total listing views</span>
+              <div class="report-readout-figure">
+                <strong>{formatNumber(totalViews)}</strong>
+                <span class="report-readout-trend"><Fragment set:html={Icon({ name: "trending-up", size: 20 })} /></span>
+              </div>
+              <p>Combined website, REALTOR.ca, and social views for the reporting period.</p>
+            </article>
+          </section>
         </section>
 
         <section class="report-sheet report-social-sheet">

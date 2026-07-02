@@ -2,10 +2,11 @@ import { defineMiddleware } from "astro:middleware";
 import { canAccessClient, isAdmin } from "./lib/auth";
 import { readClient, readSnapshot } from "./lib/storage";
 
-// /login and /api/login must stay reachable; the three body-parsing API routes
-// authorize themselves after extracting the client slug from their payload
-// (the middleware cannot read the body without consuming it).
-const OPEN = /^\/(login|api\/login)$/;
+// /login and /api/login must stay reachable, and /api/health is the deploy
+// healthcheck; the three body-parsing API routes authorize themselves after
+// extracting the client slug from their payload (the middleware cannot read
+// the body without consuming it).
+const OPEN = /^\/(login|api\/login|api\/health)$/;
 const SELF_GUARDED = /^\/api\/(pull|snapshot|client)$/;
 
 function challenge(url: URL, request: Request): Response {

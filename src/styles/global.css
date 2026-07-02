@@ -509,6 +509,45 @@ code {
   margin-top: 18px;
 }
 
+/* --- Danger zone (client deletion) ---------------------------------------- */
+.danger-zone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 22px;
+  border: 1px solid #fecaca;
+  border-radius: var(--ss-radius-lg);
+  background: #fef2f2;
+  padding: 22px 30px;
+}
+
+.danger-zone h2 {
+  margin: 0;
+  color: #991b1b;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.danger-zone p {
+  max-width: 520px;
+  margin: 6px 0 0;
+  color: #7f1d1d;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.button.danger {
+  border-color: #dc2626;
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.button.danger:hover {
+  background: #b91c1c;
+}
+
 /* --- Login page ----------------------------------------------------------- */
 .login-shell {
   display: grid;

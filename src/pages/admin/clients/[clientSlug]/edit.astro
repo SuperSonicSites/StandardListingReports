@@ -33,6 +33,39 @@ try {
         </header>
 
         <ClientForm client={client} />
+
+        <section class="danger-zone">
+          <div>
+            <h2>Delete this client</h2>
+            <p>
+              Removes the endpoint at <code>/c/{client.slug}/</code> and revokes the coordinator
+              password. Reports already created stay viewable (admin only). This cannot be undone.
+            </p>
+          </div>
+          <form
+            method="post"
+            action="/api/client"
+            data-delete-form
+            data-client-name={client.name}
+          >
+            <input type="hidden" name="mode" value="delete" />
+            <input type="hidden" name="slug" value={client.slug} />
+            <button class="button danger" type="submit">Delete client</button>
+          </form>
+        </section>
+
+        <script>
+          // A typed confirmation, not just an OK click — deletion is irreversible.
+          const form = document.querySelector("[data-delete-form]") as HTMLFormElement | null;
+          form?.addEventListener("submit", (event) => {
+            const name = form.dataset.clientName ?? "";
+            const answer = prompt(`Type the client name to confirm deletion:\n${name}`);
+            if (answer !== name) {
+              event.preventDefault();
+              if (answer !== null) alert("Name didn't match — nothing was deleted.");
+            }
+          });
+        </script>
       </>
     ) : (
       <section class="panel">

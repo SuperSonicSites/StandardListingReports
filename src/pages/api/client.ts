@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import type { APIRoute } from "astro";
 import { isAdmin, sha256 } from "../../lib/auth";
-import { clientExists, readClient, slugify, writeClient } from "../../lib/storage";
+import { clientExists, deleteClient, readClient, slugify, writeClient } from "../../lib/storage";
 import type { ClientProfile } from "../../lib/types";
 
 export const prerender = false;
@@ -43,6 +43,18 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   const form = await request.formData();
+
+  // Deleting removes the endpoint and revokes the coordinator password with it.
+  // Snapshots stay on disk, so existing reports remain viewable by the admin.
+  if (field(form, "mode") === "delete") {
+    try {
+      await deleteClient(field(form, "slug"));
+    } catch {
+      return errorPage(404, "Client profile not found.");
+    }
+    return redirect("/");
+  }
+
   const name = field(form, "name");
   const slug = slugify(field(form, "slug") || name);
   const isEdit = field(form, "mode") === "edit";

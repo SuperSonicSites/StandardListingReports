@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { access, mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ClientProfile, ReportSnapshot } from "./types";
 
@@ -73,6 +73,13 @@ export async function clientExists(slug: string) {
   } catch {
     return false;
   }
+}
+
+export async function deleteClient(slug: string) {
+  assertSafeId(slug, "client slug");
+  // Snapshots are intentionally left in place: existing reports stay viewable
+  // (admin-only once the client's password hash is gone with the profile).
+  await unlink(path.join(clientsDir, `${slug}.json`));
 }
 
 export async function readClient(slug: string) {

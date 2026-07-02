@@ -509,10 +509,6 @@ code {
   margin-top: 18px;
 }
 
-.field-grid.two {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 /* --- Login page ----------------------------------------------------------- */
 .login-shell {
   display: grid;
@@ -1224,10 +1220,6 @@ textarea {
   .section-heading {
     flex-wrap: wrap;
     align-items: flex-start;
-  }
-
-  .field-grid.two {
-    grid-template-columns: 1fr;
   }
 
   .client-card {

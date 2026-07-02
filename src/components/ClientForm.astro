@@ -15,7 +15,7 @@ const logoUrlValue = client?.logo_url.startsWith("data:") ? "" : (client?.logo_u
   <input type="hidden" name="mode" value={isEdit ? "edit" : "create"} />
   <section class="form-section">
     <h2>Brand</h2>
-    <div class="field-grid two">
+    <div class="field-grid">
       <label>
         Client name
         <input name="name" value={client?.name ?? ""} placeholder="Stone Sisters" required />
@@ -64,7 +64,7 @@ const logoUrlValue = client?.logo_url.startsWith("data:") ? "" : (client?.logo_u
 
   <section class="form-section">
     <h2>Brokerage disclaimer</h2>
-    <div class="field-grid two">
+    <div class="field-grid">
       <label>
         Brokerage
         <input name="brokerage_name" value={client?.brokerage_name ?? ""} placeholder="RE/MAX Kelowna" required />
@@ -82,7 +82,7 @@ const logoUrlValue = client?.logo_url.startsWith("data:") ? "" : (client?.logo_u
 
   <section class="form-section">
     <h2>Access</h2>
-    <div class="field-grid two">
+    <div class="field-grid">
       <label>
         Coordinator password
         <input
@@ -100,7 +100,7 @@ const logoUrlValue = client?.logo_url.startsWith("data:") ? "" : (client?.logo_u
 
   <section class="form-section">
     <h2>Integrations (optional)</h2>
-    <div class="field-grid two">
+    <div class="field-grid">
       <label>
         Facebook Page ID
         <input name="meta_page_id" value={client?.meta_page_id ?? ""} pattern="[0-9]*" inputmode="numeric" />

@@ -1419,10 +1419,11 @@ textarea {
 
 /* Logo lockup: neutral/transparent box so light- and dark-drawn client
    logos both render correctly (was hardcoded to a black box). */
+/* Fixed height, auto width: square logos render 72x72, horizontal ones grow to 220px wide. */
 .report-brand-lockup {
   display: inline-flex;
-  width: 168px;
-  height: 36px;
+  height: 72px;
+  max-width: 220px;
   align-items: center;
   overflow: hidden;
   border-radius: 5px;
@@ -1431,6 +1432,7 @@ textarea {
 
 .report-brand-lockup img {
   display: block;
+  width: auto;
   max-width: 100%;
   height: 100%;
   object-fit: contain;
@@ -1609,8 +1611,8 @@ textarea {
   line-height: 1;
 }
 
-/* Values that carry a text unit ("36 days") run wider than bare numbers — 20% smaller. */
-.report-widget strong.with-unit {
+/* The five activity-summary stats share one size (the cover widgets stay larger). */
+.report-widget-row-5 .report-widget strong {
   font-size: 1.38rem;
 }
 
@@ -1677,6 +1679,16 @@ textarea {
   padding: 18px 20px;
 }
 
+.report-notes-card {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 18px 20px;
+}
+
+.report-notes-card .report-outline-label,
 .report-summary-card .report-outline-label {
   display: flex;
   align-items: center;
@@ -1688,6 +1700,7 @@ textarea {
   text-transform: uppercase;
 }
 
+.report-notes-card p,
 .report-summary-card p {
   display: -webkit-box;
   -webkit-box-orient: vertical;

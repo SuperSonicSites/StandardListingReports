@@ -116,27 +116,11 @@ try {
                 required
               />
             </label>
-            <label class="client-field wide">
-              <span>Facebook URL</span>
-              <input
-                class="client-url-input"
-                type="url"
-                name="facebook_post_url"
-                placeholder="https://www.facebook.com/share/p/..."
-                required
-              />
-            </label>
-            <label class="client-field wide">
-              <span>Instagram URL</span>
-              <input
-                class="client-url-input"
-                type="url"
-                name="instagram_post_url"
-                placeholder="https://www.instagram.com/p/..."
-                required
-              />
-            </label>
           </div>
+          <p class="client-field-hint">
+            Facebook &amp; Instagram posts are matched from this listing automatically — pick the right one
+            in the Performance section below.
+          </p>
         </section>
 
         <section class="client-form-card">
@@ -241,7 +225,7 @@ try {
                   <div>
                     <span class="source-badge" data-source-badge="social">Meta</span>
                     <h3>Social performance</h3>
-                    <p>Post-level views pulled from the provided links. Captions and images appear on the report — review them.</p>
+                    <p>Pick the Facebook and Instagram post for this listing from the matches below. Captions and images appear on the report — review them.</p>
                   </div>
                 </div>
                 <div class="post-review-list">
@@ -250,8 +234,18 @@ try {
                       <strong>Facebook post</strong>
                       <img class="post-media-preview" data-media-preview="facebook" alt="Facebook post image (appears on the report)" hidden />
                       <label class="post-caption-field">
+                        <span>Matched post</span>
+                        <select class="post-candidate-select" data-candidate-select="facebook">
+                          <option value="">Pull data to match posts&hellip;</option>
+                        </select>
+                      </label>
+                      <label class="post-caption-field">
+                        <span>Post URL</span>
+                        <input type="url" name="facebook_post_url" placeholder="Set from your selection, or paste a link" />
+                      </label>
+                      <label class="post-caption-field">
                         <span>Caption (appears on the report)</span>
-                        <textarea name="facebook_caption" rows="2" maxlength="300" placeholder="Filled by Pull data, or write your own."></textarea>
+                        <textarea name="facebook_caption" rows="2" maxlength="300" placeholder="Filled from your selection, or write your own."></textarea>
                       </label>
                     </div>
                     <dl>
@@ -268,8 +262,18 @@ try {
                       <strong>Instagram post</strong>
                       <img class="post-media-preview" data-media-preview="instagram" alt="Instagram post image (appears on the report)" hidden />
                       <label class="post-caption-field">
+                        <span>Matched post</span>
+                        <select class="post-candidate-select" data-candidate-select="instagram">
+                          <option value="">Pull data to match posts&hellip;</option>
+                        </select>
+                      </label>
+                      <label class="post-caption-field">
+                        <span>Post URL</span>
+                        <input type="url" name="instagram_post_url" placeholder="Set from your selection, or paste a link" />
+                      </label>
+                      <label class="post-caption-field">
                         <span>Caption (appears on the report)</span>
-                        <textarea name="instagram_caption" rows="2" maxlength="300" placeholder="Filled by Pull data, or write your own."></textarea>
+                        <textarea name="instagram_caption" rows="2" maxlength="300" placeholder="Filled from your selection, or write your own."></textarea>
                       </label>
                     </div>
                     <dl>
@@ -324,8 +328,8 @@ try {
       <div class="pull-modal" data-pull-modal hidden role="status" aria-live="polite">
         <div class="pull-modal-card">
           <span class="pull-spinner" aria-hidden="true"></span>
-          <strong>Pulling performance data&hellip;</strong>
-          <p>Reading REALTOR.ca stats, Meta posts, and website analytics. This can take up to a minute.</p>
+          <strong>Finding your listing and matching social posts&hellip;</strong>
+          <p>Reading REALTOR.ca stats, matching Facebook/Instagram posts, and website analytics. This can take up to a minute.</p>
         </div>
       </div>
 
@@ -410,6 +414,76 @@ try {
             preview.hidden = false;
           }
         }
+
+        // --- Social post candidates (pick from a dropdown, top match preselected) ---
+        type Candidate = { permalink: string; caption: string; media_url: string; views: number | null; timestamp: string };
+        const candidateStore: Record<string, Candidate[]> = { facebook: [], instagram: [] };
+
+        function candidateLabel(candidate: Candidate): string {
+          const date = candidate.timestamp ? fmtDate(String(candidate.timestamp).slice(0, 10)) : "";
+          const caption = (candidate.caption || "(no caption)").replace(/\s+/g, " ").trim().slice(0, 60);
+          const views = typeof candidate.views === "number" ? ` · ${candidate.views} views` : "";
+          return [date, caption].filter(Boolean).join(" — ") + views;
+        }
+
+        // Writing a selection fills the SAME inputs the snapshot already consumes, so the
+        // snapshot shape is unchanged — only how they get filled is new.
+        function selectCandidate(network: string, index: number) {
+          const candidate = candidateStore[network]?.[index];
+          if (!candidate) return;
+          const urlInput = field(`${network}_post_url`);
+          if (urlInput) urlInput.value = candidate.permalink ?? "";
+          setVal(`${network}_caption`, String(candidate.caption ?? "").slice(0, MAX_CAPTION));
+          setVal(`${network}_media_url`, candidate.media_url ?? "");
+          if (typeof candidate.views === "number") setVal(`${network}_views`, candidate.views);
+          const sourceInput = field(`${network}_source`);
+          if (sourceInput) sourceInput.value = "meta_api";
+          if (candidate.media_url) setMediaPreview(network, candidate.media_url);
+        }
+
+        function populateCandidates(network: string, candidates: unknown, source: string, warning: string | null) {
+          const select = document.querySelector(`[data-candidate-select="${network}"]`) as HTMLSelectElement | null;
+          candidateStore[network] = Array.isArray(candidates) ? (candidates as Candidate[]) : [];
+          if (!select) return;
+          select.innerHTML = "";
+          const label = network === "facebook" ? "Facebook" : "Instagram";
+
+          if (candidateStore[network].length === 0) {
+            // No-post gate: NON-blocking — the coordinator can paste a URL or leave it blank.
+            const opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = source === "manual" ? "No posts available — enter manually" : "No matching post found";
+            select.appendChild(opt);
+            select.disabled = true;
+            const sourceInput = field(`${network}_source`);
+            if (sourceInput) sourceInput.value = "manual";
+            setNotice(
+              network,
+              warning ?? `No ${label} post found for this listing — did you post it? Enter it manually or leave blank.`
+            );
+            return;
+          }
+
+          select.disabled = false;
+          candidateStore[network].forEach((candidate, i) => {
+            const opt = document.createElement("option");
+            opt.value = String(i);
+            opt.textContent = candidateLabel(candidate);
+            select.appendChild(opt);
+          });
+          // Preselect the top match so the happy path needs zero clicks.
+          select.value = "0";
+          selectCandidate(network, 0);
+          setNotice(network, warning);
+        }
+
+        ["facebook", "instagram"].forEach((network) => {
+          const select = document.querySelector(`[data-candidate-select="${network}"]`) as HTMLSelectElement | null;
+          select?.addEventListener("change", () => {
+            const idx = Number(select.value);
+            if (Number.isInteger(idx)) selectCandidate(network, idx);
+          });
+        });
 
         // --- Report period (derived: first day on market -> today) ---
         const periodTextEl = document.querySelector("[data-period-text]");
@@ -525,29 +599,10 @@ try {
               // as an actionable warning; the report is never blocked.
               setNotice("realtor", realtor.warnings?.[0] ?? null);
 
-              const facebookFills: Record<string, unknown> = {
-                facebook_views: data.facebook.views
-              };
-              applyBlock("facebook", data.facebook.source, facebookFills, data.facebook.warnings?.[0] ?? null);
-              if (data.facebook.source !== "manual") {
-                if (data.facebook.caption) setVal("facebook_caption", String(data.facebook.caption).slice(0, MAX_CAPTION));
-                if (data.facebook.media_url) {
-                  setVal("facebook_media_url", data.facebook.media_url);
-                  setMediaPreview("facebook", data.facebook.media_url);
-                }
-              }
-
-              const instagramFills: Record<string, unknown> = {
-                instagram_views: data.instagram.views
-              };
-              applyBlock("instagram", data.instagram.source, instagramFills, data.instagram.warnings?.[0] ?? null);
-              if (data.instagram.source !== "manual") {
-                if (data.instagram.caption) setVal("instagram_caption", String(data.instagram.caption).slice(0, MAX_CAPTION));
-                if (data.instagram.media_url) {
-                  setVal("instagram_media_url", data.instagram.media_url);
-                  setMediaPreview("instagram", data.instagram.media_url);
-                }
-              }
+              // Social: fill each dropdown with the ranked candidates and preselect the top
+              // match. Empty candidates -> the no-post gate inside populateCandidates.
+              populateCandidates("facebook", data.facebook.candidates, data.facebook.source, data.facebook.warnings?.[0] ?? null);
+              populateCandidates("instagram", data.instagram.candidates, data.instagram.source, data.instagram.warnings?.[0] ?? null);
               setSocialBadge(data.facebook.source, data.instagram.source);
 
               const warned = (data.warnings ?? []).length > 0;
@@ -569,6 +624,9 @@ try {
               setSocialBadge("manual", "manual");
               setRealtorBadge(false);
               setNotice("realtor", "REALTOR.ca capture unavailable — enter views and days on market manually.");
+              // Reset the dropdowns to the manual/no-post state (non-blocking).
+              populateCandidates("facebook", [], "manual", "Auto-fetch unavailable — enter the Facebook post manually or leave blank.");
+              populateCandidates("instagram", [], "manual", "Auto-fetch unavailable — enter the Instagram post manually or leave blank.");
               // No period could be derived — let the coordinator set the window by hand.
               if (periodFallback) periodFallback.hidden = false;
               if (statusText) statusText.textContent = "Pull failed";

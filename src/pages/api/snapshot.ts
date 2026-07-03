@@ -171,16 +171,17 @@ export const POST: APIRoute = async ({ request }) => {
     return errorPage(400, "The start date must be on or before the end date.", backHref);
   }
 
-  if (!facebookPostUrl || !instagramPostUrl) {
-    return errorPage(400, "Facebook and Instagram post URLs are required.", backHref);
+  // The website URL is always required; the social post URLs are optional (a listing may
+  // have no post yet — the report must still generate). Validate a social URL only when
+  // one is present.
+  if (!isHttpUrl(listingUrl)) {
+    return errorPage(400, "Website URL must be a valid http(s) link.", backHref);
   }
-
   for (const [label, value] of [
-    ["Website URL", listingUrl],
     ["Facebook URL", facebookPostUrl],
     ["Instagram URL", instagramPostUrl]
   ] as const) {
-    if (!isHttpUrl(value)) {
+    if (value && !isHttpUrl(value)) {
       return errorPage(400, `${label} must be a valid http(s) link.`, backHref);
     }
   }
@@ -251,14 +252,16 @@ export const POST: APIRoute = async ({ request }) => {
     facebook: {
       source: sourceField(form, "facebook_source"),
       post_url: facebookPostUrl,
-      caption: (field(form, "facebook_caption") || "Facebook listing post").slice(0, MAX_CAPTION_CHARS),
+      // Only fall back to a generic caption when there IS a post; a missing post stays blank
+      // so the report doesn't imply a post that doesn't exist.
+      caption: (field(form, "facebook_caption") || (facebookPostUrl ? "Facebook listing post" : "")).slice(0, MAX_CAPTION_CHARS),
       media_url: facebookMedia,
       views: numbers.facebook_views!
     },
     instagram: {
       source: sourceField(form, "instagram_source"),
       post_url: instagramPostUrl,
-      caption: (field(form, "instagram_caption") || "Instagram listing post").slice(0, MAX_CAPTION_CHARS),
+      caption: (field(form, "instagram_caption") || (instagramPostUrl ? "Instagram listing post" : "")).slice(0, MAX_CAPTION_CHARS),
       media_url: instagramMedia,
       views: numbers.instagram_views!
     },

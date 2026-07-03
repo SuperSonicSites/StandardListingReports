@@ -236,3 +236,194 @@ export async function fetchInstagramMediaMetrics(
     return graphError("Instagram");
   }
 }
+
+// --- Candidate selection ------------------------------------------------------
+// Rather than make a busy realtor find and paste the exact post URL, we LIST their
+// recent posts, rank the ones most likely to be this listing (MLS# / address / recency),
+// and let them pick from a short dropdown. One number still ships per network.
+
+export type MetaCandidate = {
+  id: string; // Graph node id (FB: "<pageid>_<postid>", IG: media id) — used for insights
+  permalink: string;
+  caption: string;
+  media_url: string;
+  views: number | null; // null until enriched (we only enrich the shortlist)
+  timestamp: string; // ISO-ish created time
+};
+
+export type MetaCandidatesResult = {
+  source: "meta_api" | "manual" | "mock";
+  candidates: MetaCandidate[];
+  warning?: string;
+};
+
+function noCandidates(kind: "Facebook" | "Instagram", reason: string): MetaCandidatesResult {
+  return { source: "manual", candidates: [], warning: `${reason} Enter the ${kind} post manually.` };
+}
+
+// DEMO_MODE only, labeled source: "mock" — never reaches a real client (see integration rules).
+function mockCandidates(prefix: string, base: number): MetaCandidate[] {
+  const captions = ["Just listed ✨ book your showing", "Price improved — don't miss it", "Open house this weekend"];
+  return captions.map((caption, i) => ({
+    id: `mock_${prefix}_${i}`,
+    permalink: `https://example.com/${prefix}/mock-${i}`,
+    caption,
+    media_url: "",
+    views: base + i * 41,
+    timestamp: `2026-0${i + 4}-15T12:00:00+0000`
+  }));
+}
+
+/** List a Page's recent posts as ranking candidates. NEVER throws. */
+export async function fetchFacebookPostCandidates(pageId: string | undefined): Promise<MetaCandidatesResult> {
+  const token = metaToken();
+  if (!token) {
+    if (demoMode()) return { source: "mock", candidates: mockCandidates("facebook", 420) };
+    return noCandidates("Facebook", "Meta token is not configured.");
+  }
+  if (!pageId) return noCandidates("Facebook", "Meta is not configured for this client.");
+
+  try {
+    const pageToken = await getPageAccessToken(pageId, token);
+    if (!pageToken) return noCandidates("Facebook", "Facebook auto-fetch unavailable.");
+    const body = await fetchJson(
+      `${GRAPH}/${pageId}/posts?fields=message,full_picture,permalink_url,created_time&limit=25`,
+      pageToken
+    );
+    const items: any[] = Array.isArray(body?.data) ? body.data : [];
+    const candidates = items
+      .map((item) => ({
+        id: String(item.id ?? ""),
+        permalink: String(item.permalink_url ?? ""),
+        caption: String(item.message ?? ""),
+        media_url: String(item.full_picture ?? ""),
+        views: null,
+        timestamp: String(item.created_time ?? "")
+      }))
+      .filter((c) => c.id);
+    return { source: "meta_api", candidates };
+  } catch {
+    return noCandidates("Facebook", "Facebook auto-fetch unavailable.");
+  }
+}
+
+/** List an IG account's recent media as ranking candidates. NEVER throws. */
+export async function fetchInstagramMediaCandidates(igUserId: string | undefined): Promise<MetaCandidatesResult> {
+  const token = metaToken();
+  if (!token) {
+    if (demoMode()) return { source: "mock", candidates: mockCandidates("instagram", 150) };
+    return noCandidates("Instagram", "Meta token is not configured.");
+  }
+  if (!igUserId) return noCandidates("Instagram", "Meta is not configured for this client.");
+
+  try {
+    const fields = "permalink,caption,media_url,thumbnail_url,media_type,timestamp";
+    const list = await fetchJson(`${GRAPH}/${igUserId}/media?fields=${fields}&limit=50`, token);
+    const items: any[] = Array.isArray(list?.data) ? list.data : [];
+    const candidates = items
+      .map((item) => ({
+        id: String(item.id ?? ""),
+        permalink: String(item.permalink ?? ""),
+        caption: String(item.caption ?? ""),
+        media_url: String(item.thumbnail_url ?? item.media_url ?? ""),
+        views: null,
+        timestamp: String(item.timestamp ?? "")
+      }))
+      .filter((c) => c.id);
+    return { source: "meta_api", candidates };
+  } catch {
+    return noCandidates("Instagram", "Instagram auto-fetch unavailable.");
+  }
+}
+
+export type RankContext = {
+  mls?: string | null;
+  address?: string | null;
+  listDate?: string | null;
+  startDate?: string | null;
+};
+
+function normalize(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 3);
+}
+
+function dateMs(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const ms = new Date(value).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/**
+ * Rank candidates by how likely each is THIS listing's post: MLS# exact match in the
+ * caption (strongest), then address-token overlap, then recency near the listing date.
+ * Returns the top `limit` (default 4). Pure — no I/O.
+ */
+export function rankCandidates(candidates: MetaCandidate[], ctx: RankContext, limit = 4): MetaCandidate[] {
+  const addrTokens = ctx.address ? tokenize(ctx.address) : [];
+  const mls = normalize(ctx.mls ?? "");
+  const anchorMs = dateMs(ctx.listDate) ?? dateMs(ctx.startDate);
+
+  const scored = candidates.map((candidate) => {
+    let score = 0;
+    if (mls && normalize(candidate.caption).includes(mls)) score += 100;
+    if (addrTokens.length) {
+      const capTokens = new Set(tokenize(candidate.caption));
+      const hits = addrTokens.filter((t) => capTokens.has(t)).length;
+      score += (hits / addrTokens.length) * 50;
+    }
+    const ts = dateMs(candidate.timestamp);
+    if (anchorMs && ts) {
+      const days = Math.abs(ts - anchorMs) / 86_400_000;
+      score += Math.max(0, 20 - days); // posts within ~20 days of listing get a bump
+    }
+    return { candidate, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score || (dateMs(b.candidate.timestamp) ?? 0) - (dateMs(a.candidate.timestamp) ?? 0));
+  return scored.slice(0, limit).map((s) => s.candidate);
+}
+
+/** Fill `views` for the FB shortlist only (one insights call each). NEVER throws. */
+export async function enrichFacebookViews(candidates: MetaCandidate[], pageId: string | undefined): Promise<MetaCandidate[]> {
+  const token = metaToken();
+  if (!token || !pageId || candidates.length === 0) return candidates;
+  const pageToken = await getPageAccessToken(pageId, token);
+  if (!pageToken) return candidates;
+  return Promise.all(
+    candidates.map(async (candidate) => {
+      try {
+        const insights = await fetchJson(`${GRAPH}/${candidate.id}/insights?metric=post_video_views,post_clicks`, pageToken);
+        const values = (insights?.data ?? [])
+          .map((m: any) => m?.values?.[0]?.value)
+          .filter((n: any): n is number => typeof n === "number");
+        return { ...candidate, views: values.length ? Math.max(...values) : 0 };
+      } catch {
+        return { ...candidate, views: 0 };
+      }
+    })
+  );
+}
+
+/** Fill `views` for the IG shortlist only (one insights call each). NEVER throws. */
+export async function enrichInstagramViews(candidates: MetaCandidate[]): Promise<MetaCandidate[]> {
+  const token = metaToken();
+  if (!token || candidates.length === 0) return candidates;
+  return Promise.all(
+    candidates.map(async (candidate) => {
+      try {
+        const insights = await fetchJson(`${GRAPH}/${candidate.id}/insights?metric=views`, token);
+        const value = insights?.data?.[0]?.values?.[0]?.value;
+        return { ...candidate, views: typeof value === "number" ? value : 0 };
+      } catch {
+        return { ...candidate, views: 0 };
+      }
+    })
+  );
+}

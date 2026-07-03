@@ -5,9 +5,6 @@ const NAV_TIMEOUT_MS = 45_000;
 const READY_TIMEOUT_MS = 20_000;
 const DATA_TIMEOUT_MS = 15_000;
 const MAX_ATTEMPTS = 3;
-// A current desktop Chrome UA — a stale UA is itself a bot signal. Keep this fresh.
-const UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 export type RealtorStatsResult = {
   source: "realtor_page" | "manual";
@@ -102,7 +99,7 @@ export async function fetchRealtorAdminStats(adminUrl: string): Promise<RealtorS
 }
 
 async function scrapeOnce(page: Page, adminUrl: string): Promise<RealtorStatsResult> {
-  await page.setUserAgent(UA);
+  // UA is set at the browser level (see chrome.ts LAUNCH_ARGS); just add locale hints here.
   await page.setExtraHTTPHeaders({ "Accept-Language": "en-CA,en;q=0.9" });
   await page.setViewport({ width: 1280, height: 900 });
 

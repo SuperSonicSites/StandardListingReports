@@ -1,7 +1,13 @@
 import type { APIRoute } from "astro";
 import { canAccessClient } from "../../lib/auth";
 import { readClient } from "../../lib/storage";
-import { fetchFacebookPostMetrics, fetchInstagramMediaMetrics } from "../../lib/meta";
+import {
+  fetchFacebookPostCandidates,
+  fetchInstagramMediaCandidates,
+  rankCandidates,
+  enrichFacebookViews,
+  enrichInstagramViews
+} from "../../lib/meta";
 import { fetchRealtorAdminStats, type RealtorStatsResult } from "../../lib/realtor";
 import { fetchRybbitListingViews, fetchRybbitSiteTotalViews } from "../../lib/rybbit";
 
@@ -51,16 +57,18 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   const listingUrl = String(body.listing_url ?? "");
-  const facebookUrl = String(body.facebook_post_url ?? "");
-  const instagramUrl = String(body.instagram_post_url ?? "");
   const realtorAdminUrl = String(body.realtor_admin_url ?? "");
+  // Fallback only — ranking prefers the SCRAPED address, but if the scrape missed it and
+  // the coordinator typed one, use that so candidate matching still has an address signal.
+  const typedAddress = String(body.address ?? "");
 
   // Phase A: the period-independent pulls. Each adapter NEVER throws; it returns a typed
-  // result carrying its own `source` + optional warning. Run them concurrently — done
-  // sequentially the per-request timeouts stack into a minute-plus hang behind "Pulling...".
-  const [fb, ig, realtorStats] = await Promise.all([
-    fetchFacebookPostMetrics(client.meta_page_id, facebookUrl),
-    fetchInstagramMediaMetrics(client.meta_instagram_id, instagramUrl),
+  // result carrying its own `source` + optional warning. We LIST social candidates here
+  // and rank/enrich them in Phase B (ranking needs the scraped MLS/address). Run concurrently
+  // — done sequentially the per-request timeouts stack into a minute-plus hang.
+  const [fbList, igList, realtorStats] = await Promise.all([
+    fetchFacebookPostCandidates(client.meta_page_id),
+    fetchInstagramMediaCandidates(client.meta_instagram_id),
     fetchRealtorAdminStats(realtorAdminUrl)
   ]);
 
@@ -69,10 +77,20 @@ export const POST: APIRoute = async ({ request }) => {
   // only after Phase A returns.
   const period = derivePeriod(realtorStats);
 
-  // Phase B: Rybbit needs the derived window.
-  const [web, siteTotal] = await Promise.all([
+  const rankContext = {
+    mls: realtorStats.mls_number,
+    address: realtorStats.address ?? typedAddress,
+    listDate: realtorStats.list_date,
+    startDate: period.start_date
+  };
+
+  // Phase B: everything that needed the scrape's output — Rybbit (derived window) and the
+  // ranked+enriched social shortlists (views fetched only for the top few, to bound calls).
+  const [web, siteTotal, fbTop, igTop] = await Promise.all([
     fetchRybbitListingViews(client.rybbit_site_id, listingUrl, period.start_date, period.end_date),
-    fetchRybbitSiteTotalViews(client.rybbit_site_id, period.start_date, period.end_date)
+    fetchRybbitSiteTotalViews(client.rybbit_site_id, period.start_date, period.end_date),
+    enrichFacebookViews(rankCandidates(fbList.candidates, rankContext), client.meta_page_id),
+    enrichInstagramViews(rankCandidates(igList.candidates, rankContext))
   ]);
 
   const website = {
@@ -82,18 +100,14 @@ export const POST: APIRoute = async ({ request }) => {
     warnings: [web.warning, siteTotal.warning].filter((w): w is string => Boolean(w))
   };
   const facebook = {
-    source: fb.source,
-    views: fb.views,
-    caption: fb.caption ?? "",
-    media_url: fb.media_url ?? "",
-    warnings: fb.warning ? [fb.warning] : []
+    source: fbList.source,
+    candidates: fbTop,
+    warnings: fbList.warning ? [fbList.warning] : []
   };
   const instagram = {
-    source: ig.source,
-    views: ig.views,
-    caption: ig.caption ?? "",
-    media_url: ig.media_url ?? "",
-    warnings: ig.warning ? [ig.warning] : []
+    source: igList.source,
+    candidates: igTop,
+    warnings: igList.warning ? [igList.warning] : []
   };
   const realtor = {
     source: realtorStats.source,

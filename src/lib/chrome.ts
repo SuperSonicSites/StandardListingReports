@@ -25,11 +25,17 @@ export function browserPath(): string | undefined {
 // long-lived browser and hand out a page per request, capped so we never run
 // more than a couple of tabs at once. A crashed/closed browser self-heals: the
 // "disconnected" reset drops the handle so the next call relaunches.
+// A current desktop Chrome UA — a stale UA is itself a bot signal. Keep this fresh.
+// Set at the browser level (not the deprecated page.setUserAgent) so every scrape page uses it.
+const SCRAPER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
 const LAUNCH_ARGS = [
   "--no-sandbox",
   "--disable-setuid-sandbox",
   "--disable-dev-shm-usage",
-  "--disable-blink-features=AutomationControlled"
+  "--disable-blink-features=AutomationControlled",
+  `--user-agent=${SCRAPER_UA}`
 ];
 
 let sharedBrowser: Browser | null = null;

@@ -2,10 +2,32 @@ import type { APIRoute } from "astro";
 import { canAccessClient } from "../../lib/auth";
 import { readClient } from "../../lib/storage";
 import { fetchFacebookPostMetrics, fetchInstagramMediaMetrics } from "../../lib/meta";
-import { fetchRealtorAdminStats } from "../../lib/realtor";
+import { fetchRealtorAdminStats, type RealtorStatsResult } from "../../lib/realtor";
 import { fetchRybbitListingViews, fetchRybbitSiteTotalViews } from "../../lib/rybbit";
 
 export const prerender = false;
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_MS = 86_400_000;
+const DEFAULT_WINDOW_DAYS = 90;
+
+function toIsoDate(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+// The report period is always "first day on market -> today", derived from the scrape.
+// Prefer an explicit list date, else back-date from days-on-market; if the scrape gave
+// neither, fall back to a default window and flag it so the form can offer manual dates.
+function derivePeriod(stats: RealtorStatsResult): { start_date: string; end_date: string; derived: boolean } {
+  const end_date = toIsoDate(Date.now());
+  if (stats.list_date && ISO_DATE.test(stats.list_date)) {
+    return { start_date: stats.list_date, end_date, derived: true };
+  }
+  if (stats.days_on_market !== null && stats.days_on_market >= 0) {
+    return { start_date: toIsoDate(Date.now() - stats.days_on_market * DAY_MS), end_date, derived: true };
+  }
+  return { start_date: toIsoDate(Date.now() - DEFAULT_WINDOW_DAYS * DAY_MS), end_date, derived: false };
+}
 
 export const POST: APIRoute = async ({ request }) => {
   // A body of valid-JSON `null` (or a bare number/string) parses fine — coerce anything
@@ -32,18 +54,25 @@ export const POST: APIRoute = async ({ request }) => {
   const facebookUrl = String(body.facebook_post_url ?? "");
   const instagramUrl = String(body.instagram_post_url ?? "");
   const realtorAdminUrl = String(body.realtor_admin_url ?? "");
-  const startDate = String(body.start_date ?? "");
-  const endDate = String(body.end_date ?? "");
 
-  // Each adapter call NEVER throws; it returns a typed result carrying its own `source` +
-  // optional warning. Run everything concurrently — sequentially the per-request timeouts
-  // stack up to a minute-plus hang behind the form's "Pulling..." button.
-  const [web, siteTotal, fb, ig, realtorStats] = await Promise.all([
-    fetchRybbitListingViews(client.rybbit_site_id, listingUrl, startDate, endDate),
-    fetchRybbitSiteTotalViews(client.rybbit_site_id, startDate, endDate),
+  // Phase A: the period-independent pulls. Each adapter NEVER throws; it returns a typed
+  // result carrying its own `source` + optional warning. Run them concurrently — done
+  // sequentially the per-request timeouts stack into a minute-plus hang behind "Pulling...".
+  const [fb, ig, realtorStats] = await Promise.all([
     fetchFacebookPostMetrics(client.meta_page_id, facebookUrl),
     fetchInstagramMediaMetrics(client.meta_instagram_id, instagramUrl),
     fetchRealtorAdminStats(realtorAdminUrl)
+  ]);
+
+  // The report period is DERIVED, not typed: first day on market -> today. It comes from
+  // the REALTOR.ca scrape, so it (and the Rybbit window that depends on it) is computed
+  // only after Phase A returns.
+  const period = derivePeriod(realtorStats);
+
+  // Phase B: Rybbit needs the derived window.
+  const [web, siteTotal] = await Promise.all([
+    fetchRybbitListingViews(client.rybbit_site_id, listingUrl, period.start_date, period.end_date),
+    fetchRybbitSiteTotalViews(client.rybbit_site_id, period.start_date, period.end_date)
   ]);
 
   const website = {
@@ -71,6 +100,12 @@ export const POST: APIRoute = async ({ request }) => {
     total_views: realtorStats.total_views,
     days_on_market: realtorStats.days_on_market,
     image_url: realtorStats.image_url,
+    address: realtorStats.address,
+    mls_number: realtorStats.mls_number,
+    list_date: realtorStats.list_date,
+    // "terminal" = bad/expired link (re-share); "transient" = try again later.
+    failure: realtorStats.failure ?? null,
+    period,
     warnings: realtorStats.warning ? [realtorStats.warning] : []
   };
 

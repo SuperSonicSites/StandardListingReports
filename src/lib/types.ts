@@ -33,6 +33,10 @@ export type ReportSnapshot = {
   };
   report: {
     address: string;
+    // MLS number and first-day-on-market date, both derived from the REALTOR.ca
+    // scrape (editable fallback in the form). Optional so older snapshots parse.
+    mls_number?: string;
+    list_date?: string;
     start_date: string;
     end_date: string;
     listing_url: string;

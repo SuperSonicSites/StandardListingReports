@@ -44,22 +44,40 @@ try {
             <span>01</span>
             <div>
               <h2>Listing</h2>
-              <p>The property and reporting window for this seller report.</p>
+              <p>Address, MLS&reg; and the reporting window are pulled from REALTOR.ca. Edit only if a value is wrong.</p>
             </div>
           </div>
+          <!-- Period is DERIVED (first day on market -> today) from the REALTOR.ca pull,
+               never typed. The date inputs below only appear if the pull can't determine
+               the listing date. -->
+          <input type="hidden" name="start_date" value="" />
+          <input type="hidden" name="end_date" value="" />
           <div class="client-field-grid two">
             <label class="client-field wide">
               <span>Address</span>
-              <input name="address" placeholder="985 Academy Way Unit 208" required />
+              <input name="address" placeholder="Pulled from REALTOR.ca" required />
             </label>
             <label class="client-field">
-              <span>Start date</span>
-              <input type="date" name="start_date" required />
+              <span>MLS&reg; number</span>
+              <input name="mls_number" placeholder="Pulled from REALTOR.ca" />
+            </label>
+            <div class="client-field wide">
+              <span>Report period</span>
+              <p class="client-period-value" data-period-text>Pull REALTOR.ca data to set the reporting window (first day on market &rarr; today).</p>
+            </div>
+          </div>
+          <div class="client-field-grid two" data-period-fallback hidden>
+            <label class="client-field">
+              <span>First day on market</span>
+              <input type="date" data-period-start />
             </label>
             <label class="client-field">
               <span>End date</span>
-              <input type="date" name="end_date" required />
+              <input type="date" data-period-end />
             </label>
+            <p class="client-field wide import-fetch-notice">
+              We couldn't read the listing date from REALTOR.ca — set the reporting window here.
+            </p>
           </div>
         </section>
 
@@ -68,10 +86,26 @@ try {
             <span>02</span>
             <div>
               <h2>Links</h2>
-              <p>Website and social post URLs used to pull performance.</p>
+              <p>Paste the REALTOR.ca share link and hit Pull data — it fills the rest.</p>
             </div>
           </div>
           <div class="client-field-grid two">
+            <label class="client-field wide">
+              <span>REALTOR.ca Admin URL</span>
+              <input
+                class="client-url-input"
+                type="url"
+                name="realtor_admin_url"
+                placeholder="https://member.realtor.ca/Reports/ListingDestination/..."
+                required
+              />
+              <small>
+                Signed in to REALTOR.ca, the top-right corner of your listing has a SHARE LISTING
+                button — share the link with yourself and paste it here. Pull data reads the address,
+                MLS&reg; number, days on market, listing views and photo, sets the reporting window,
+                and finds the matching Facebook/Instagram posts.
+              </small>
+            </label>
             <label class="client-field wide">
               <span>Website URL</span>
               <input
@@ -101,20 +135,6 @@ try {
                 placeholder="https://www.instagram.com/p/..."
                 required
               />
-            </label>
-            <label class="client-field wide">
-              <span>REALTOR.ca Admin URL</span>
-              <input
-                class="client-url-input"
-                type="url"
-                name="realtor_admin_url"
-                placeholder="https://member.realtor.ca/Reports/ListingDestination/..."
-              />
-              <small>
-                Tip: signed in to REALTOR.ca, the top-right corner of your listing has a SHARE LISTING
-                button — you can share the link with yourself and then paste it here. Pull data reads
-                total views, days on market, and the listing photo from it.
-              </small>
             </label>
           </div>
         </section>
@@ -391,6 +411,48 @@ try {
           }
         }
 
+        // --- Report period (derived: first day on market -> today) ---
+        const periodTextEl = document.querySelector("[data-period-text]");
+        const periodFallback = document.querySelector("[data-period-fallback]") as HTMLElement | null;
+        const periodStartInput = document.querySelector("[data-period-start]") as HTMLInputElement | null;
+        const periodEndInput = document.querySelector("[data-period-end]") as HTMLInputElement | null;
+
+        function fmtDate(iso: string): string {
+          if (!iso) return "";
+          const date = new Date(`${iso}T00:00:00Z`);
+          if (Number.isNaN(date.getTime())) return iso;
+          return date.toLocaleDateString("en-CA", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
+        }
+
+        function refreshPeriodText() {
+          const start = field("start_date")?.value ?? "";
+          const end = field("end_date")?.value ?? "";
+          if (periodTextEl && start && end) periodTextEl.textContent = `${fmtDate(start)} → ${fmtDate(end)}`;
+        }
+
+        function applyPeriod(period: { start_date?: string; end_date?: string; derived?: boolean } | undefined) {
+          if (!period) return;
+          if (period.start_date) setVal("start_date", period.start_date);
+          if (period.end_date) setVal("end_date", period.end_date);
+          refreshPeriodText();
+          // Reveal the manual date fallback ONLY when the listing date couldn't be read.
+          const needsManual = !period.derived || !period.start_date;
+          if (periodFallback) periodFallback.hidden = !needsManual;
+          if (needsManual) {
+            if (periodStartInput && period.start_date) periodStartInput.value = period.start_date;
+            if (periodEndInput && period.end_date) periodEndInput.value = period.end_date;
+          }
+        }
+
+        periodStartInput?.addEventListener("change", () => {
+          if (periodStartInput.value) setVal("start_date", periodStartInput.value);
+          refreshPeriodText();
+        });
+        periodEndInput?.addEventListener("change", () => {
+          if (periodEndInput.value) setVal("end_date", periodEndInput.value);
+          refreshPeriodText();
+        });
+
         function applyBlock(key: string, source: string, fills: Record<string, unknown>, warning: string | null) {
           // A degraded block ("manual") keeps whatever the coordinator already typed —
           // a failed refresh must never wipe corrections back to 0.
@@ -418,9 +480,7 @@ try {
             listing_url: field("listing_url")?.value ?? "",
             facebook_post_url: field("facebook_post_url")?.value ?? "",
             instagram_post_url: field("instagram_post_url")?.value ?? "",
-            realtor_admin_url: field("realtor_admin_url")?.value ?? "",
-            start_date: field("start_date")?.value ?? "",
-            end_date: field("end_date")?.value ?? ""
+            realtor_admin_url: field("realtor_admin_url")?.value ?? ""
           };
 
           let data: any = null;
@@ -454,7 +514,15 @@ try {
                 setVal("property_image_url", realtor.image_url);
                 setMediaPreview("realtor", realtor.image_url);
               }
+              // Address/MLS are derived but editable — fill only if the coordinator hasn't
+              // typed a value, so a correction is never overwritten by a refresh.
+              if (realtor.address && !(field("address")?.value)) setVal("address", realtor.address);
+              if (realtor.mls_number && !(field("mls_number")?.value)) setVal("mls_number", realtor.mls_number);
+              // Reporting window: first day on market -> today, from the scrape.
+              applyPeriod(realtor.period);
               setRealtorBadge(realtor.source === "realtor_page");
+              // A bad/expired link (terminal) or a reach blip (transient) both surface here
+              // as an actionable warning; the report is never blocked.
               setNotice("realtor", realtor.warnings?.[0] ?? null);
 
               const facebookFills: Record<string, unknown> = {
@@ -501,6 +569,8 @@ try {
               setSocialBadge("manual", "manual");
               setRealtorBadge(false);
               setNotice("realtor", "REALTOR.ca capture unavailable — enter views and days on market manually.");
+              // No period could be derived — let the coordinator set the window by hand.
+              if (periodFallback) periodFallback.hidden = false;
               if (statusText) statusText.textContent = "Pull failed";
               if (statusDetail) statusDetail.textContent = "The data sources could not be reached. Enter the numbers manually below.";
             }

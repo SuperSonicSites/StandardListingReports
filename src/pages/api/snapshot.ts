@@ -43,6 +43,10 @@ function validDate(value: string) {
   return ISO_DATE.test(value) && !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime());
 }
 
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function redirect(location: string) {
   return new Response(null, {
     status: 303,
@@ -139,13 +143,24 @@ export const POST: APIRoute = async ({ request }) => {
   const address = field(form, "address");
   const listingUrl = field(form, "listing_url");
   const startDate = field(form, "start_date");
-  const endDate = field(form, "end_date");
+  // The reporting window is derived (first day on market -> today); end_date defaults to
+  // today when the pull didn't set it. start_date must be present (pull-filled or manual).
+  const endDate = field(form, "end_date") || todayIso();
+  const mlsNumber = field(form, "mls_number");
   const facebookPostUrl = field(form, "facebook_post_url");
   const instagramPostUrl = field(form, "instagram_post_url");
   const realtorUrl = field(form, "realtor_admin_url");
 
-  if (!address || !listingUrl || !startDate || !endDate) {
-    return errorPage(400, "Address, listing URL, start date, and end date are required.", backHref);
+  if (!address || !listingUrl) {
+    return errorPage(400, "Address and listing URL are required.", backHref);
+  }
+
+  if (!startDate) {
+    return errorPage(
+      400,
+      "The reporting period isn't set. Use Pull data to read it from REALTOR.ca, or set the dates manually.",
+      backHref
+    );
   }
 
   if (!validDate(startDate) || !validDate(endDate)) {
@@ -214,6 +229,9 @@ export const POST: APIRoute = async ({ request }) => {
     },
     report: {
       address,
+      // start_date is the listing's first day on market, so it doubles as the list date.
+      mls_number: mlsNumber || undefined,
+      list_date: startDate,
       start_date: startDate,
       end_date: endDate,
       listing_url: listingUrl,

@@ -171,7 +171,9 @@ The code is host-agnostic; these are the moving parts:
 1. Set the start command to `npm run start` **before** the first deploy
    (Railpack cannot infer it for `output: "server"`).
 2. Service variables: `HOST=0.0.0.0`, `ADMIN_PASSWORD`, `META_SYSTEM_USER_TOKEN`,
-   `RYBBIT_API_KEY`, `CHROME_PATH=/usr/bin/chromium`, and
+   `RYBBIT_API_KEY`, `BRAVE_API_KEY` (optional — enables auto-finding the listing
+   page on the client's website by MLS#/address via Brave Search; without it the
+   Website URL is entered manually), `CHROME_PATH=/usr/bin/chromium`, and
    `RAILPACK_DEPLOY_APT_PACKAGES=chromium` (installs Chrome for the PDF route).
    The built server never loads `.env` — platform env vars are the only source.
 3. Mount a volume at `/app/data`. Client profiles and snapshots are runtime

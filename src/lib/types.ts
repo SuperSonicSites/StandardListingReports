@@ -15,6 +15,9 @@ export type ClientProfile = {
   meta_page_id?: string;
   meta_instagram_id?: string;
   rybbit_site_id?: string;
+  // The client's public website (e.g. https://acmerealty.com). Used to auto-find the
+  // listing page by MLS#/address via web search, and documents the site the Rybbit id tracks.
+  website_url?: string;
 };
 
 export type MetricSource = "rybbit_api" | "meta_api" | "manual" | "mock";

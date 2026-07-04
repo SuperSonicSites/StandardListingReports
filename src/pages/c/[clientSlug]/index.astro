@@ -106,20 +106,20 @@ try {
                 and finds the matching Facebook/Instagram posts.
               </small>
             </label>
-            <label class="client-field wide">
+            <label class="client-field wide" data-notice-anchor="listing">
               <span>Website URL</span>
               <input
                 class="client-url-input"
                 type="url"
                 name="listing_url"
-                placeholder="https://your-site.com/listings/985-academy-way-unit-208"
+                placeholder="Found automatically from the listing — or paste it here"
                 required
               />
             </label>
           </div>
           <p class="client-field-hint">
-            Facebook &amp; Instagram posts are matched from this listing automatically — pick the right one
-            in the Performance section below.
+            The listing page on your website is found automatically from the REALTOR.ca listing, and the
+            Facebook &amp; Instagram posts are matched too — just confirm them in the Performance section below.
           </p>
         </section>
 
@@ -578,6 +578,14 @@ try {
                 data.website.warnings?.[0] ?? null
               );
               setWebsiteBadge(data.website.source);
+
+              // Listing URL auto-found on the client's website — fill it (unless the
+              // coordinator already typed one), else show a manual-entry notice.
+              const listingUrlFound = data.website.listing_source === "search" || data.website.listing_source === "mock";
+              if (listingUrlFound && data.website.listing_url && !(field("listing_url")?.value)) {
+                setVal("listing_url", data.website.listing_url);
+              }
+              setNotice("listing", listingUrlFound ? null : (data.website.listing_warning ?? null));
 
               // REALTOR.ca: partial capture is normal — only overwrite what was actually
               // read (null means "not captured", never wipe a typed value back to 0).

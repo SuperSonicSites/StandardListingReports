@@ -10,6 +10,7 @@ import {
 } from "../../lib/meta";
 import { fetchRealtorAdminStats, type RealtorStatsResult } from "../../lib/realtor";
 import { fetchRybbitListingViews, fetchRybbitSiteTotalViews } from "../../lib/rybbit";
+import { findListingUrl } from "../../lib/listing_search";
 
 export const prerender = false;
 
@@ -56,7 +57,7 @@ export const POST: APIRoute = async ({ request }) => {
     return new Response("Sign-in required.", { status: 401 });
   }
 
-  const listingUrl = String(body.listing_url ?? "");
+  const typedListingUrl = String(body.listing_url ?? "");
   const realtorAdminUrl = String(body.realtor_admin_url ?? "");
   // Fallback only — ranking prefers the SCRAPED address, but if the scrape missed it and
   // the coordinator typed one, use that so candidate matching still has an address signal.
@@ -84,10 +85,19 @@ export const POST: APIRoute = async ({ request }) => {
     startDate: period.start_date
   };
 
-  // Phase B: everything that needed the scrape's output — Rybbit (derived window) and the
-  // ranked+enriched social shortlists (views fetched only for the top few, to bound calls).
+  // Auto-find the listing on the CLIENT'S own website (web search by MLS#/address). Rybbit
+  // needs a URL, so resolve this before the Rybbit calls; fall back to whatever the form
+  // already has if the search is unconfigured or finds nothing.
+  const listingSearch = await findListingUrl(client.website_url, {
+    mls: realtorStats.mls_number,
+    address: realtorStats.address ?? typedAddress
+  });
+  const resolvedListingUrl = listingSearch.url || typedListingUrl;
+
+  // Phase B: everything that needed the scrape's output — Rybbit (derived window + resolved
+  // listing URL) and the ranked+enriched social shortlists (views for the top few only).
   const [web, siteTotal, fbTop, igTop] = await Promise.all([
-    fetchRybbitListingViews(client.rybbit_site_id, listingUrl, period.start_date, period.end_date),
+    fetchRybbitListingViews(client.rybbit_site_id, resolvedListingUrl, period.start_date, period.end_date),
     fetchRybbitSiteTotalViews(client.rybbit_site_id, period.start_date, period.end_date),
     enrichFacebookViews(rankCandidates(fbList.candidates, rankContext), client.meta_page_id),
     enrichInstagramViews(rankCandidates(igList.candidates, rankContext))
@@ -97,6 +107,11 @@ export const POST: APIRoute = async ({ request }) => {
     source: web.source,
     listing_views: web.listing_views,
     site_total_views: siteTotal.site_total_views,
+    // The listing URL we resolved (search hit or the form's own value) + how we got it, so
+    // the form can auto-fill the field and show a manual-entry notice when nothing was found.
+    listing_url: resolvedListingUrl,
+    listing_source: listingSearch.source,
+    listing_warning: listingSearch.warning ?? null,
     warnings: [web.warning, siteTotal.warning].filter((w): w is string => Boolean(w))
   };
   const facebook = {
@@ -129,7 +144,13 @@ export const POST: APIRoute = async ({ request }) => {
       facebook,
       instagram,
       realtor,
-      warnings: [...website.warnings, ...facebook.warnings, ...instagram.warnings, ...realtor.warnings]
+      warnings: [
+        ...website.warnings,
+        ...(website.listing_warning ? [website.listing_warning] : []),
+        ...facebook.warnings,
+        ...instagram.warnings,
+        ...realtor.warnings
+      ]
     }),
     { headers: { "Content-Type": "application/json" } }
   );

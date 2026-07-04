@@ -102,6 +102,10 @@ const logoUrlValue = client?.logo_url.startsWith("data:") ? "" : (client?.logo_u
     <h2>Integrations (optional)</h2>
     <div class="field-grid">
       <label>
+        Website URL
+        <input name="website_url" type="url" value={client?.website_url ?? ""} placeholder="https://acmerealty.com" />
+      </label>
+      <label>
         Facebook Page ID
         <input name="meta_page_id" value={client?.meta_page_id ?? ""} pattern="[0-9]*" inputmode="numeric" />
       </label>

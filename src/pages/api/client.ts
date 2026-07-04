@@ -19,6 +19,15 @@ function field(form: FormData, name: string) {
   return String(form.get(name) ?? "").trim();
 }
 
+function isHttpUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function redirect(location: string) {
   return new Response(null, {
     status: 303,
@@ -116,6 +125,13 @@ export const POST: APIRoute = async ({ request }) => {
   const metaInstagramId = ids.meta_instagram_id;
   const rybbitSiteId = ids.rybbit_site_id;
 
+  // Optional client website — validated as http(s) so a typo can't silently break the
+  // listing-URL search later.
+  const websiteUrl = field(form, "website_url");
+  if (websiteUrl && !isHttpUrl(websiteUrl)) {
+    return errorPage(400, "Website URL must be a valid http(s) link (e.g. https://acmerealty.com).");
+  }
+
   const client: ClientProfile = {
     slug,
     name,
@@ -129,7 +145,8 @@ export const POST: APIRoute = async ({ request }) => {
     password_hash: passwordHash,
     ...(metaPageId ? { meta_page_id: metaPageId } : {}),
     ...(metaInstagramId ? { meta_instagram_id: metaInstagramId } : {}),
-    ...(rybbitSiteId ? { rybbit_site_id: rybbitSiteId } : {})
+    ...(rybbitSiteId ? { rybbit_site_id: rybbitSiteId } : {}),
+    ...(websiteUrl ? { website_url: websiteUrl } : {})
   };
 
   await writeClient(client);

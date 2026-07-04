@@ -51,16 +51,14 @@ function isRealtorAdminUrl(value: string): boolean {
   }
 }
 
-type ScrapeStrategy = "json-ld" | "og" | "dom" | "miss";
-
 /**
- * Scrape the REALTOR.ca member stats page ("share listing" link) in headless Chrome:
- *  - all-time listing views + days on market (report widgets),
- *  - the listing's address, MLS® number and first photo (from the public listing page,
- *    preferring JSON-LD/OpenGraph over brittle DOM ids).
- * NEVER throws. Retries transient failures; a bad/expired link fails fast with a
- * "re-share" message. Partial capture returns whatever was found plus a warning. A real
- * browser is required — realtor.ca blocks plain HTTP clients but passes headless Chrome.
+ * Scrape the REALTOR.ca member stats page ("share listing" link) in headless Chrome.
+ * Everything we need is server-rendered on that ONE page: all-time listing views + days
+ * on market (report widgets), and the listing's address, MLS® number and first photo.
+ * (The public listing page is bot-walled — a ~1 KB stub with no data — so we never leave
+ * the stats page.) NEVER throws. Retries transient failures; a bad/expired link fails fast
+ * with a "re-share" message. Partial capture returns whatever was found plus a warning. A
+ * real browser is required — realtor.ca blocks plain HTTP clients but passes headless Chrome.
  */
 export async function fetchRealtorAdminStats(adminUrl: string): Promise<RealtorStatsResult> {
   if (!adminUrl) {
@@ -114,7 +112,7 @@ async function scrapeOnce(page: Page, adminUrl: string): Promise<RealtorStatsRes
     throw new TransientScrapeError("Couldn't reach REALTOR.ca right now — try Pull again in a minute.");
   }
 
-  // The report widgets hydrate client-side; the "All" pills tab is our readiness signal.
+  // The report widgets can hydrate client-side; the "All" pills tab is our readiness signal.
   const pillsTab = await page
     .waitForSelector("#ui_report_all_pillsTab", { timeout: READY_TIMEOUT_MS })
     .catch(() => null);
@@ -139,6 +137,7 @@ async function scrapeOnce(page: Page, adminUrl: string): Promise<RealtorStatsRes
     .catch(() => {});
 
   const stats = await page.evaluate(() => {
+    const clean = (el: Element | null) => (el?.textContent ?? "").replace(/\s+/g, " ").trim();
     const parseCount = (text: string | null | undefined) => {
       const match = (text ?? "").match(/\d[\d,]*/);
       return match ? parseInt(match[0].replace(/,/g, ""), 10) : null;
@@ -151,89 +150,42 @@ async function scrapeOnce(page: Page, adminUrl: string): Promise<RealtorStatsRes
       .map((el) => parseCount(el.textContent))
       .filter((n): n is number => n !== null);
     const dom = document.querySelector('[id^="data_report_"][id$="_daysOnRealtor"]');
-    const link = document.querySelector<HTMLAnchorElement>("#hyp_reportRight_viewOnRealtor");
     const imgEl = document.querySelector<HTMLImageElement>('[id^="img_report_"][id$="_propertyImage"]');
     const imgSrc = imgEl ? imgEl.currentSrc || imgEl.src : "";
     const adminImage =
       imgEl && imgEl.naturalWidth > 0 && /^https:\/\/(images|cdn)\.realtor\.ca\//i.test(imgSrc)
         ? imgSrc.split("?")[0]
         : "";
+    // Address, MLS and photo are all server-rendered on the member stats page itself —
+    // the public listing page is bot-walled (a ~1 KB stub), so we never leave this page.
+    const address = clean(document.querySelector('[id^="data_report_"][id$="_propertyAddress"]')) || null;
+    let mls: string | null = null;
+    for (const el of document.querySelectorAll('[id^="data_report_"][id$="_mlsNumber"]')) {
+      // The element reads "MLS® Number <value>" — strip the label, keep the value.
+      const value = clean(el).replace(/^.*?number\s*/i, "").trim();
+      if (value) {
+        mls = value;
+        break;
+      }
+    }
     return {
       totalViews: counts.length ? Math.max(...counts) : null,
       daysOnMarket: dom ? parseCount(dom.textContent) : null,
-      listingHref: link?.href ?? "",
-      adminImage
+      adminImage,
+      address,
+      mls
     };
   });
 
-  let imageUrl = stats.adminImage;
-  let address: string | null = null;
-  let mlsNumber: string | null = null;
-  let listDate: string | null = null;
-  let daysOnMarket = stats.daysOnMarket;
-  const strategy: Record<string, ScrapeStrategy> = { address: "miss", mls: "miss", photo: imageUrl ? "dom" : "miss" };
-
-  // The public listing page is the reliable source for address / MLS / list date, so we
-  // always follow the link when present (the photo may already be captured above).
-  if (stats.listingHref) {
-    try {
-      await page.goto(stats.listingHref, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT_MS });
-      // Two extraction passes: the page occasionally stalls behind the bot wall on first
-      // paint, and one reload usually clears it (cheaper than losing address/MLS/photo).
-      for (let pass = 0; pass < 2; pass++) {
-        await page
-          .waitForFunction(
-            () =>
-              document.querySelector('script[type="application/ld+json"]') !== null ||
-              document.querySelector('meta[property="og:image"]') !== null,
-            { timeout: DATA_TIMEOUT_MS, polling: 500 }
-          )
-          .catch(() => {});
-
-        const structured = await extractListingStructured(page);
-        if (!address && structured.address) {
-          address = structured.address;
-          strategy.address = structured.addressStrategy;
-        }
-        if (!mlsNumber && structured.mls) {
-          mlsNumber = structured.mls;
-          strategy.mls = structured.mlsStrategy;
-        }
-        if (!listDate && structured.listDate) listDate = structured.listDate;
-        if (!imageUrl && structured.image) {
-          imageUrl = structured.image;
-          strategy.photo = structured.imageStrategy;
-        }
-        if (!imageUrl) {
-          imageUrl = await extractListingPhoto(page).catch(() => "");
-          if (imageUrl) strategy.photo = "dom";
-        }
-        if (daysOnMarket === null) {
-          daysOnMarket = await page
-            .evaluate(() => {
-              const value = [...document.querySelectorAll(".propertyDetailsSectionContentValue")].find((el) =>
-                /time on realtor/i.test(el.previousElementSibling?.textContent ?? "")
-              );
-              const match = (value?.textContent ?? "").match(/\d[\d,]*/);
-              return match ? parseInt(match[0].replace(/,/g, ""), 10) : null;
-            })
-            .catch(() => null);
-        }
-
-        if (address && imageUrl) break; // got the essentials
-        if (pass === 0) {
-          await page.reload({ waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT_MS }).catch(() => {});
-        }
-      }
-    } catch {
-      // keep whatever the stats page yielded
-    }
-  }
+  const imageUrl = stats.adminImage;
+  const address = stats.address;
+  const mlsNumber = stats.mls;
+  const daysOnMarket = stats.daysOnMarket;
 
   // eslint-disable-next-line no-console
   console.info(
-    `[realtor] strategy address=${strategy.address} mls=${strategy.mls} photo=${strategy.photo} ` +
-      `views=${stats.totalViews ?? "miss"} days=${daysOnMarket ?? "miss"}`
+    `[realtor] address=${address ? "ok" : "miss"} mls=${mlsNumber ? "ok" : "miss"} ` +
+      `photo=${imageUrl ? "ok" : "miss"} views=${stats.totalViews ?? "miss"} days=${daysOnMarket ?? "miss"}`
   );
 
   const missing = [
@@ -256,7 +208,7 @@ async function scrapeOnce(page: Page, adminUrl: string): Promise<RealtorStatsRes
     image_url: imageUrl,
     address,
     mls_number: mlsNumber,
-    list_date: listDate,
+    list_date: null, // no explicit list date on the stats page; period derives from days_on_market
     warning: missing.length ? `REALTOR.ca capture could not read: ${missing.join(", ")}. Fill those in manually.` : undefined
   };
 }
@@ -273,138 +225,4 @@ async function classifyLoadFailure(page: Page): Promise<never> {
   throw new TransientScrapeError(
     "Couldn't reach REALTOR.ca right now — try Pull again in a minute, or enter the numbers manually."
   );
-}
-
-type StructuredResult = {
-  address: string | null;
-  addressStrategy: ScrapeStrategy;
-  mls: string | null;
-  mlsStrategy: ScrapeStrategy;
-  image: string;
-  imageStrategy: ScrapeStrategy;
-  listDate: string | null;
-};
-
-// Prefer machine-readable JSON-LD (least likely to churn), then og: tags, then DOM
-// label/value pairs — take the first that yields a value for each field.
-async function extractListingStructured(page: Page): Promise<StructuredResult> {
-  return page.evaluate(() => {
-    const out = {
-      address: null as string | null,
-      addressStrategy: "miss",
-      mls: null as string | null,
-      mlsStrategy: "miss",
-      image: "",
-      imageStrategy: "miss",
-      listDate: null as string | null
-    };
-
-    // --- JSON-LD ---
-    const nodes: any[] = [];
-    for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
-      try {
-        const parsed = JSON.parse(script.textContent ?? "");
-        const items = Array.isArray(parsed) ? parsed : [parsed];
-        for (const item of items) {
-          if (item && typeof item === "object") {
-            nodes.push(item);
-            if (Array.isArray(item["@graph"])) nodes.push(...item["@graph"]);
-          }
-        }
-      } catch {
-        /* ignore malformed ld+json */
-      }
-    }
-    const composeAddress = (a: any): string | null => {
-      if (!a) return null;
-      if (typeof a === "string") return a.trim() || null;
-      const parts = [a.streetAddress, a.addressLocality, a.addressRegion, a.postalCode]
-        .filter((p) => typeof p === "string" && p.trim())
-        .map((p) => p.trim());
-      return parts.length ? parts.join(", ") : null;
-    };
-    for (const node of nodes) {
-      if (!node || typeof node !== "object") continue;
-      if (out.address === null && node.address) {
-        const composed = composeAddress(node.address);
-        if (composed) {
-          out.address = composed;
-          out.addressStrategy = "json-ld";
-        }
-      }
-      if (out.mls === null) {
-        const raw = node.sku ?? node.productID ?? node.mlsNumber ?? node.identifier;
-        const value = typeof raw === "string" ? raw : raw && typeof raw === "object" ? raw.value : undefined;
-        if (typeof value === "string" && value.trim()) {
-          out.mls = value.trim();
-          out.mlsStrategy = "json-ld";
-        }
-      }
-      if (!out.image) {
-        const img = Array.isArray(node.image) ? node.image[0] : node.image;
-        const src = typeof img === "string" ? img : img && typeof img === "object" ? img.url : "";
-        if (typeof src === "string" && /realtor\.ca/i.test(src)) {
-          out.image = src.split("?")[0];
-          out.imageStrategy = "json-ld";
-        }
-      }
-      if (out.listDate === null) {
-        const d = node.datePosted ?? node.availabilityStarts ?? node.dateCreated;
-        if (typeof d === "string") {
-          const m = d.match(/\d{4}-\d{2}-\d{2}/);
-          if (m) out.listDate = m[0];
-        }
-      }
-    }
-
-    // --- og: image fallback ---
-    if (!out.image) {
-      const og = document.querySelector('meta[property="og:image"]')?.getAttribute("content") ?? "";
-      if (/realtor\.ca/i.test(og)) {
-        out.image = og.split("?")[0];
-        out.imageStrategy = "og";
-      }
-    }
-
-    // --- DOM label/value fallback (address, MLS) ---
-    const labelValue = (labelRe: RegExp): string | null => {
-      const el = [...document.querySelectorAll(".propertyDetailsSectionContentValue")].find((node) =>
-        labelRe.test(node.previousElementSibling?.textContent ?? "")
-      );
-      const text = el?.textContent?.trim();
-      return text ? text : null;
-    };
-    if (out.address === null) {
-      const heading = document.querySelector("h1")?.textContent?.trim();
-      if (heading) {
-        out.address = heading;
-        out.addressStrategy = "dom";
-      }
-    }
-    if (out.mls === null) {
-      const mls = labelValue(/mls|listing id/i);
-      if (mls) {
-        out.mls = mls.replace(/^[^0-9A-Za-z]+/, "");
-        out.mlsStrategy = "dom";
-      }
-    }
-
-    return out;
-  }) as Promise<StructuredResult>;
-}
-
-// Prefer a real gallery image (#heroImage or any cdn.realtor.ca listing image) over
-// og:image, which is a low-res 512x256 crop. Query params stripped -> highres original.
-async function extractListingPhoto(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    const hero = document.querySelector<HTMLImageElement>("#heroImage");
-    const heroSrc = hero ? hero.currentSrc || hero.src : "";
-    if (/cdn\.realtor\.ca/i.test(heroSrc)) return heroSrc.split("?")[0];
-    const gallery = [...document.querySelectorAll("img")]
-      .map((img) => img.currentSrc || img.src)
-      .find((src) => /cdn\.realtor\.ca\/listings\//i.test(src));
-    if (gallery) return gallery.split("?")[0];
-    const og = document.querySelector('meta[property="og:image"]')?.getAttribute("content") ?? "";
-    return /cdn\.realtor\.ca/i.test(og) ? og : "";
-  });
 }

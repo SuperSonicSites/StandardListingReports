@@ -360,31 +360,57 @@ function dateMs(value: string | null | undefined): number | null {
   return Number.isNaN(ms) ? null : ms;
 }
 
+// Street-type and direction words carry no matching signal — a caption saying "Place" or
+// "West" tells us nothing about which listing it is. Only the distinctive street NAME does.
+const STREET_STOPWORDS = new Set([
+  "st", "street", "ave", "avenue", "av", "rd", "road", "dr", "drive", "way", "blvd", "boulevard",
+  "cres", "crescent", "crt", "court", "ct", "lane", "ln", "place", "pl", "unit", "apt", "suite",
+  "ste", "hwy", "highway", "terrace", "terr", "gate", "close", "bay", "cove", "point", "pt",
+  "trail", "grove", "green", "row", "walk", "mews", "circle", "cir", "square", "sq", "loop",
+  "run", "ridge", "park", "parkway", "north", "south", "east", "west", "the"
+]);
+
+// The distinctive street-name tokens (e.g. "pintail", "academy") — numbers and street-type
+// words removed. These are what a real listing post names.
+function streetNameTokens(address: string): string[] {
+  return tokenize(address).filter((t) => !/^\d+$/.test(t) && !STREET_STOPWORDS.has(t) && t.length >= 4);
+}
+
+// All digit-runs in a string (e.g. "985", "103", "12", "208"). Uses a raw regex, not
+// `tokenize`, so short civic/unit numbers (1–2 digits) aren't dropped.
+function numbersIn(text: string): Set<string> {
+  return new Set(text.match(/\d+/g) ?? []);
+}
+
 /**
- * Rank candidates by how likely each is THIS listing's post: MLS# exact match in the
- * caption (strongest), then address-token overlap, then recency near the listing date.
- * Returns the top `limit` (default 4). Pure — no I/O.
+ * Return only the candidates that GENUINELY match this listing — never a best-effort guess.
+ * A post qualifies if its caption contains the MLS# (as a whole token) OR both the street
+ * name AND a civic/unit number from the address. Recency is a tiebreaker among real matches,
+ * never a qualifier on its own — otherwise an unrelated recent post (a testimonial, a market
+ * update) would be surfaced and auto-selected. No qualifying post ⇒ empty array ⇒ the form
+ * shows the "no post found" gate instead of filling in a stray post. Pure — no I/O.
  */
 export function rankCandidates(candidates: MetaCandidate[], ctx: RankContext, limit = 4): MetaCandidate[] {
-  const addrTokens = ctx.address ? tokenize(ctx.address) : [];
+  const nameTokens = ctx.address ? streetNameTokens(ctx.address) : [];
+  const addrNumbers = ctx.address ? numbersIn(ctx.address) : new Set<string>();
   const mls = normalize(ctx.mls ?? "");
-  const anchorMs = dateMs(ctx.listDate) ?? dateMs(ctx.startDate);
 
-  const scored = candidates.map((candidate) => {
-    let score = 0;
-    if (mls && normalize(candidate.caption).includes(mls)) score += 100;
-    if (addrTokens.length) {
+  const scored = candidates
+    .map((candidate) => {
       const capTokens = new Set(tokenize(candidate.caption));
-      const hits = addrTokens.filter((t) => capTokens.has(t)).length;
-      score += (hits / addrTokens.length) * 50;
-    }
-    const ts = dateMs(candidate.timestamp);
-    if (anchorMs && ts) {
-      const days = Math.abs(ts - anchorMs) / 86_400_000;
-      score += Math.max(0, 20 - days); // posts within ~20 days of listing get a bump
-    }
-    return { candidate, score };
-  });
+      const capNumbers = numbersIn(candidate.caption);
+      let score = 0;
+      // MLS# as a whole token — NOT a substring (which could match inside a price like $174,010).
+      if (mls && capTokens.has(mls)) score += 100;
+      // Address: street name AND a civic/unit number must BOTH appear. A listing post has
+      // both ("985 Academy Way"); a testimonial/market-update/holiday post has neither.
+      const nameHit = nameTokens.some((t) => capTokens.has(t));
+      const numberHit = [...addrNumbers].some((n) => capNumbers.has(n));
+      if (nameHit && numberHit) score += 60;
+      return { candidate, score };
+    })
+    // Relevance threshold: only genuine matches survive (MLS = 100, name+number = 60).
+    .filter((s) => s.score >= 60);
 
   scored.sort((a, b) => b.score - a.score || (dateMs(b.candidate.timestamp) ?? 0) - (dateMs(a.candidate.timestamp) ?? 0));
   return scored.slice(0, limit).map((s) => s.candidate);

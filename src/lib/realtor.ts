@@ -1,5 +1,5 @@
 import puppeteer, { type Page } from "puppeteer-core";
-import { browserPath } from "./chrome";
+import { browserPath, BROWSER_LAUNCH_ARGS, launchErrorDetail } from "./chrome";
 
 const NAV_TIMEOUT_MS = 45_000;
 const READY_TIMEOUT_MS = 20_000;
@@ -8,11 +8,9 @@ const MAX_ATTEMPTS = 3;
 // A current desktop Chrome UA — a stale UA is itself a bot signal. Keep this fresh.
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+// Shared hardened flags (incl. --disable-gpu) plus the scraper's stealth extras.
 const LAUNCH_ARGS = [
-  "--no-sandbox",
-  "--disable-setuid-sandbox",
-  // container /dev/shm is often 64MB and Chrome crashes without this.
-  "--disable-dev-shm-usage",
+  ...BROWSER_LAUNCH_ARGS,
   "--disable-blink-features=AutomationControlled",
   `--user-agent=${UA}`
 ];
@@ -95,13 +93,12 @@ export async function fetchRealtorAdminStats(adminUrl: string): Promise<RealtorS
       browser = await puppeteer.launch({ executablePath, headless: true, args: LAUNCH_ARGS });
     } catch (error) {
       // A genuine launch failure won't fix itself on retry — surface it and stop.
-      // The real cause (missing libs, version mismatch, etc.) is included so it can be
-      // diagnosed without digging through host logs; trim once the deploy is sorted.
-      const detail = ((error as Error)?.message ?? String(error)).split("\n")[0].slice(0, 200);
+      // launchErrorDetail digs out Chromium's real stderr (missing lib / kill signal),
+      // which the generic first line hides; log the whole thing server-side too.
       // eslint-disable-next-line no-console
       console.error(`[realtor] browser launch failed (${executablePath}): ${(error as Error)?.message ?? error}`);
       return degraded(
-        `Couldn't start the browser to read REALTOR.ca (${executablePath}). Error: ${detail}`,
+        `Couldn't start the browser to read REALTOR.ca. ${launchErrorDetail(error)} — enter the numbers manually below.`,
         "terminal"
       );
     }

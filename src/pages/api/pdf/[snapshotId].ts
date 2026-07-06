@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import puppeteer from "puppeteer-core";
-import { browserPath } from "../../../lib/chrome";
+import { browserPath, BROWSER_LAUNCH_ARGS } from "../../../lib/chrome";
 import { readSnapshot, slugify } from "../../../lib/storage";
 
 export const prerender = false;
@@ -31,9 +31,7 @@ export const GET: APIRoute = async ({ params, request }) => {
     browser = await puppeteer.launch({
       executablePath,
       headless: true,
-      // --disable-dev-shm-usage: container /dev/shm is often 64MB and Chrome crashes
-      // mid-render without it.
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+      args: BROWSER_LAUNCH_ARGS
     });
     const page = await browser.newPage();
     await page.setViewport({ width: 1240, height: 1600, deviceScaleFactor: 1 });

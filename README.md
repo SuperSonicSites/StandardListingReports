@@ -173,9 +173,14 @@ The code is host-agnostic; these are the moving parts:
 2. Service variables: `HOST=0.0.0.0`, `ADMIN_PASSWORD`, `META_SYSTEM_USER_TOKEN`,
    `RYBBIT_API_KEY`, `BRAVE_API_KEY` (optional — enables auto-finding the listing
    page on the client's website by MLS#/address via Brave Search; without it the
-   Website URL is entered manually), `CHROME_PATH=/usr/bin/chromium`, and
-   `RAILPACK_DEPLOY_APT_PACKAGES=chromium` (installs Chrome for the PDF route).
-   The built server never loads `.env` — platform env vars are the only source.
+   Website URL is entered manually). The built server never loads `.env` —
+   platform env vars are the only source.
+   **Chromium** (PDF + REALTOR.ca capture) ships bundled via `@sparticuz/chromium`
+   — a headless-shell build that runs in restricted containers where the system
+   apt `chromium` can't (recent Chromium needs unprivileged user namespaces the
+   host kernel now blocks). No `CHROME_PATH` or `RAILPACK_DEPLOY_APT_PACKAGES` is
+   needed on Linux; on Linux `CHROME_PATH` is ignored so a stale one can't force
+   the broken system binary. `/api/health/chrome` (admin-only) verifies the launch.
 3. Mount a volume at `/app/data`. Client profiles and snapshots are runtime
    data that live only on this volume (gitignored) — deploys never touch them.
    Create clients via `/admin/clients/new` after the first deploy.

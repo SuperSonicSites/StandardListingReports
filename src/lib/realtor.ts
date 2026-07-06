@@ -1,5 +1,5 @@
 import puppeteer, { type Page } from "puppeteer-core";
-import { browserPath, browserLaunchOptions, launchErrorDetail } from "./chrome";
+import { resolveBrowserLaunch, launchErrorDetail } from "./chrome";
 
 const NAV_TIMEOUT_MS = 45_000;
 const READY_TIMEOUT_MS = 20_000;
@@ -8,19 +8,8 @@ const MAX_ATTEMPTS = 3;
 // A current desktop Chrome UA — a stale UA is itself a bot signal. Keep this fresh.
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
-// The scraper's extra flags, layered onto the shared hardened flags/options.
-//   --single-process + --no-zygote: on the container host, multi-process Chromium dies
-//     right after startup (only the benign dbus line in stderr) — the zygote/namespace
-//     fork failing, or an OOM kill. Running everything in one process fixes the fork and
-//     roughly halves memory. Safe here: we only read DOM text/attributes off one page, so
-//     the renderer-stability caveat of --single-process doesn't bite (the PDF route keeps
-//     multi-process for print fidelity).
-const EXTRA_ARGS = [
-  "--single-process",
-  "--no-zygote",
-  "--disable-blink-features=AutomationControlled",
-  `--user-agent=${UA}`
-];
+// Scraper-only extras (the bot-wall stealth) layered onto the resolved launch args.
+const EXTRA_ARGS = ["--disable-blink-features=AutomationControlled", `--user-agent=${UA}`];
 
 export type RealtorStatsResult = {
   source: "realtor_page" | "manual";
@@ -86,24 +75,24 @@ export async function fetchRealtorAdminStats(adminUrl: string): Promise<RealtorS
       "terminal"
     );
   }
-  const executablePath = browserPath();
-  if (!executablePath) {
+  const launchOptions = await resolveBrowserLaunch(EXTRA_ARGS);
+  if (!launchOptions.executablePath) {
     return degraded("REALTOR.ca capture needs Chrome/Edge (or CHROME_PATH) on the server.");
   }
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    // Launch a fresh browser per attempt — the SAME per-call model the PDF route uses and
-    // that captured REALTOR.ca photos before. (An earlier shared long-lived browser broke
-    // this on the deploy host; the launch itself is cheap for this low-volume tool.)
+    // Launch a fresh browser per attempt (per-call model; a shared long-lived browser broke
+    // this on the deploy host). On Linux this uses the bundled @sparticuz/chromium — see
+    // resolveBrowserLaunch — because the system apt Chromium can't start in the container.
     let browser;
     try {
-      browser = await puppeteer.launch({ executablePath, ...browserLaunchOptions(EXTRA_ARGS) });
+      browser = await puppeteer.launch(launchOptions);
     } catch (error) {
       // A genuine launch failure won't fix itself on retry — surface it and stop.
       // launchErrorDetail digs out Chromium's real stderr (missing lib / kill signal),
       // which the generic first line hides; log the whole thing server-side too.
       // eslint-disable-next-line no-console
-      console.error(`[realtor] browser launch failed (${executablePath}): ${(error as Error)?.message ?? error}`);
+      console.error(`[realtor] browser launch failed (${launchOptions.executablePath}): ${(error as Error)?.message ?? error}`);
       return degraded(
         `Couldn't start the browser to read REALTOR.ca. ${launchErrorDetail(error)} — enter the numbers manually below.`,
         "terminal"

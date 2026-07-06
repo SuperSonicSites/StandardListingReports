@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import puppeteer from "puppeteer-core";
-import { browserPath, browserLaunchOptions } from "../../../lib/chrome";
+import { resolveBrowserLaunch } from "../../../lib/chrome";
 import { readSnapshot, slugify } from "../../../lib/storage";
 
 export const prerender = false;
@@ -15,8 +15,10 @@ export const GET: APIRoute = async ({ params, request }) => {
     return new Response("Snapshot not found.", { status: 404 });
   }
 
-  const executablePath = browserPath();
-  if (!executablePath) {
+  // On Linux this uses the bundled @sparticuz/chromium (the system apt Chromium can't start
+  // in the container); on dev it uses the local Chrome. See resolveBrowserLaunch.
+  const launchOptions = await resolveBrowserLaunch();
+  if (!launchOptions.executablePath) {
     return new Response("PDF generation needs Chrome, Edge, or CHROME_PATH set.", { status: 500 });
   }
 
@@ -28,7 +30,7 @@ export const GET: APIRoute = async ({ params, request }) => {
 
   let browser;
   try {
-    browser = await puppeteer.launch({ executablePath, ...browserLaunchOptions() });
+    browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
     await page.setViewport({ width: 1240, height: 1600, deviceScaleFactor: 1 });
     // The loopback self-fetch must carry the caller's auth cookie, or the

@@ -1,19 +1,29 @@
 import os from "node:os";
-import { existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import type { APIRoute } from "astro";
 import puppeteer from "puppeteer-core";
 import { isAdmin } from "../../../lib/auth";
-import { browserPath } from "../../../lib/chrome";
+import { browserPath, resolveBrowserLaunch } from "../../../lib/chrome";
 
 export const prerender = false;
+
+function readSysctl(path: string): string {
+  try {
+    return readFileSync(path, "utf-8").trim();
+  } catch {
+    return "n/a";
+  }
+}
 
 // One-shot Chromium launch diagnostic (admin-only). Hitting this on the deploy host runs
 // the REAL puppeteer.launch under three flag sets and reports the full error + exit
 // code/signal for each, plus container memory — so a launch failure is diagnosed from
 // data (missing lib? OOM SIGKILL? which flags work?) instead of guessed at from afar.
 // Temporary: remove once the deploy's browser launch is sorted.
-async function tryLaunch(label: string, args: string[]) {
-  const executablePath = browserPath();
+async function tryLaunch(label: string, args: string[], executablePath: string | undefined) {
+  if (!executablePath) {
+    return { label, ok: false, error: "no executablePath resolved" };
+  }
   const start = Date.now();
   let browser;
   try {
@@ -49,8 +59,7 @@ export const GET: APIRoute = async ({ request }) => {
     return new Response("Admin sign-in required.", { status: 401 });
   }
 
-  const executablePath = browserPath();
-  const base = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"];
+  const systemPath = browserPath();
   const report: Record<string, unknown> = {
     platform: process.platform,
     arch: process.arch,
@@ -59,23 +68,31 @@ export const GET: APIRoute = async ({ request }) => {
     freeMemMB: Math.round(os.freemem() / 1_048_576),
     cpus: os.cpus().length,
     CHROME_PATH: process.env.CHROME_PATH ?? null,
-    resolvedBrowserPath: executablePath ?? null,
-    browserExists: executablePath ? existsSync(executablePath) : false
+    systemBrowserPath: systemPath ?? null,
+    // Confirms the root cause: "1" = the kernel restricts unprivileged user namespaces, so
+    // recent system Chromium can't create its sandbox and dies at startup ("Code: null").
+    "kernel.apparmor_restrict_unprivileged_userns": readSysctl(
+      "/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
+    ),
+    "kernel.unprivileged_userns_clone": readSysctl("/proc/sys/kernel/unprivileged_userns_clone"),
+    "user.max_user_namespaces": readSysctl("/proc/sys/user/max_user_namespaces")
   };
 
-  if (!executablePath) {
-    report.attempts = "No browser binary found — nothing to launch.";
-    return new Response(JSON.stringify(report, null, 2), {
-      headers: { "Content-Type": "application/json" }
-    });
-  }
+  // The bundled @sparticuz/chromium launch — this is the real production path.
+  const sparticuz = await resolveBrowserLaunch();
+  report.sparticuzExecutablePath = sparticuz.executablePath ?? null;
+  const attempts: unknown[] = [];
+  attempts.push(await tryLaunch("sparticuz (production path)", sparticuz.args, sparticuz.executablePath));
 
-  // Run sequentially (never two Chromium at once) so a launch OOM in one doesn't skew the next.
-  report.attempts = [
-    await tryLaunch("base", base),
-    await tryLaunch("gpu-off", [...base, "--disable-gpu", "--disable-software-rasterizer"]),
-    await tryLaunch("single-process", [...base, "--disable-gpu", "--single-process", "--no-zygote"])
-  ];
+  // For contrast, the old system-Chromium attempts (expected to fail on the deploy host).
+  if (systemPath) {
+    const base = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"];
+    attempts.push(await tryLaunch("system base", base, systemPath));
+    attempts.push(
+      await tryLaunch("system single-process", [...base, "--disable-gpu", "--single-process", "--no-zygote"], systemPath)
+    );
+  }
+  report.attempts = attempts;
 
   return new Response(JSON.stringify(report, null, 2), {
     headers: { "Content-Type": "application/json" }

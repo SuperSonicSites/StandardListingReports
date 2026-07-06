@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import chromium from "@sparticuz/chromium";
 
 // Local Chrome/Edge used for PDF printing and the REALTOR.ca capture.
 // CHROME_PATH (env or .env) wins; otherwise probe the standard install spots.
@@ -33,20 +34,42 @@ export const BROWSER_LAUNCH_ARGS = [
   "--disable-software-rasterizer"
 ];
 
-// Common puppeteer.launch options shared by the PDF route and the scraper. Callers add
-// their own `executablePath` and any extra args.
-export function browserLaunchOptions(extraArgs: string[] = []) {
+const LAUNCH_ENV = { ...process.env, DBUS_SESSION_BUS_ADDRESS: "/dev/null" };
+
+/**
+ * Resolve the full puppeteer.launch options for this host. NEVER two browsers: callers add
+ * their own extra args.
+ *
+ * On Linux (the Railway deploy host) the system apt Chromium can't start — recent Chromium
+ * needs unprivileged user namespaces that the host kernel now restricts (dies instantly,
+ * "Code: null", unaffected by flags/memory). So we use @sparticuz/chromium: a bundled
+ * headless-shell Chromium built to run in restricted containers (no userns). Its own arg
+ * set (--no-sandbox/--single-process/--no-zygote/...) is required, so we use it as the base
+ * on Linux and IGNORE any CHROME_PATH pointing at the broken /usr/bin/chromium.
+ *
+ * On Windows/macOS dev the bundled Linux binary is useless, so use the local system Chrome.
+ */
+export async function resolveBrowserLaunch(extraArgs: string[] = []) {
+  const base = {
+    // A cold container Chromium can take longer than puppeteer's default 30s to expose the
+    // endpoint; give it room. No system D-Bus in the container, so point Chromium at a dead
+    // address (kills the noisy, misleading "Failed to connect to the bus" line + its stall).
+    timeout: 60_000,
+    env: LAUNCH_ENV
+  };
+  if (process.platform === "linux") {
+    return {
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+      args: [...chromium.args, ...extraArgs],
+      ...base
+    };
+  }
   return {
+    executablePath: browserPath(),
     headless: true as const,
     args: [...BROWSER_LAUNCH_ARGS, ...extraArgs],
-    // A memory-pressured container can take well over puppeteer's default 30s to bring up
-    // the DevTools endpoint (the benign dbus stderr prints while it's still starting) — so
-    // the launch times out and reports a failure that isn't one. Give it more room.
-    timeout: 60_000,
-    // There's no system D-Bus in the container; point Chromium at a dead address so it
-    // doesn't keep trying the missing /run/dbus socket (the source of the noisy — and
-    // misleading — "Failed to connect to the bus" line) and stall startup on the retries.
-    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: "/dev/null" }
+    ...base
   };
 }
 

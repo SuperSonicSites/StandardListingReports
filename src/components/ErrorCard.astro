@@ -1,0 +1,70 @@
+---
+// Branded, recoverable error / empty card. App chrome only. Used for the
+// edit-route 404. The API-route server error pages render their own
+// self-contained variant of this (they can't import an Astro component).
+type Action = { label: string; href: string; variant?: "primary" | "ghost" };
+
+type Props = {
+  eyebrow: string;
+  title: string;
+  reason?: string;
+  reassure?: boolean;
+  actions: Action[];
+};
+
+const { eyebrow, title, reason, reassure = false, actions } = Astro.props;
+---
+
+<main
+  class="reveal"
+  style="min-height: 72vh; display: grid; place-items: center; padding: 56px 16px"
+>
+  <div class="card" style="width: min(480px, 100%); padding: 34px 32px; text-align: center">
+    <div
+      style="width: 48px; height: 48px; border-radius: 12px; background: var(--ss-danger-soft); display: grid; place-items: center; margin: 0 auto 16px"
+    >
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path
+          d="M12 9v4m0 4h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
+          stroke="#dc2626"
+          stroke-width="1.7"
+          stroke-linecap="round"
+          stroke-linejoin="round"></path>
+      </svg>
+    </div>
+    <p class="eyebrow" style="color: var(--ss-danger-ink); margin-bottom: 8px">
+      {eyebrow}
+    </p>
+    <h1
+      style="font-size: 1.5rem; font-weight: 700; color: var(--ss-ink); margin: 0 0 10px; letter-spacing: -0.02em"
+    >
+      {title}
+    </h1>
+    {
+      reason && (
+        <p style="color: var(--ss-text-soft); line-height: 1.6; margin: 0 0 8px">
+          {reason}
+        </p>
+      )
+    }
+    {
+      reassure && (
+        <p style="color: var(--ss-muted); font-size: 0.86rem; margin: 0 0 22px">
+          Nothing was lost — your entries are still on the form.
+        </p>
+      )
+    }
+    <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px">
+      {
+        actions.map((action) => (
+          <a
+            class={`button ${action.variant ?? "primary"} block`}
+            href={action.href}
+          >
+            {action.label}
+          </a>
+        ))
+      }
+    </div>
+  </div>
+</main>

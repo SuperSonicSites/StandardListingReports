@@ -1,7 +1,10 @@
 ---
 import AppLayout from "../../../layouts/AppLayout.astro";
 import SiteHeader from "../../../components/SiteHeader.astro";
+import ErrorCard from "../../../components/ErrorCard.astro";
+import Toast from "../../../components/Toast.astro";
 import { readClient } from "../../../lib/storage";
+import { takeFlash } from "../../../lib/flash";
 
 const clientSlug = Astro.params.clientSlug ?? "";
 let client;
@@ -11,694 +14,515 @@ try {
 } catch {
   Astro.response.status = 404;
 }
+const flash = takeFlash(Astro.cookies);
 ---
 
-<AppLayout title={client ? `New Report | ${client.name}` : "Client Not Found"} className="client-form-body">
-  {client ? (
-    <>
-    <SiteHeader context={client.name} />
-    <main class="client-workspace">
-      <header class="client-form-hero">
-        <div>
-          <p class="eyebrow">Listing report</p>
-          <h1>Create Listing Report</h1>
-          <p>
-            Paste the REALTOR.ca share link and hit Pull data — the address, MLS&reg;, reporting window,
-            website page, views, photo and matching social posts all fill in below. Then just confirm and create.
-          </p>
-        </div>
-      </header>
-
-      <form id="report-form" class="client-report-form" method="post" action="/api/snapshot">
-        <input type="hidden" name="client_slug" value={client.slug} />
-        <input type="hidden" name="facebook_media_url" value="" />
-        <input type="hidden" name="instagram_media_url" value="" />
-        <input type="hidden" name="property_image_url" value="" />
-        <input type="hidden" name="site_total_views" value="0" />
-        <input type="hidden" name="website_source" value="manual" />
-        <input type="hidden" name="facebook_source" value="manual" />
-        <input type="hidden" name="instagram_source" value="manual" />
-        <input type="hidden" name="start_date" value="" />
-        <input type="hidden" name="end_date" value="" />
-
-        <!-- ===== 1. Intake (always visible) ===== -->
-        <section class="client-form-card client-pull-card" data-pull-card>
-          <div class="client-section-header">
-            <span>1</span>
-            <div>
-              <h2>Start here</h2>
-              <p>Paste the REALTOR.ca share link and pull. Everything else fills in below for you to confirm.</p>
-            </div>
+<AppLayout
+  title={client ? `New report | ${client.name}` : "Client not found | Supersonic"}
+  className="client-form-body"
+>
+  {
+    client ? (
+      <>
+        <SiteHeader context={client.name} contextAccent={client.brand_accent} />
+        <main class="client-workspace">
+          <div class="co-hero reveal">
+            <p class="eyebrow">Listing report</p>
+            <h1>Create Listing Report</h1>
+            <p>
+              Paste your REALTOR.ca share link and pull. We find the listing, the
+              matching posts, and the numbers — you just confirm and create the
+              report.
+            </p>
           </div>
 
-          <div class="client-field-grid two">
-            <label class="client-field wide" data-notice-anchor="realtor">
-              <span>REALTOR.ca Admin URL</span>
-              <input
-                class="client-url-input"
-                type="url"
-                name="realtor_admin_url"
-                placeholder="https://member.realtor.ca/Reports/ListingDestination/..."
-                required
-              />
-              <small>
-                Signed in to REALTOR.ca, the top-right corner of your listing has a SHARE LISTING
-                button — share the link with yourself, paste it here, and press Pull data.
-              </small>
-            </label>
-          </div>
+          <form id="report-form" method="post" action="/api/snapshot" novalidate>
+            <input type="hidden" name="client_slug" value={client.slug} />
+            <input type="hidden" name="facebook_media_url" value="" />
+            <input type="hidden" name="instagram_media_url" value="" />
+            <input type="hidden" name="property_image_url" value="" />
+            <input type="hidden" name="site_total_views" value="0" />
+            <input type="hidden" name="website_source" value="manual" />
+            <input type="hidden" name="facebook_source" value="manual" />
+            <input type="hidden" name="instagram_source" value="manual" />
+            <input type="hidden" name="start_date" value="" />
+            <input type="hidden" name="end_date" value="" />
 
-          <div class="client-pull-strip">
-            <div class="client-pull-status">
-              <span aria-hidden="true"></span>
-              <div>
-                <strong data-pull-status>Ready to pull</strong>
-                <small data-pull-detail>Paste the REALTOR.ca link above, then pull — everything else fills in for you to confirm.</small>
+            {/* ===== 1. Intake ===== */}
+            <section class="card co-section" data-pull-card>
+              <div class="numbered-head">
+                <span class="num">1</span>
+                <div class="head-text">
+                  <h2>Start here</h2>
+                  <p>
+                    Paste the REALTOR.ca share link and pull. Everything else
+                    fills in below for you to confirm.
+                  </p>
+                </div>
               </div>
-            </div>
-            <button class="client-pull-button" type="button" data-pull-trigger>Pull data</button>
-          </div>
 
-          <!-- Facebook / Instagram post pickers — revealed once the pull matches them. -->
-          <div class="client-field-grid two" data-social-picker hidden>
-            <label class="client-field" data-notice-anchor="facebook">
-              <span>Facebook post</span>
-              <select class="post-candidate-select" data-candidate-select="facebook">
-                <option value="">Pull data to match posts&hellip;</option>
-              </select>
-              <img class="post-media-preview" data-media-preview="facebook" alt="Selected Facebook post image" hidden />
-            </label>
-            <label class="client-field" data-notice-anchor="instagram">
-              <span>Instagram post</span>
-              <select class="post-candidate-select" data-candidate-select="instagram">
-                <option value="">Pull data to match posts&hellip;</option>
-              </select>
-              <img class="post-media-preview" data-media-preview="instagram" alt="Selected Instagram post image" hidden />
-            </label>
-          </div>
-        </section>
-
-        <!-- ===== Review (revealed after the pull) ===== -->
-        <div class="client-review-block" data-review-block hidden>
-
-          <section class="client-form-card">
-            <div class="client-section-header">
-              <span>2</span>
-              <div>
-                <h2>Listing details</h2>
-                <p>Pulled from REALTOR.ca — edit only if a value is wrong.</p>
-              </div>
-            </div>
-            <div class="client-field-grid two">
-              <label class="client-field wide">
-                <span>Address</span>
-                <input name="address" placeholder="Pulled from REALTOR.ca" required />
-              </label>
-              <label class="client-field">
-                <span>MLS&reg; number</span>
-                <input name="mls_number" placeholder="Pulled from REALTOR.ca" />
-              </label>
-              <div class="client-field wide">
-                <span>Report period</span>
-                <p class="client-period-value" data-period-text>First day on market &rarr; today</p>
-              </div>
-              <label class="client-field wide" data-notice-anchor="listing">
-                <span>Website URL</span>
+              <div class="field">
+                <label class="field-label" for="coord-url">
+                  REALTOR.ca Admin URL <span class="req">*</span>
+                </label>
                 <input
-                  class="client-url-input"
+                  id="coord-url"
                   type="url"
-                  name="listing_url"
-                  placeholder="Found automatically from the listing — or paste it here"
-                  required
+                  name="realtor_admin_url"
+                  placeholder="https://member.realtor.ca/Reports/ListingDestination/..."
+                  aria-describedby="url-help"
+                  autofocus
                 />
-              </label>
-            </div>
-            <div class="client-field-grid two" data-period-fallback hidden>
-              <label class="client-field">
-                <span>First day on market</span>
-                <input type="date" data-period-start />
-              </label>
-              <label class="client-field">
-                <span>End date</span>
-                <input type="date" data-period-end />
-              </label>
-              <p class="client-field wide import-fetch-notice">
-                We couldn't read the listing date from REALTOR.ca — set the reporting window here.
-              </p>
-            </div>
-          </section>
-
-          <section class="client-form-card">
-            <div class="client-section-header">
-              <span>3</span>
-              <div>
-                <h2>Performance</h2>
-                <p>Pulled numbers — review and correct anything that looks off.</p>
+                <p class="field-hint" id="url-help">
+                  In REALTOR.ca, open your listing and click
+                  <span class="share-pill">SHARE LISTING</span> (top-right). Send
+                  the link to yourself, then paste it here.
+                </p>
               </div>
-            </div>
-            <div class="import-review-stack">
-              <article class="import-review-card">
-                <div class="import-review-head">
-                  <div>
-                    <span class="source-badge" data-source-badge="website">Rybbit</span>
-                    <h3>Website analytics</h3>
-                    <p>Listing traffic for the reporting window.</p>
-                  </div>
-                  <div class="import-primary-metric">
-                    <input class="import-metric-input" type="number" min="0" name="website_views" value="0" required />
-                    <small>listing page views</small>
-                  </div>
-                </div>
-              </article>
 
-              <article class="import-review-card">
-                <div class="import-review-head">
-                  <div>
-                    <span class="source-badge" data-source-badge="realtor">REALTOR.ca</span>
-                    <h3>REALTOR.ca performance</h3>
-                    <p>All-time listing views, days on market, and the listing's first photo (shown on the report cover).</p>
-                    <img class="post-media-preview" data-media-preview="realtor" alt="REALTOR.ca listing photo (appears on the report cover)" hidden />
-                  </div>
-                </div>
-                <div class="post-review-list">
-                  <div class="post-review-row">
-                    <div>
-                      <strong>Listing stats</strong>
-                      <p>Total views is all-time, regardless of the report period.</p>
+              <div class="pull-strip">
+                <div class="pull-status" aria-live="polite">
+                  <span class="pull-dot" data-pull-dot aria-hidden="true" />
+                  <div style="min-width: 0">
+                    <strong data-pull-status>Ready to pull</strong>
+                    <div class="detail" data-pull-detail>
+                      Paste the REALTOR.ca link above, then pull — everything else
+                      fills in for you to confirm.
                     </div>
-                    <dl>
-                      <div>
-                        <dt>Total views</dt>
-                        <dd>
-                          <input class="import-metric-input" type="number" min="0" name="realtor_listing_views" value="0" required />
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Days on market</dt>
-                        <dd>
-                          <input class="import-metric-input" type="number" min="0" name="days_on_market" value="0" required />
-                        </dd>
-                      </div>
-                    </dl>
                   </div>
                 </div>
-              </article>
+                <button
+                  class="button primary"
+                  type="button"
+                  data-pull-trigger
+                  style="min-width: 124px"
+                >
+                  Pull data
+                </button>
+              </div>
 
-              <article class="import-review-card">
-                <div class="import-review-head">
-                  <div>
-                    <span class="source-badge" data-source-badge="social">Meta</span>
-                    <h3>Social performance</h3>
-                    <p>Captions and views for the Facebook &amp; Instagram posts you picked above. Edit anything that should read differently on the report.</p>
+              {/* Post pickers — revealed after the pull. */}
+              <div data-social-picker hidden>
+                <div
+                  class="reveal"
+                  style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px"
+                >
+                  <div class="field" data-notice-anchor="facebook">
+                    <label class="field-label">Featured Facebook post</label>
+                    <div style="display: flex; gap: 12px; align-items: flex-start">
+                      <button
+                        type="button"
+                        class="post-thumb"
+                        style="width: 76px; height: 76px; flex: none"
+                        data-zoom="facebook"
+                        aria-label="Enlarge Facebook post image"
+                      >
+                        <img data-media-preview="facebook" alt="Selected Facebook post image" hidden />
+                        <span
+                          class="thumb-badge"
+                          style="background: #1877f2; font-weight: 800; font-size: 0.6rem"
+                        >
+                          f
+                        </span>
+                      </button>
+                      <div style="flex: 1; min-width: 0">
+                        <select data-candidate-select="facebook" aria-label="Featured Facebook post">
+                          <option value="">Pull data to match posts…</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="field" data-notice-anchor="instagram">
+                    <label class="field-label">Featured Instagram post</label>
+                    <div style="display: flex; gap: 12px; align-items: flex-start">
+                      <button
+                        type="button"
+                        class="post-thumb"
+                        style="width: 76px; height: 76px; flex: none"
+                        data-zoom="instagram"
+                        aria-label="Enlarge Instagram post image"
+                      >
+                        <img data-media-preview="instagram" alt="Selected Instagram post image" hidden />
+                        <span
+                          class="thumb-badge"
+                          style="background: linear-gradient(45deg, #f09433, #dc2743, #bc1888)"
+                        >
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                            <rect x="4" y="4" width="16" height="16" rx="4.5" stroke="currentColor" stroke-width="2.4" />
+                            <circle cx="12" cy="12" r="3.3" stroke="currentColor" stroke-width="2.4" />
+                          </svg>
+                        </span>
+                      </button>
+                      <div style="flex: 1; min-width: 0">
+                        <select data-candidate-select="instagram" aria-label="Featured Instagram post">
+                          <option value="">Pull data to match posts…</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div class="post-review-list">
-                  <div class="post-review-row">
-                    <div>
-                      <strong>Facebook post</strong>
-                      <label class="post-caption-field">
-                        <span>Post URL</span>
-                        <input type="url" name="facebook_post_url" placeholder="Set from your selection, or paste a link" />
+              </div>
+            </section>
+
+            {/* ===== Review (revealed after the pull) ===== */}
+            <div data-review-block hidden>
+              <div id="coord-summary" class="card err-summary" role="alert" hidden>
+                <h2 id="coord-summary-h" tabindex="-1" />
+                <ul data-summary-list />
+              </div>
+
+              {/* Section 2 — Listing details */}
+              <section class="card co-section reveal">
+                <div class="numbered-head">
+                  <span class="num">2</span>
+                  <div class="head-text">
+                    <h2>Listing details</h2>
+                    <p>Pulled from REALTOR.ca — edit only if a value is wrong.</p>
+                  </div>
+                </div>
+                <div class="section-fields">
+                  <div class="field">
+                    <label class="field-label" for="addr">Address <span class="req">*</span></label>
+                    <input id="addr" name="address" placeholder="Pulled from REALTOR.ca" data-field="address" />
+                    <p class="err-note" data-err-for="address" hidden />
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="mls">MLS&reg; number</label>
+                    <input id="mls" name="mls_number" placeholder="Pulled from REALTOR.ca" />
+                  </div>
+
+                  <div class="field" data-period-pill>
+                    <span class="field-label">Report period</span>
+                    <div
+                      style="display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; background: var(--ss-bg); border: 1px solid var(--ss-border); border-radius: var(--ss-radius-sm); padding: 10px 14px; min-height: 44px"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <rect x="4" y="5" width="16" height="16" rx="2" stroke="#64748b" stroke-width="1.6" />
+                        <path d="M4 9h16M8 3v4M16 3v4" stroke="#64748b" stroke-width="1.6" stroke-linecap="round" />
+                      </svg>
+                      <span style="font-weight: 600; font-size: 0.88rem" data-period-text>
+                        First day on market &rarr; today
+                      </span>
+                    </div>
+                    <p class="field-hint">Set automatically from the listing&rsquo;s first day on market.</p>
+                  </div>
+
+                  <div class="field" data-period-fallback hidden>
+                    <div class="notice" role="status">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 9v4m0 4h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                      We couldn&rsquo;t read the listing date. Set the reporting window below.
+                    </div>
+                    <div class="two-up" style="margin-top: 8px">
+                      <label class="field" style="gap: 6px">
+                        <span class="field-label">First day on market</span>
+                        <input class="amber" type="date" data-period-start />
                       </label>
-                      <label class="post-caption-field">
-                        <span>Caption (appears on the report)</span>
-                        <textarea name="facebook_caption" rows="2" maxlength="300" placeholder="Filled from your selection, or write your own."></textarea>
+                      <label class="field" style="gap: 6px">
+                        <span class="field-label">End date</span>
+                        <input class="amber" type="date" data-period-end />
                       </label>
                     </div>
-                    <dl>
-                      <div>
-                        <dt>Views</dt>
-                        <dd>
-                          <input class="import-metric-input" type="number" min="0" name="facebook_views" value="0" required />
-                        </dd>
-                      </div>
-                    </dl>
                   </div>
-                  <div class="post-review-row">
-                    <div>
-                      <strong>Instagram post</strong>
-                      <label class="post-caption-field">
-                        <span>Post URL</span>
-                        <input type="url" name="instagram_post_url" placeholder="Set from your selection, or paste a link" />
-                      </label>
-                      <label class="post-caption-field">
-                        <span>Caption (appears on the report)</span>
-                        <textarea name="instagram_caption" rows="2" maxlength="300" placeholder="Filled from your selection, or write your own."></textarea>
-                      </label>
-                    </div>
-                    <dl>
-                      <div>
-                        <dt>Views</dt>
-                        <dd>
-                          <input class="import-metric-input" type="number" min="0" name="instagram_views" value="0" required />
-                        </dd>
-                      </div>
-                    </dl>
+
+                  <div class="field" data-notice-anchor="listing">
+                    <label class="field-label" for="listing-url">
+                      Website URL <span class="req">*</span>
+                      <span class="info-wrap" data-info="listing" hidden>
+                        <button type="button" class="info-dot" data-tip-toggle="listing" style="width: 18px; height: 18px" />
+                        <span class="tooltip" data-tip="listing" hidden />
+                      </span>
+                    </label>
+                    <input id="listing-url" type="url" name="listing_url" placeholder="https://…" data-field="listing_url" />
+                    <p class="err-note" data-err-for="listing_url" hidden />
                   </div>
                 </div>
-              </article>
-            </div>
-          </section>
+              </section>
 
-          <section class="client-form-card">
-            <div class="client-section-header">
-              <span>4</span>
-              <div>
-                <h2>Showings &amp; notes</h2>
-                <p>The one number we can't pull, plus any seller-facing note.</p>
-              </div>
-            </div>
-            <div class="client-field-grid two">
-              <div>
-                <label class="client-field">
-                  <span>Showings</span>
-                  <input type="number" min="0" name="showings" placeholder="0" required />
-                </label>
-                <label class="client-toggle">
-                  <input type="checkbox" name="hide_showings" value="yes" />
-                  <span>Do not display showings on the report</span>
-                </label>
-              </div>
-              <div class="wide">
-                <label class="client-field wide">
-                  <span>Notes</span>
-                  <textarea name="notes" rows="4" maxlength="600" placeholder="Optional notes shown on the report's performance page."></textarea>
-                </label>
-                <label class="client-toggle">
-                  <input type="checkbox" name="hide_notes" value="yes" />
-                  <span>Do not display notes on the report</span>
-                </label>
-              </div>
-            </div>
-          </section>
+              {/* Section 3 — Performance */}
+              <section class="card co-section reveal">
+                <div class="numbered-head">
+                  <span class="num">3</span>
+                  <div class="head-text">
+                    <h2>Performance</h2>
+                    <p>Pulled numbers — review and correct anything that looks off.</p>
+                  </div>
+                </div>
+                <div class="perf-stack">
+                  {/* Website */}
+                  <div class="rail-card" data-rail="website" data-fold="website" data-notice-anchor="website" style="box-shadow: none">
+                    <div class="perf-metric-row">
+                      <div style="min-width: 180px">
+                        <div class="co-card-title">
+                          <h3>Website analytics</h3>
+                          <span class="info-wrap" data-info="website" hidden>
+                            <button type="button" class="info-dot" data-tip-toggle="website" />
+                            <span class="tooltip" data-tip="website" hidden />
+                          </span>
+                        </div>
+                        <p class="co-card-desc">Listing traffic for the reporting window.</p>
+                      </div>
+                      <div style="text-align: right">
+                        <input class="import-metric-input metric-big" type="number" inputmode="numeric" min="0" name="website_views" value="0" aria-label="Website listing page views" data-field="website_views" />
+                        <div class="metric-cap">listing page views</div>
+                      </div>
+                    </div>
+                    <p class="err-note" data-err-for="website_views" hidden style="margin-top: 8px" />
+                  </div>
 
-          <div class="client-submit-panel">
-            <label class="client-approval">
-              <input type="checkbox" name="approved" value="yes" required />
-              <span>
-                <strong>Review and approve</strong>
-                <small>I have reviewed the numbers, captions, images, and notes above.</small>
-              </span>
-            </label>
-            <button class="client-submit-button" type="submit" data-submit-button>Create Report</button>
+                  {/* REALTOR.ca */}
+                  <div class="rail-card" data-rail="realtor" data-notice-anchor="realtor" style="box-shadow: none">
+                    <div class="realtor-grid">
+                      <div style="min-width: 0">
+                        <div class="co-card-title">
+                          <h3>REALTOR.ca performance</h3>
+                          <span class="info-wrap" data-info="realtor" hidden>
+                            <button type="button" class="info-dot" data-tip-toggle="realtor" />
+                            <span class="tooltip" data-tip="realtor" hidden />
+                          </span>
+                        </div>
+                        <p class="co-card-desc">Listing views and days on market for the reporting window.</p>
+                        <div style="display: flex; gap: 12px; margin-top: 12px">
+                          <div class="stat-tile" style="flex: 1">
+                            <div class="stat-label">Total views</div>
+                            <input class="import-metric-input" type="number" inputmode="numeric" min="0" name="realtor_listing_views" value="0" aria-label="Total views" data-field="realtor_listing_views" />
+                          </div>
+                          <div class="stat-tile" style="flex: 1">
+                            <div class="stat-label">Days on market</div>
+                            <input class="import-metric-input" type="number" inputmode="numeric" min="0" name="days_on_market" value="0" aria-label="Days on market" data-field="days_on_market" />
+                          </div>
+                        </div>
+                      </div>
+                      <div style="min-width: 0">
+                        <div class="tile-label">Cover photo</div>
+                        <div class="cover-tile" data-cover-tile aria-label="Listing cover photo">
+                          <img data-media-preview="realtor" alt="Listing cover photo (appears on the report cover)" hidden />
+                          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" data-cover-icon>
+                            <path d="M4 11 12 4l8 7" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                            <path d="M6 10v9h12v-9" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                          </svg>
+                        </div>
+                        <div class="cover-empty" data-cover-empty hidden>No cover photo captured</div>
+                        <p style="font-size: 0.72rem; color: var(--ss-muted); margin: 6px 0 0">
+                          This image appears on the report cover.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Social */}
+                  <div class="rail-card" data-fold="social" data-notice-anchor="social" style="border-left-color: var(--ss-border); box-shadow: none">
+                    <div class="co-card-title">
+                      <h3>Social performance</h3>
+                      <span class="info-wrap" data-info="social" hidden>
+                        <button type="button" class="info-dot" data-tip-toggle="social" />
+                        <span class="tooltip" data-tip="social" hidden />
+                      </span>
+                    </div>
+                    <p class="co-card-desc">
+                      Views for the featured posts. Captions land verbatim on the report.
+                    </p>
+
+                    <div class="social-row" data-rail="facebook">
+                      <div style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
+                        <div class="social-net">
+                          <span class="net-ico" style="background: #1877f2; font-weight: 800; font-size: 0.7rem">f</span>
+                          Facebook
+                        </div>
+                        <input name="facebook_post_url" placeholder="Post URL" aria-label="Facebook post URL" style="min-height: 38px" />
+                        <div class="field" style="gap: 4px">
+                          <textarea name="facebook_caption" maxlength="300" rows="2" aria-label="Facebook caption — appears on the report" placeholder="Caption — appears on the report" data-counter-src="facebook" />
+                          <div class="counter" data-counter="facebook">0 / 300</div>
+                        </div>
+                        <div class="stat-tile">
+                          <div class="stat-label">Views</div>
+                          <input class="import-metric-input" type="number" inputmode="numeric" min="0" name="facebook_views" value="0" aria-label="Facebook views" data-field="facebook_views" />
+                        </div>
+                      </div>
+                      <div style="min-width: 0">
+                        <div class="tile-label">Post image</div>
+                        <button type="button" class="post-thumb" data-zoom="facebook" aria-label="Enlarge Facebook post image">
+                          <img data-review-media="facebook" alt="Facebook post image" hidden />
+                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" data-thumb-icon style="position: absolute; inset: 0; margin: auto; opacity: 0.85">
+                            <path d="M4 11 12 4l8 7" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                            <path d="M6 10v9h12v-9" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                          </svg>
+                          <span class="thumb-badge" style="background: #1877f2; font-weight: 800; font-size: 0.68rem">f</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="social-row" data-rail="instagram">
+                      <div style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
+                        <div class="social-net">
+                          <span class="net-ico" style="background: linear-gradient(45deg, #f09433, #dc2743, #bc1888)">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                              <rect x="4" y="4" width="16" height="16" rx="4.5" stroke="currentColor" stroke-width="2" />
+                              <circle cx="12" cy="12" r="3.5" stroke="currentColor" stroke-width="2" />
+                            </svg>
+                          </span>
+                          Instagram
+                        </div>
+                        <input name="instagram_post_url" placeholder="Post URL" aria-label="Instagram post URL" style="min-height: 38px" />
+                        <div class="field" style="gap: 4px">
+                          <textarea name="instagram_caption" maxlength="300" rows="2" aria-label="Instagram caption — appears on the report" placeholder="Caption — appears on the report" data-counter-src="instagram" />
+                          <div class="counter" data-counter="instagram">0 / 300</div>
+                        </div>
+                        <div class="stat-tile">
+                          <div class="stat-label">Views</div>
+                          <input class="import-metric-input" type="number" inputmode="numeric" min="0" name="instagram_views" value="0" aria-label="Instagram views" data-field="instagram_views" />
+                        </div>
+                      </div>
+                      <div style="min-width: 0">
+                        <div class="tile-label">Post image</div>
+                        <button type="button" class="post-thumb" data-zoom="instagram" aria-label="Enlarge Instagram post image">
+                          <img data-review-media="instagram" alt="Instagram post image" hidden />
+                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" data-thumb-icon style="position: absolute; inset: 0; margin: auto; opacity: 0.85">
+                            <path d="M4 11 12 4l8 7" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                            <path d="M6 10v9h12v-9" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                          </svg>
+                          <span class="thumb-badge" style="background: linear-gradient(45deg, #f09433, #dc2743, #bc1888)">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                              <rect x="4" y="4" width="16" height="16" rx="4.5" stroke="currentColor" stroke-width="2.4" />
+                              <circle cx="12" cy="12" r="3.3" stroke="currentColor" stroke-width="2.4" />
+                            </svg>
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Section 4 — Showings & notes */}
+              <section class="card co-section reveal">
+                <div class="numbered-head">
+                  <span class="num">4</span>
+                  <div class="head-text">
+                    <h2>Showings &amp; notes</h2>
+                    <p>The one number we can&rsquo;t pull, plus any seller-facing note.</p>
+                  </div>
+                </div>
+                <div class="section-fields">
+                  <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end">
+                    <div class="field" style="max-width: 200px">
+                      <label class="field-label" for="showings">Showings <span class="req">*</span></label>
+                      <input id="showings" type="number" inputmode="numeric" min="0" name="showings" placeholder="0" style="font-weight: 600" data-field="showings" />
+                      <p class="err-note" data-err-for="showings" hidden />
+                    </div>
+                    <label class="toggle-row">
+                      <input type="checkbox" name="hide_showings" value="yes" />
+                      Do not display showings on the report
+                    </label>
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="notes">Seller-facing note</label>
+                    <textarea id="notes" name="notes" maxlength="600" rows="4" placeholder="Optional — a short note the seller sees on the report." data-counter-src="notes" style="min-height: 88px" />
+                    <div class="counter" data-counter="notes">0 / 600</div>
+                    <label class="toggle-row">
+                      <input type="checkbox" name="hide_notes" value="yes" />
+                      Do not display notes on the report
+                    </label>
+                  </div>
+                </div>
+              </section>
+
+              {/* Submit */}
+              <div class="card co-submit reveal">
+                <label class="toggle-row" style="align-items: flex-start; max-width: 520px">
+                  <input type="checkbox" name="approved" value="yes" data-approval style="margin-top: 2px" />
+                  <span>
+                    <span style="font-weight: 600; color: var(--ss-ink); display: block; margin-bottom: 2px">
+                      Review and approve
+                    </span>
+                    <span style="font-size: 0.84rem; color: var(--ss-text-soft); line-height: 1.4">
+                      I have reviewed the numbers, captions, images, and notes above.
+                    </span>
+                  </span>
+                </label>
+                <div class="co-submit-right">
+                  <button class="button primary" type="submit" data-submit-button disabled style="min-width: 172px">
+                    Create Report
+                  </button>
+                  <span style="font-size: 0.78rem; color: var(--ss-muted)" data-approval-hint>
+                    Check the box to enable.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </form>
+
+          {/* Pull loading modal */}
+          <div
+            class="modal-scrim"
+            data-pull-modal
+            role="dialog"
+            aria-modal="true"
+            aria-label="Pulling your data"
+            hidden
+          >
+            <div class="modal-card" style="width: min(400px, 100%); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 30px 28px">
+              <span class="pull-spinner" aria-hidden="true" />
+              <div aria-live="polite" style="min-height: 52px">
+                <div style="font-weight: 700; font-size: 1rem; color: var(--ss-ink); margin-bottom: 5px" data-pull-stage>
+                  Opening your REALTOR.ca listing…
+                </div>
+                <p style="font-size: 0.85rem; color: var(--ss-text-soft); margin: 0; line-height: 1.5">
+                  Reading REALTOR.ca stats, matching Facebook/Instagram posts, and
+                  website analytics. This can take up to a minute.
+                </p>
+              </div>
+              <div style="width: 100%; height: 6px; border-radius: 999px; background: var(--ss-bg); overflow: hidden">
+                <div data-pull-progress style="height: 100%; background: var(--ss-accent); border-radius: 999px; width: 8%; transition: width 0.4s ease" />
+              </div>
+            </div>
           </div>
-        </div>
-      </form>
 
-      <div class="pull-modal" data-pull-modal hidden role="status" aria-live="polite">
-        <div class="pull-modal-card">
-          <span class="pull-spinner" aria-hidden="true"></span>
-          <strong>Finding your listing and matching social posts&hellip;</strong>
-          <p>Reading REALTOR.ca stats, matching Facebook/Instagram posts, and website analytics. This can take up to a minute.</p>
-        </div>
-      </div>
+          {/* Image zoom modal */}
+          <div class="modal-scrim" data-zoom-modal role="dialog" aria-modal="true" aria-label="Post image preview" style="z-index: 85" hidden>
+            <div class="zoom-card" data-zoom-card>
+              <div class="zoom-media">
+                <img data-zoom-img alt="Post image" />
+                <span style="position: absolute; top: 12px; left: 12px; display: inline-flex; align-items: center; gap: 6px; background: rgba(13,21,34,.5); color: #fff; border-radius: var(--ss-radius-pill); padding: 4px 11px; font-size: 0.75rem; font-weight: 600" data-zoom-platform>
+                  Facebook post
+                </span>
+                <button type="button" data-zoom-close aria-label="Close preview" style="position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 50%; border: none; background: rgba(13,21,34,.5); color: #fff; cursor: pointer; font-size: 1.15rem; line-height: 1">
+                  ×
+                </button>
+              </div>
+              <div style="padding: 18px 20px">
+                <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px">
+                  <span style="font-weight: 700; font-size: 0.9rem; color: var(--ss-ink)">Post preview</span>
+                  <span style="font-size: 0.82rem; color: var(--ss-muted)"><span data-zoom-views>0</span> views</span>
+                </div>
+                <p style="font-size: 0.9rem; color: var(--ss-text-soft); line-height: 1.6; margin: 0" data-zoom-caption />
+                <p style="font-size: 0.78rem; color: var(--ss-muted); margin: 12px 0 0; font-style: italic">
+                  This is the image and caption that appear on the report.
+                </p>
+              </div>
+            </div>
+          </div>
+        </main>
 
-      <script>
-        const form = document.getElementById("report-form") as HTMLFormElement | null;
-        const pullButtons = document.querySelectorAll("[data-pull-trigger]");
-        const pullCard = document.querySelector("[data-pull-card]");
-        const statusText = document.querySelector("[data-pull-status]");
-        const statusDetail = document.querySelector("[data-pull-detail]");
-        const submitButton = document.querySelector("[data-submit-button]") as HTMLButtonElement | null;
-        // Everything past the intake card is hidden until a pull has run.
-        const reviewBlock = document.querySelector("[data-review-block]") as HTMLElement | null;
-        const socialPicker = document.querySelector("[data-social-picker]") as HTMLElement | null;
-        const MAX_CAPTION = 300;
+        <Toast message={flash} />
 
-        const groups: Record<string, string[]> = {
-          website: ["website_views"],
-          facebook: ["facebook_views"],
-          instagram: ["instagram_views"]
-        };
-
-        function field(name: string): HTMLInputElement | null {
-          return (form?.querySelector(`[name="${name}"]`) as HTMLInputElement | null) ?? null;
-        }
-
-        function setVal(name: string, value: unknown) {
-          const el = field(name);
-          if (el) el.value = String(value ?? 0);
-        }
-
-        function noticeTarget(name: string) {
-          const el = field(name);
-          return el?.closest(".post-review-row") ?? el?.closest(".import-review-card") ?? null;
-        }
-
-        // One notice element per block, updated in place so refreshes replace stale text.
-        // Blocks without metric inputs (the REALTOR.ca link, the social pickers) anchor via
-        // data-notice-anchor.
-        function setNotice(key: string, message: string | null) {
-          const target =
-            document.querySelector(`[data-notice-anchor="${key}"]`) ??
-            (groups[key]?.length ? noticeTarget(groups[key][0]) : null);
-          if (!target) return;
-          let notice = target.querySelector("[data-fetch-notice]") as HTMLElement | null;
-          if (!message) {
-            notice?.remove();
-            return;
-          }
-          if (!notice) {
-            notice = document.createElement("p");
-            notice.dataset.fetchNotice = "";
-            notice.className = "import-fetch-notice";
-            target.appendChild(notice);
-          }
-          notice.textContent = message;
-        }
-
-        function setWebsiteBadge(source: string) {
-          const badge = document.querySelector('[data-source-badge="website"]');
-          if (!badge) return;
-          if (source === "mock") badge.textContent = "Rybbit — demo data";
-          else if (source === "manual") badge.textContent = "Rybbit — manual";
-          else badge.textContent = "Rybbit — pulled";
-        }
-
-        function setRealtorBadge(pulled: boolean) {
-          const badge = document.querySelector('[data-source-badge="realtor"]');
-          if (badge) badge.textContent = pulled ? "REALTOR.ca — pulled" : "REALTOR.ca — manual";
-        }
-
-        // Facebook and Instagram share one badge — reflect BOTH results,
-        // never let the second block's status overwrite the first's.
-        function setSocialBadge(fbSource: string, igSource: string) {
-          const badge = document.querySelector('[data-source-badge="social"]');
-          if (!badge) return;
-          if (fbSource === "mock" || igSource === "mock") badge.textContent = "Meta — demo data";
-          else if (fbSource === "manual" && igSource === "manual") badge.textContent = "Meta — manual";
-          else if (fbSource === "manual" || igSource === "manual") badge.textContent = "Meta — partial";
-          else badge.textContent = "Meta — pulled";
-        }
-
-        function setMediaPreview(key: string, url: string) {
-          const preview = document.querySelector(`[data-media-preview="${key}"]`) as HTMLImageElement | null;
-          if (preview && url) {
-            preview.src = url;
-            preview.hidden = false;
-          }
-        }
-
-        // --- Social post candidates (pick from a dropdown, top match preselected) ---
-        type Candidate = { permalink: string; caption: string; media_url: string; views: number | null; timestamp: string };
-        const candidateStore: Record<string, Candidate[]> = { facebook: [], instagram: [] };
-
-        function candidateLabel(candidate: Candidate): string {
-          const date = candidate.timestamp ? fmtDate(String(candidate.timestamp).slice(0, 10)) : "";
-          const caption = (candidate.caption || "(no caption)").replace(/\s+/g, " ").trim().slice(0, 60);
-          const views = typeof candidate.views === "number" ? ` · ${candidate.views} views` : "";
-          return [date, caption].filter(Boolean).join(" — ") + views;
-        }
-
-        // Writing a selection fills the SAME inputs the snapshot already consumes, so the
-        // snapshot shape is unchanged — only how they get filled is new.
-        function selectCandidate(network: string, index: number) {
-          const candidate = candidateStore[network]?.[index];
-          if (!candidate) return;
-          const urlInput = field(`${network}_post_url`);
-          if (urlInput) urlInput.value = candidate.permalink ?? "";
-          setVal(`${network}_caption`, String(candidate.caption ?? "").slice(0, MAX_CAPTION));
-          setVal(`${network}_media_url`, candidate.media_url ?? "");
-          if (typeof candidate.views === "number") setVal(`${network}_views`, candidate.views);
-          const sourceInput = field(`${network}_source`);
-          if (sourceInput) sourceInput.value = "meta_api";
-          if (candidate.media_url) setMediaPreview(network, candidate.media_url);
-        }
-
-        function populateCandidates(network: string, candidates: unknown, source: string, warning: string | null) {
-          const select = document.querySelector(`[data-candidate-select="${network}"]`) as HTMLSelectElement | null;
-          candidateStore[network] = Array.isArray(candidates) ? (candidates as Candidate[]) : [];
-          if (!select) return;
-          select.innerHTML = "";
-          const label = network === "facebook" ? "Facebook" : "Instagram";
-
-          if (candidateStore[network].length === 0) {
-            // No-post gate: NON-blocking — the coordinator can paste a URL or leave it blank.
-            const opt = document.createElement("option");
-            opt.value = "";
-            opt.textContent = source === "manual" ? "No posts available — enter manually" : "No matching post found";
-            select.appendChild(opt);
-            select.disabled = true;
-            const sourceInput = field(`${network}_source`);
-            if (sourceInput) sourceInput.value = "manual";
-            setNotice(
-              network,
-              warning ?? `No ${label} post found for this listing — did you post it? Enter it manually or leave blank.`
-            );
-            return;
-          }
-
-          select.disabled = false;
-          candidateStore[network].forEach((candidate, i) => {
-            const opt = document.createElement("option");
-            opt.value = String(i);
-            opt.textContent = candidateLabel(candidate);
-            select.appendChild(opt);
-          });
-          // Preselect the top match so the happy path needs zero clicks.
-          select.value = "0";
-          selectCandidate(network, 0);
-          setNotice(network, warning);
-        }
-
-        ["facebook", "instagram"].forEach((network) => {
-          const select = document.querySelector(`[data-candidate-select="${network}"]`) as HTMLSelectElement | null;
-          select?.addEventListener("change", () => {
-            const idx = Number(select.value);
-            if (Number.isInteger(idx)) selectCandidate(network, idx);
-          });
-        });
-
-        // --- Report period (derived: first day on market -> today) ---
-        const periodTextEl = document.querySelector("[data-period-text]");
-        const periodFallback = document.querySelector("[data-period-fallback]") as HTMLElement | null;
-        const periodStartInput = document.querySelector("[data-period-start]") as HTMLInputElement | null;
-        const periodEndInput = document.querySelector("[data-period-end]") as HTMLInputElement | null;
-
-        function fmtDate(iso: string): string {
-          if (!iso) return "";
-          const date = new Date(`${iso}T00:00:00Z`);
-          if (Number.isNaN(date.getTime())) return iso;
-          return date.toLocaleDateString("en-CA", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
-        }
-
-        function refreshPeriodText() {
-          const start = field("start_date")?.value ?? "";
-          const end = field("end_date")?.value ?? "";
-          if (periodTextEl && start && end) periodTextEl.textContent = `${fmtDate(start)} → ${fmtDate(end)}`;
-        }
-
-        function applyPeriod(period: { start_date?: string; end_date?: string; derived?: boolean } | undefined) {
-          if (!period) return;
-          if (period.start_date) setVal("start_date", period.start_date);
-          if (period.end_date) setVal("end_date", period.end_date);
-          refreshPeriodText();
-          // Reveal the manual date fallback ONLY when the listing date couldn't be read.
-          const needsManual = !period.derived || !period.start_date;
-          if (periodFallback) periodFallback.hidden = !needsManual;
-          if (needsManual) {
-            if (periodStartInput && period.start_date) periodStartInput.value = period.start_date;
-            if (periodEndInput && period.end_date) periodEndInput.value = period.end_date;
-          }
-        }
-
-        periodStartInput?.addEventListener("change", () => {
-          if (periodStartInput.value) setVal("start_date", periodStartInput.value);
-          refreshPeriodText();
-        });
-        periodEndInput?.addEventListener("change", () => {
-          if (periodEndInput.value) setVal("end_date", periodEndInput.value);
-          refreshPeriodText();
-        });
-
-        function applyBlock(key: string, source: string, fills: Record<string, unknown>, warning: string | null) {
-          // A degraded block ("manual") keeps whatever the coordinator already typed —
-          // a failed refresh must never wipe corrections back to 0.
-          if (source !== "manual") {
-            Object.entries(fills).forEach(([name, value]) => setVal(name, value));
-          }
-          const sourceInput = field(`${key}_source`);
-          if (sourceInput) sourceInput.value = source;
-          if (source === "mock") {
-            setNotice(key, "Demo numbers — not pulled from real analytics.");
-          } else {
-            setNotice(key, warning);
-          }
-        }
-
-        const pullModal = document.querySelector("[data-pull-modal]") as HTMLElement | null;
-
-        // Reveal the review section + social pickers once a pull has run (success OR
-        // degraded) — the report is never blocked, so the fields are always reachable.
-        function revealAfterPull() {
-          if (reviewBlock) reviewBlock.hidden = false;
-          if (socialPicker) socialPicker.hidden = false;
-        }
-
-        async function pull(button: HTMLButtonElement) {
-          button.disabled = true;
-          button.textContent = "Pulling...";
-          if (pullModal) pullModal.hidden = false;
-
-          const payload = {
-            client_slug: field("client_slug")?.value ?? "",
-            listing_url: field("listing_url")?.value ?? "",
-            facebook_post_url: field("facebook_post_url")?.value ?? "",
-            instagram_post_url: field("instagram_post_url")?.value ?? "",
-            realtor_admin_url: field("realtor_admin_url")?.value ?? ""
-          };
-
-          let data: any = null;
-          try {
-            const response = await fetch("/api/pull", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload)
-            });
-            if (response.ok) data = await response.json();
-          } catch {
-            // swallow — degrade below
-          }
-
-          try {
-            if (data) {
-              applyBlock(
-                "website",
-                data.website.source,
-                { website_views: data.website.listing_views, site_total_views: data.website.site_total_views },
-                data.website.warnings?.[0] ?? null
-              );
-              setWebsiteBadge(data.website.source);
-
-              // Listing URL auto-found on the client's website — fill it (unless the
-              // coordinator already typed one), else show a manual-entry notice.
-              const listingUrlFound = data.website.listing_source === "search" || data.website.listing_source === "mock";
-              if (listingUrlFound && data.website.listing_url && !(field("listing_url")?.value)) {
-                setVal("listing_url", data.website.listing_url);
-              }
-              setNotice("listing", listingUrlFound ? null : (data.website.listing_warning ?? null));
-
-              // REALTOR.ca: partial capture is normal — only overwrite what was actually
-              // read (null means "not captured", never wipe a typed value back to 0).
-              const realtor = data.realtor ?? {};
-              if (realtor.total_views != null) setVal("realtor_listing_views", realtor.total_views);
-              if (realtor.days_on_market != null) setVal("days_on_market", realtor.days_on_market);
-              if (realtor.image_url) {
-                setVal("property_image_url", realtor.image_url);
-                setMediaPreview("realtor", realtor.image_url);
-              }
-              // Address/MLS are derived but editable — fill only if the coordinator hasn't
-              // typed a value, so a correction is never overwritten by a refresh.
-              if (realtor.address && !(field("address")?.value)) setVal("address", realtor.address);
-              if (realtor.mls_number && !(field("mls_number")?.value)) setVal("mls_number", realtor.mls_number);
-              // Reporting window: first day on market -> today, from the scrape.
-              applyPeriod(realtor.period);
-              setRealtorBadge(realtor.source === "realtor_page");
-              // A bad/expired link (terminal) or a reach blip (transient) both surface here
-              // as an actionable warning; the report is never blocked.
-              setNotice("realtor", realtor.warnings?.[0] ?? null);
-
-              // Social: fill each dropdown with the ranked candidates and preselect the top
-              // match. Empty candidates -> the no-post gate inside populateCandidates.
-              populateCandidates("facebook", data.facebook.candidates, data.facebook.source, data.facebook.warnings?.[0] ?? null);
-              populateCandidates("instagram", data.instagram.candidates, data.instagram.source, data.instagram.warnings?.[0] ?? null);
-              setSocialBadge(data.facebook.source, data.instagram.source);
-
-              const warned = (data.warnings ?? []).length > 0;
-              pullCard?.classList.add("is-pulled");
-              if (statusText) statusText.textContent = warned ? "Data pulled — with warnings" : "Data pulled";
-              if (statusDetail) {
-                statusDetail.textContent = warned
-                  ? "Some sources could not be fetched — see the notes below and fill those numbers in manually."
-                  : "Review the values below, edit anything that looks off, then create the report.";
-              }
-            } else {
-              // Total failure (network/HTTP): everything stays editable; say so honestly.
-              Object.keys(groups).forEach((key) => {
-                const sourceInput = field(`${key}_source`);
-                if (sourceInput) sourceInput.value = "manual";
-                setNotice(key, "Auto-fetch unavailable. Please enter numbers manually.");
-              });
-              setWebsiteBadge("manual");
-              setSocialBadge("manual", "manual");
-              setRealtorBadge(false);
-              setNotice("realtor", "REALTOR.ca capture unavailable — enter views and days on market manually.");
-              // Reset the dropdowns to the manual/no-post state (non-blocking).
-              populateCandidates("facebook", [], "manual", "Auto-fetch unavailable — enter the Facebook post manually or leave blank.");
-              populateCandidates("instagram", [], "manual", "Auto-fetch unavailable — enter the Instagram post manually or leave blank.");
-              // No period could be derived — let the coordinator set the window by hand.
-              if (periodFallback) periodFallback.hidden = false;
-              if (statusText) statusText.textContent = "Pull failed";
-              if (statusDetail) statusDetail.textContent = "The data sources could not be reached. Enter the numbers manually below.";
-            }
-          } finally {
-            if (pullModal) pullModal.hidden = true;
-            revealAfterPull();
-            pullButtons.forEach((trigger) => {
-              if (trigger instanceof HTMLButtonElement) {
-                trigger.disabled = false;
-                trigger.textContent = "Refresh data";
-              }
-            });
-          }
-        }
-
-        pullButtons.forEach((button) => {
-          button.addEventListener("click", () => {
-            if (button instanceof HTMLButtonElement) pull(button);
-          });
-        });
-
-        // Pressing Enter in the REALTOR.ca link triggers the pull rather than a premature
-        // (and invalid, since the review fields are still hidden) form submit.
-        const realtorInput = field("realtor_admin_url");
-        realtorInput?.addEventListener("keydown", (event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            const trigger = document.querySelector("[data-pull-trigger]");
-            if (trigger instanceof HTMLButtonElement) pull(trigger);
-          }
-        });
-
-        // Snapshot creation embeds images server-side and can take several seconds —
-        // block the double-submit that would create duplicate reports. Also guard against
-        // a submit before the review section (and its required fields) has been revealed.
-        form?.addEventListener("submit", (event) => {
-          if (reviewBlock?.hidden) {
-            event.preventDefault();
-            return;
-          }
-          if (submitButton) {
-            submitButton.disabled = true;
-            submitButton.textContent = "Creating report...";
-          }
-        });
-
-        // Coming back from a server-side validation error restores this page from the
-        // bfcache WITH the disabled button state — re-enable so the coordinator can fix
-        // the problem and resubmit. The review section stays revealed.
-        window.addEventListener("pageshow", () => {
-          if (submitButton) {
-            submitButton.disabled = false;
-            submitButton.textContent = "Create Report";
-          }
-        });
-      </script>
-    </main>
-    </>
-  ) : (
-    <>
-    <SiteHeader />
-    <main class="form-shell">
-      <section class="panel">
-        <p class="eyebrow">Missing client</p>
-        <h1>Client not found</h1>
-        <p>No local client profile exists for <code>{clientSlug}</code>.</p>
-        <div class="form-actions" style="justify-content: flex-start; padding-top: 20px;">
-          <a class="button primary" href="/admin/clients/new">Create client</a>
-        </div>
-      </section>
-    </main>
-    </>
-  )}
+        <script>
+          import { initCoordinatorForm } from "../../../scripts/coordinator-form";
+          initCoordinatorForm();
+        </script>
+      </>
+    ) : (
+      <>
+        <SiteHeader />
+        <ErrorCard
+          eyebrow="Missing client"
+          title="Client not found"
+          reason={`No client profile exists for "${clientSlug}". The link may be out of date.`}
+          actions={[{ label: "Back to clients", href: "/", variant: "primary" }]}
+        />
+      </>
+    )
+  }
 </AppLayout>

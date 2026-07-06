@@ -1,9 +1,22 @@
 ---
 import AppLayout from "../layouts/AppLayout.astro";
 import SiteHeader from "../components/SiteHeader.astro";
+import Toast from "../components/Toast.astro";
 import { listClients } from "../lib/storage";
+import { takeFlash } from "../lib/flash";
 
 const clients = await listClients();
+const flash = takeFlash(Astro.cookies);
+const count = clients.length;
+
+const initialsOf = (name: string) =>
+  name
+    .trim()
+    .split(/\s+/)
+    .map((word) => word[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 ---
 
 <AppLayout title="Seller Report Generator | Supersonic" className="app-body">
@@ -13,16 +26,19 @@ const clients = await listClients();
 
   <main class="app-shell">
     <section class="app-hero">
-      <div>
+      <div style="max-width: 560px">
         <p class="eyebrow">Seller report engine</p>
-        <h1>Seller Report Generator</h1>
-        <p>
-          Capture report details, freeze the numbers into a snapshot, and
-          render a branded seller report ready to download as a PDF.
-        </p>
-      </div>
-      <div class="hero-actions">
-        <a class="button primary" href="/admin/clients/new">Create client</a>
+        <h1 style="font-size: clamp(1.55rem, 3.2vw, 2.05rem)">
+          Seller Report Generator
+        </h1>
+        {
+          count === 0 && (
+            <p>
+              Capture report details, freeze the numbers into a snapshot, and
+              render a branded seller report ready to download as a PDF.
+            </p>
+          )
+        }
       </div>
     </section>
 
@@ -30,36 +46,108 @@ const clients = await listClients();
       <div class="section-heading">
         <div>
           <p class="eyebrow">Clients</p>
-          <h2>Report endpoints</h2>
+          <h2 style="display: flex; align-items: center; gap: 10px">
+            Your clients
+            <span class="pill">{count} {count === 1 ? "client" : "clients"}</span>
+          </h2>
         </div>
-        <span class="count-badge">{clients.length} {clients.length === 1 ? "client" : "clients"}</span>
+        {
+          count > 6 && (
+            <div class="dash-search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <circle cx="11" cy="11" r="7" stroke="#64748b" stroke-width="1.75" />
+                <path
+                  d="m20 20-3.2-3.2"
+                  stroke="#64748b"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <input
+                type="search"
+                data-client-search
+                placeholder="Search clients…"
+                aria-label="Search clients"
+              />
+            </div>
+          )
+        }
       </div>
 
-      {clients.length > 0 ? (
-        <div class="client-grid">
-          {clients.map((client) => (
-            <article class="client-card">
-              <div class="client-card-logo">
-                <img src={client.logo_url} alt={`${client.name} logo`} />
-              </div>
-              <div>
-                <h3>{client.name}</h3>
-                <p>{client.footer_text}</p>
-                <div class="client-card-links">
-                  <a class="button secondary sm" href={`/c/${client.slug}/`}>Open report form</a>
-                  <a class="button ghost sm" href={`/admin/clients/${client.slug}/edit`}>Edit</a>
+      {
+        count > 0 ? (
+          <div class="client-grid" data-client-grid>
+            {clients.map((client) => (
+              <article class="ccard" data-client-name={client.name}>
+                <div class="ccard-logo" style={`color: ${client.brand_accent}`}>
+                  {initialsOf(client.name)}
                 </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <div class="empty-state">
-          <strong>No clients yet</strong>
-          <p>Create your first client profile to get a branded report form endpoint.</p>
-          <a class="button primary" href="/admin/clients/new">Create client</a>
-        </div>
-      )}
+                <div class="ccard-body">
+                  <h3>{client.name}</h3>
+                  <p>{client.footer_text}</p>
+                  <div class="ccard-actions">
+                    <a
+                      class="button secondary sm ccard-open"
+                      href={`/c/${client.slug}/`}
+                      style="border-color: var(--ss-accent); color: var(--ss-accent-ink)"
+                      aria-label={`Open report form for ${client.name}`}
+                    >
+                      Open report form
+                    </a>
+                    <a
+                      class="button ghost sm ccard-edit"
+                      href={`/admin/clients/${client.slug}/edit`}
+                      aria-label={`Edit ${client.name}`}
+                    >
+                      Edit
+                    </a>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div class="empty-state">
+            <img
+              src="/assets/supersonic-logo.png"
+              alt="Supersonic"
+              width="200"
+              height="118"
+              style="width: 118px; height: auto; opacity: 0.92"
+            />
+            <div>
+              <strong style="font-size: 1.1rem">No clients yet</strong>
+              <p style="max-width: 380px; line-height: 1.6">
+                Create your first client to generate a branded report form they
+                can fill in.
+              </p>
+            </div>
+            <a class="button primary" href="/admin/clients/new">
+              Create your first client
+            </a>
+          </div>
+        )
+      }
     </section>
   </main>
+
+  <Toast message={flash} />
+
+  <script>
+    const search = document.querySelector(
+      "[data-client-search]"
+    ) as HTMLInputElement | null;
+    if (search) {
+      const cards = Array.from(
+        document.querySelectorAll("[data-client-grid] .ccard")
+      ) as HTMLElement[];
+      search.addEventListener("input", () => {
+        const q = search.value.trim().toLowerCase();
+        for (const card of cards) {
+          const name = (card.dataset.clientName ?? "").toLowerCase();
+          card.style.display = !q || name.includes(q) ? "" : "none";
+        }
+      });
+    }
+  </script>
 </AppLayout>

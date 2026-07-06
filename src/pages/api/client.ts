@@ -3,6 +3,8 @@ import type { APIRoute } from "astro";
 import { isAdmin, sha256 } from "../../lib/auth";
 import { clientExists, deleteClient, readClient, slugify, writeClient } from "../../lib/storage";
 import type { ClientProfile } from "../../lib/types";
+import { brandedErrorPage } from "../../lib/error-page";
+import { redirectWithFlash } from "../../lib/flash";
 
 export const prerender = false;
 
@@ -28,21 +30,15 @@ function isHttpUrl(value: string) {
   }
 }
 
-function redirect(location: string) {
-  return new Response(null, {
-    status: 303,
-    headers: { Location: location }
-  });
-}
-
 function errorPage(status: number, message: string) {
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Client not saved</title></head>
-<body style="font-family: system-ui, sans-serif; max-width: 32rem; margin: 4rem auto; padding: 0 1rem;">
-<h1 style="font-size:1.25rem;">Client not saved</h1>
-<p>${message}</p>
-<p>Use your browser's <strong>Back</strong> button to return to the form — your entries are preserved there.</p>
-</body></html>`;
-  return new Response(html, { status, headers: { "Content-Type": "text/html; charset=utf-8" } });
+  return brandedErrorPage({
+    status,
+    eyebrow: "Client not saved",
+    title: "That didn’t save — here’s why.",
+    reason: message,
+    reassure: true,
+    primaryLabel: "← Back to the client form"
+  });
 }
 
 export const POST: APIRoute = async ({ request }) => {
@@ -56,12 +52,19 @@ export const POST: APIRoute = async ({ request }) => {
   // Deleting removes the endpoint and revokes the coordinator password with it.
   // Snapshots stay on disk, so existing reports remain viewable by the admin.
   if (field(form, "mode") === "delete") {
+    const slug = field(form, "slug");
+    let name = slug;
     try {
-      await deleteClient(field(form, "slug"));
+      name = (await readClient(slug)).name;
+    } catch {
+      // fall back to the slug for the confirmation message
+    }
+    try {
+      await deleteClient(slug);
     } catch {
       return errorPage(404, "Client profile not found.");
     }
-    return redirect("/");
+    return redirectWithFlash("/", `${name} was deleted.`);
   }
 
   const name = field(form, "name");
@@ -74,7 +77,18 @@ export const POST: APIRoute = async ({ request }) => {
 
   // Creating must not silently overwrite an existing profile; edits declare themselves.
   if (!isEdit && (await clientExists(slug))) {
-    return errorPage(409, `A client with the slug "${slug}" already exists. Edit it from the home page instead.`);
+    return brandedErrorPage({
+      status: 409,
+      eyebrow: "Client not saved",
+      title: "That slug is already taken.",
+      reason: `A client with the slug "${slug}" already exists.`,
+      reassure: true,
+      primaryLabel: "← Back to the client form",
+      secondary: {
+        label: "Edit the existing client instead",
+        href: `/admin/clients/${slug}/edit`
+      }
+    });
   }
 
   const existing = isEdit ? await readClient(slug).catch(() => undefined) : undefined;
@@ -150,5 +164,8 @@ export const POST: APIRoute = async ({ request }) => {
   };
 
   await writeClient(client);
-  return redirect(`/c/${client.slug}/`);
+  return redirectWithFlash(
+    `/c/${client.slug}/`,
+    isEdit ? "Changes saved." : "Client created — this is their report form."
+  );
 };

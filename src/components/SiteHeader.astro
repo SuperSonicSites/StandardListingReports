@@ -2,11 +2,23 @@
 import SupersonicBrand from "./SupersonicBrand.astro";
 
 // App chrome only — never rendered inside a report sheet (white-label discipline).
+// The identity chip uses the client's initials + accent purely for wayfinding
+// ("which client am I in") — it identifies scope, it does not style the chrome.
 type Props = {
   context?: string;
+  contextAccent?: string;
 };
 
-const { context } = Astro.props;
+const { context, contextAccent = "#29abe2" } = Astro.props;
+const initials = context
+  ? context
+      .trim()
+      .split(/\s+/)
+      .map((word) => word[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase()
+  : "";
 ---
 
 <header class="site-header">
@@ -15,7 +27,16 @@ const { context } = Astro.props;
       <a class="site-brand-link" href="/" aria-label="Supersonic — all clients">
         <SupersonicBrand size={32} />
       </a>
-      {context && <span class="site-context">{context}</span>}
+      {
+        context && (
+          <span class="site-context" aria-label={`Current client: ${context}`}>
+            <span class="site-context-tile" style={`color: ${contextAccent}`}>
+              {initials}
+            </span>
+            <span class="site-context-name">{context}</span>
+          </span>
+        )
+      }
     </div>
     <nav class="site-nav-actions">
       <slot />

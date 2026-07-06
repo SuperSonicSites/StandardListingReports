@@ -2,6 +2,7 @@
 import AppLayout from "../../../../layouts/AppLayout.astro";
 import SiteHeader from "../../../../components/SiteHeader.astro";
 import ClientForm from "../../../../components/ClientForm.astro";
+import ErrorCard from "../../../../components/ErrorCard.astro";
 import { readClient } from "../../../../lib/storage";
 
 const clientSlug = Astro.params.clientSlug ?? "";
@@ -14,68 +15,55 @@ try {
 }
 ---
 
-<AppLayout title={client ? `Edit ${client.name} | Seller Report Generator` : "Client Not Found"} className="app-body">
-  <SiteHeader context={client?.name}>
+<AppLayout
+  title={client ? `Edit ${client.name} | Supersonic` : "Client not found | Supersonic"}
+  className="app-body"
+>
+  <SiteHeader context={client?.name} contextAccent={client?.brand_accent}>
     <a class="nav-link" href="/">All clients</a>
   </SiteHeader>
 
-  <main class="form-shell">
-    {client ? (
-      <>
+  {
+    client ? (
+      <main class="app-shell">
         <header class="page-header">
-          <a class="back-link" href="/">&larr; Back to clients</a>
+          <a class="back-link" href="/">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M15 6l-6 6 6 6"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Back to clients
+          </a>
           <p class="eyebrow">Client setup</p>
           <h1>Edit client</h1>
           <p>
-            This updates the JSON profile at <code>data/clients/{client.slug}.json</code>.
-            Reports already generated for this client keep their original branding.
+            Update this client&rsquo;s brand and access. Reports you&rsquo;ve
+            already generated keep the branding they were created with — changes
+            here only affect new reports.
           </p>
         </header>
 
         <ClientForm client={client} />
-
-        <section class="danger-zone">
-          <div>
-            <h2>Delete this client</h2>
-            <p>
-              Removes the endpoint at <code>/c/{client.slug}/</code> and revokes the coordinator
-              password. Reports already created stay viewable (admin only). This cannot be undone.
-            </p>
-          </div>
-          <form
-            method="post"
-            action="/api/client"
-            data-delete-form
-            data-client-name={client.name}
-          >
-            <input type="hidden" name="mode" value="delete" />
-            <input type="hidden" name="slug" value={client.slug} />
-            <button class="button danger" type="submit">Delete client</button>
-          </form>
-        </section>
-
-        <script>
-          // A typed confirmation, not just an OK click — deletion is irreversible.
-          const form = document.querySelector("[data-delete-form]") as HTMLFormElement | null;
-          form?.addEventListener("submit", (event) => {
-            const name = form.dataset.clientName ?? "";
-            const answer = prompt(`Type the client name to confirm deletion:\n${name}`);
-            if (answer !== name) {
-              event.preventDefault();
-              if (answer !== null) alert("Name didn't match — nothing was deleted.");
-            }
-          });
-        </script>
-      </>
+      </main>
     ) : (
-      <section class="panel">
-        <p class="eyebrow">Missing client</p>
-        <h1>Client not found</h1>
-        <p>No local client profile exists for <code>{clientSlug}</code>.</p>
-        <div class="form-actions" style="justify-content: flex-start; padding-top: 20px;">
-          <a class="button primary" href="/">Back to clients</a>
-        </div>
-      </section>
-    )}
-  </main>
+      <ErrorCard
+        eyebrow="Missing client"
+        title="Client not found"
+        reason={`We couldn't find a client called "${clientSlug}". It may have been deleted, or the link might be out of date.`}
+        actions={[
+          { label: "Back to clients", href: "/", variant: "primary" },
+          {
+            label: "Create a new client",
+            href: "/admin/clients/new",
+            variant: "ghost"
+          }
+        ]}
+      />
+    )
+  }
 </AppLayout>

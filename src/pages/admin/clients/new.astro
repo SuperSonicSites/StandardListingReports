@@ -2,24 +2,41 @@
 import AppLayout from "../../../layouts/AppLayout.astro";
 import SiteHeader from "../../../components/SiteHeader.astro";
 import ClientForm from "../../../components/ClientForm.astro";
+import { listClients } from "../../../lib/storage";
+
+const clients = await listClients();
+const existing = clients.map((client) => ({
+  slug: client.slug,
+  name: client.name
+}));
 ---
 
-<AppLayout title="Create Client | Seller Report Generator" className="app-body">
+<AppLayout title="Create client | Supersonic" className="app-body">
   <SiteHeader>
     <a class="nav-link" href="/">All clients</a>
   </SiteHeader>
 
-  <main class="form-shell">
+  <main class="app-shell">
     <header class="page-header">
-      <a class="back-link" href="/">&larr; Back to clients</a>
+      <a class="back-link" href="/">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M15 6l-6 6 6 6"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"></path>
+        </svg>
+        Back to clients
+      </a>
       <p class="eyebrow">Client setup</p>
       <h1>Create client</h1>
       <p>
-        This writes a JSON profile to <code>data/clients</code> and creates the
-        report form endpoint for that client.
+        Set up a client&rsquo;s brand and access. This creates their report form
+        and the login their coordinator uses.
       </p>
     </header>
 
-    <ClientForm />
+    <ClientForm existing={existing} />
   </main>
 </AppLayout>

@@ -3,124 +3,583 @@ import type { ClientProfile } from "../lib/types";
 
 interface Props {
   client?: ClientProfile;
+  existing?: { slug: string; name: string }[];
 }
 
-const { client } = Astro.props;
+const { client, existing = [] } = Astro.props;
 const isEdit = Boolean(client);
 // Uploaded logos are stored as data URIs — never prefill those into the URL input.
-const logoUrlValue = client?.logo_url.startsWith("data:") ? "" : (client?.logo_url ?? "");
+const logoUrlValue = client?.logo_url.startsWith("data:")
+  ? ""
+  : (client?.logo_url ?? "");
+const slugValue = client?.slug ?? "";
+const primaryValue = client?.brand_primary ?? "#111111";
+const accentValue = client?.brand_accent ?? "#c9a86a";
+const intCount = [
+  client?.website_url,
+  client?.meta_page_id,
+  client?.meta_instagram_id,
+  client?.rybbit_site_id
+].filter(Boolean).length;
 ---
 
-<form class="entry-form" method="post" action="/api/client" enctype="multipart/form-data">
+<div
+  id="client-summary"
+  class="card err-summary reveal"
+  role="alert"
+  hidden
+>
+  <h2 id="client-summary-h" tabindex="-1">
+    Almost there — a couple of fields need attention.
+  </h2>
+  <ul data-summary-list></ul>
+</div>
+
+<form
+  id="client-form"
+  class="card setup-form"
+  method="post"
+  action="/api/client"
+  enctype="multipart/form-data"
+  data-mode={isEdit ? "edit" : "create"}
+  data-existing={JSON.stringify(existing)}
+  novalidate
+>
   <input type="hidden" name="mode" value={isEdit ? "edit" : "create"} />
-  <section class="form-section">
-    <h2>Brand</h2>
-    <div class="field-grid">
-      <label>
-        Client name
-        <input name="name" value={client?.name ?? ""} placeholder="Stone Sisters" required />
-      </label>
-      <label>
-        Client slug
+
+  <!-- Section 1 — Brand -->
+  <section class="setup-section">
+    <div class="numbered-head">
+      <span class="num">1</span>
+      <div class="head-text">
+        <h2>Brand</h2>
+        <p>How this client looks on their report.</p>
+      </div>
+    </div>
+    <div class="section-fields">
+      <div class="field">
+        <label class="field-label" for="f-name">
+          Client name <span class="req">*</span>
+        </label>
         <input
-          name="slug"
-          value={client?.slug ?? ""}
-          placeholder="stone-sisters"
-          pattern="[a-z0-9-]+"
-          required
-          readonly={isEdit}
+          id="f-name"
+          name="name"
+          value={client?.name ?? ""}
+          placeholder="Stone Sisters Group"
+          data-field="name"
         />
-        <span>{isEdit ? "Slug can't be changed after creation." : "Lowercase letters, numbers, and hyphens."}</span>
-      </label>
-      <label>
-        Logo upload
-        <input type="file" name="logo_file" accept="image/png,image/jpeg,image/svg+xml,image/webp" />
-        <span>PNG, JPEG, SVG, or WebP, up to 1 MB.{isEdit && " Leave empty to keep the current logo."}</span>
-      </label>
-      <label>
-        Logo URL (alternative to upload)
-        <input name="logo_url" value={logoUrlValue} placeholder="https://acmerealty.com/logo.svg" />
-      </label>
-      {isEdit && client?.logo_url && (
-        <div class="logo-preview">
-          <span>Current logo</span>
-          <img src={client.logo_url} alt={`${client.name} logo`} />
+        <p class="err-note" data-err-for="name" hidden></p>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="f-slug">
+          Client slug <span class="req">*</span>
+        </label>
+        <div class="pw-wrap">
+          <input
+            id="f-slug"
+            name="slug"
+            value={slugValue}
+            placeholder="stone-sisters"
+            readonly={isEdit}
+            data-field="slug"
+            style="font-family: ui-monospace, monospace"
+          />
+          {
+            isEdit && (
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                style="position: absolute; right: 12px; pointer-events: none"
+              >
+                <rect
+                  x="5"
+                  y="11"
+                  width="14"
+                  height="9"
+                  rx="2"
+                  stroke="#64748b"
+                  stroke-width="1.75"
+                />
+                <path
+                  d="M8 11V8a4 4 0 0 1 8 0v3"
+                  stroke="#64748b"
+                  stroke-width="1.75"
+                />
+              </svg>
+            )
+          }
         </div>
-      )}
-      <label>
-        Footer text
-        <input name="footer_text" value={client?.footer_text ?? ""} placeholder="Acme Realty Team | Kelowna, BC" required />
-      </label>
-      <label>
-        Primary color
-        <input type="color" name="brand_primary" value={client?.brand_primary ?? "#111111"} required />
-      </label>
-      <label>
-        Accent color
-        <input type="color" name="brand_accent" value={client?.brand_accent ?? "#c9a86a"} required />
-      </label>
-    </div>
-  </section>
+        <p class="field-hint">
+          This becomes the client&rsquo;s report URL:
+          <code style="color: var(--ss-accent-ink)">/c/<span
+              data-slug-preview>{slugValue || "…"}</span>/</code
+          >
+        </p>
+        {
+          !isEdit && (
+            <p class="field-hint" style="color: var(--ss-warn-ink)">
+              Choose carefully — the slug can&rsquo;t be changed later.
+            </p>
+          )
+        }
+        {
+          isEdit && (
+            <p class="field-hint">Locked — the slug can&rsquo;t be changed after creation.</p>
+          )
+        }
+        <p class="err-note" data-err-for="slug" hidden></p>
+      </div>
 
-  <section class="form-section">
-    <h2>Brokerage disclaimer</h2>
-    <div class="field-grid">
-      <label>
-        Brokerage
-        <input name="brokerage_name" value={client?.brokerage_name ?? ""} placeholder="RE/MAX Kelowna" required />
-      </label>
-      <label>
-        Contact
-        <input name="brokerage_contact" value={client?.brokerage_contact ?? ""} placeholder="Acme Realty Team" required />
-      </label>
-      <label class="wide">
-        Brokerage address
-        <input name="brokerage_address" value={client?.brokerage_address ?? ""} placeholder="100-1553 Harvey Avenue, Kelowna, BC" required />
-      </label>
-    </div>
-  </section>
+      <!-- Unified logo control -->
+      <div class="field">
+        <span class="field-label">
+          Client logo {!isEdit && <span class="req">*</span>}
+        </span>
+        <label for="f-logo" class="dropzone">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 16V4m0 0-4 4m4-4 4 4"
+              stroke="#0f8ac4"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"></path>
+            <path
+              d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"
+              stroke="#64748b"
+              stroke-width="1.75"
+              stroke-linecap="round"></path>
+          </svg>
+          <span style="font-weight: 600; color: var(--ss-accent-ink)">Upload a file</span>
+          <span style="font-size: 0.8rem; color: var(--ss-muted)"
+            >PNG, JPEG, SVG, or WebP · up to 1 MB</span
+          >
+          <input
+            type="file"
+            id="f-logo"
+            name="logo_file"
+            class="vh"
+            accept="image/png,image/jpeg,image/svg+xml,image/webp"
+            data-logo-file
+          />
+        </label>
 
-  <section class="form-section">
-    <h2>Access</h2>
-    <div class="field-grid">
-      <label>
-        Coordinator password
+        <div class="logo-chosen" data-logo-chosen hidden>
+          <div class="logo-swatches">
+            <div class="logo-swatch on-white">
+              <img data-logo-white alt="Chosen logo on white" />
+            </div>
+            <div class="logo-swatch on-dark">
+              <img data-logo-dark alt="Chosen logo on dark" />
+            </div>
+          </div>
+          <div style="min-width: 0; flex: 1">
+            <p
+              data-logo-name
+              style="margin: 0; font-size: 0.82rem; font-weight: 600; color: var(--ss-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis"
+            >
+            </p>
+            <button
+              type="button"
+              class="button ghost sm"
+              data-logo-remove
+              style="padding-left: 0">Remove</button
+            >
+          </div>
+        </div>
+
+        {
+          isEdit && client?.logo_url && (
+            <div class="logo-current" data-current-logo>
+              <div class="logo-swatches">
+                <div class="logo-swatch on-white">
+                  <img src={client.logo_url} alt="Current logo on white" />
+                </div>
+                <div class="logo-swatch on-dark">
+                  <img src={client.logo_url} alt="Current logo on dark" />
+                </div>
+              </div>
+              <p style="font-size: 0.82rem; color: var(--ss-text-soft); margin: 0">
+                Current logo — leave the upload empty to keep it.
+              </p>
+            </div>
+          )
+        }
+
+        <details style="margin-top: 2px">
+          <summary
+            style="cursor: pointer; font-size: 0.82rem; color: var(--ss-accent-ink); font-weight: 600"
+            >or paste an image URL</summary
+          >
+          <div style="margin-top: 8px">
+            <input
+              name="logo_url"
+              type="url"
+              value={logoUrlValue}
+              placeholder="https://acmerealty.com/logo.svg"
+              data-field="logo"
+            />
+            <p class="field-hint" style="margin-top: 6px">
+              We&rsquo;ll fetch and store a copy. If you upload a file, it&rsquo;s
+              used instead of the URL.
+            </p>
+          </div>
+        </details>
+        <p class="err-note" data-err-for="logo" hidden></p>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="f-footer">
+          Footer text <span class="req">*</span>
+        </label>
         <input
+          id="f-footer"
+          name="footer_text"
+          value={client?.footer_text ?? ""}
+          placeholder="Acme Realty Team | Kelowna, BC"
+          data-field="footer_text"
+          data-disclaimer-src
+        />
+        <p class="field-hint">
+          Appears at the bottom of every report page — usually the team name and
+          city.
+        </p>
+        <p class="err-note" data-err-for="footer_text" hidden></p>
+      </div>
+
+      <!-- Color pickers -->
+      <div>
+        <p class="wall-note">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.75"
+            ></circle>
+          </svg>
+          These colors appear on this client&rsquo;s report — not in this app.
+        </p>
+        <div class="color-row">
+          <div class="field">
+            <label class="field-label" for="f-primary">
+              Primary color <span class="req">*</span>
+            </label>
+            <div class="color-input-row">
+              <input
+                type="color"
+                id="f-primary"
+                name="brand_primary"
+                value={primaryValue}
+                class="color-swatch"
+                data-color="primary"
+              />
+              <input
+                class="color-hex"
+                value={primaryValue}
+                aria-label="Primary color hex"
+                data-hex="primary"
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label" for="f-accent">
+              Accent color <span class="req">*</span>
+            </label>
+            <div class="color-input-row">
+              <input
+                type="color"
+                id="f-accent"
+                name="brand_accent"
+                value={accentValue}
+                class="color-swatch"
+                data-color="accent"
+              />
+              <input
+                class="color-hex"
+                value={accentValue}
+                aria-label="Accent color hex"
+                data-hex="accent"
+              />
+            </div>
+          </div>
+          <div class="color-preview" aria-hidden="true">
+            <span class="preview-eyebrow">On the report</span>
+            <span
+              class="preview-name"
+              data-preview-name
+              style={`color: ${primaryValue}`}>{client?.name || "Client name"}</span
+            >
+            <span
+              class="preview-rule"
+              data-preview-rule
+              style={`background: ${accentValue}`}></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 2 — Brokerage disclaimer -->
+  <section class="setup-section">
+    <div class="numbered-head">
+      <span class="num">2</span>
+      <div class="head-text">
+        <h2>Brokerage disclaimer</h2>
+        <p>Required by BC real-estate rules — this appears as fine print on every report.</p>
+      </div>
+    </div>
+    <div class="section-fields">
+      <div class="two-up">
+        <div class="field">
+          <label class="field-label" for="f-brokerage">
+            Brokerage <span class="req">*</span>
+          </label>
+          <input
+            id="f-brokerage"
+            name="brokerage_name"
+            value={client?.brokerage_name ?? ""}
+            placeholder="RE/MAX Kelowna"
+            data-field="brokerage_name"
+            data-disclaimer-src
+          />
+          <p class="err-note" data-err-for="brokerage_name" hidden></p>
+        </div>
+        <div class="field">
+          <label class="field-label" for="f-contact">
+            Contact <span class="req">*</span>
+          </label>
+          <input
+            id="f-contact"
+            name="brokerage_contact"
+            value={client?.brokerage_contact ?? ""}
+            placeholder="Acme Realty Team"
+            data-field="brokerage_contact"
+            data-disclaimer-src
+          />
+          <p class="err-note" data-err-for="brokerage_contact" hidden></p>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label" for="f-address">
+          Brokerage address <span class="req">*</span>
+        </label>
+        <input
+          id="f-address"
+          name="brokerage_address"
+          value={client?.brokerage_address ?? ""}
+          placeholder="100-1553 Harvey Avenue, Kelowna, BC"
+          data-field="brokerage_address"
+          data-disclaimer-src
+        />
+        <p class="err-note" data-err-for="brokerage_address" hidden></p>
+      </div>
+      <div class="preview-box">
+        <span class="preview-eyebrow">Report fine print preview</span>
+        <p data-disclaimer-preview></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 3 — Access -->
+  <section class="setup-section">
+    <div class="numbered-head">
+      <span class="num">3</span>
+      <div class="head-text">
+        <h2>Access</h2>
+        <p>The password this client&rsquo;s coordinator signs in with.</p>
+      </div>
+    </div>
+    <div class="field" style="max-width: 440px">
+      <label class="field-label" for="f-password">
+        Coordinator password {!isEdit && <span class="req">*</span>}
+      </label>
+      <div class="pw-wrap">
+        <input
+          id="f-password"
           type="password"
           name="password"
           autocomplete="new-password"
-          minlength="8"
-          required={!isEdit}
           placeholder={isEdit ? "Leave blank to keep current password" : ""}
+          data-field="password"
+          style="padding-right: 70px"
         />
-        <span>Coordinators use this to open /c/{client?.slug ?? "<slug>"}/. At least 8 characters.</span>
-      </label>
+        <button
+          type="button"
+          class="pw-toggle"
+          data-pw-toggle
+          aria-pressed="false"
+          aria-label="Show password">Show</button
+        >
+      </div>
+      <p class="field-hint">
+        {
+          isEdit
+            ? `Leave blank to keep the current password. Coordinators sign in at /c/${slugValue}/. Minimum 8 characters.`
+            : "The coordinator signs in with this. Minimum 8 characters — share it with them securely."
+        }
+      </p>
+      <p class="affirm" data-pw-affirm hidden>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <path
+            d="m5 13 4 4L19 7"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"></path>
+        </svg>
+        Looks good
+      </p>
+      <p class="err-note" data-err-for="password" hidden></p>
     </div>
   </section>
 
-  <section class="form-section">
-    <h2>Integrations (optional)</h2>
-    <div class="field-grid">
-      <label>
-        Website URL
-        <input name="website_url" type="url" value={client?.website_url ?? ""} placeholder="https://acmerealty.com" />
-      </label>
-      <label>
-        Facebook Page ID
-        <input name="meta_page_id" value={client?.meta_page_id ?? ""} pattern="[0-9]*" inputmode="numeric" />
-      </label>
-      <label>
-        Instagram account ID
-        <input name="meta_instagram_id" value={client?.meta_instagram_id ?? ""} pattern="[0-9]*" inputmode="numeric" />
-      </label>
-      <label>
-        Rybbit site ID
-        <input name="rybbit_site_id" value={client?.rybbit_site_id ?? ""} pattern="[0-9]*" inputmode="numeric" />
-      </label>
+  <!-- Section 4 — Data sources -->
+  <section class="setup-section">
+    <div class="numbered-head">
+      <span class="num">4</span>
+      <div class="head-text">
+        <h2>Data sources</h2>
+        <p>
+          Connect Website, Facebook, Instagram, and Rybbit so this client&rsquo;s
+          reports can pull real numbers automatically.
+        </p>
+      </div>
+      {
+        isEdit && (
+          <span class="pill" data-int-count style="flex: none">
+            {intCount} of 4 connected
+          </span>
+        )
+      }
+    </div>
+    <div class="section-fields">
+      <div class="field">
+        <label class="field-label" for="f-website">Website URL</label>
+        <input
+          id="f-website"
+          name="website_url"
+          type="url"
+          value={client?.website_url ?? ""}
+          placeholder="https://acmerealty.com"
+          inputmode="url"
+          data-int
+        />
+        <p class="field-hint">The listing/agent site Rybbit tracks. Used to pull page views.</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="f-fbid">Facebook Page ID</label>
+        <input
+          id="f-fbid"
+          name="meta_page_id"
+          value={client?.meta_page_id ?? ""}
+          placeholder="104882937461022"
+          inputmode="numeric"
+          data-int
+        />
+        <p class="field-hint">Numeric Page ID (not the @handle). Used to find matching posts.</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="f-igid">Instagram account ID</label>
+        <input
+          id="f-igid"
+          name="meta_instagram_id"
+          value={client?.meta_instagram_id ?? ""}
+          placeholder="17841400000000000"
+          inputmode="numeric"
+          data-int
+        />
+        <p class="field-hint">Numeric account ID. Used to pull Instagram post views.</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="f-rybbit">Rybbit site ID</label>
+        <input
+          id="f-rybbit"
+          name="rybbit_site_id"
+          value={client?.rybbit_site_id ?? ""}
+          placeholder="48213"
+          inputmode="numeric"
+          data-int
+        />
+        <p class="field-hint">The numeric site ID from your Rybbit dashboard.</p>
+      </div>
+      <p style="font-size: 0.82rem; color: var(--ss-muted); margin: 0">
+        Missing a source? The coordinator can still enter that number by hand when
+        creating a report.
+      </p>
     </div>
   </section>
-
-  <div class="form-actions">
-    <button class="button primary" type="submit">{isEdit ? "Save changes" : "Create endpoint"}</button>
-  </div>
 </form>
+
+{
+  isEdit && (
+    <div class="danger-zone">
+      <h2>Delete this client</h2>
+      <p>
+        This removes their report form and revokes the coordinator password.
+        Reports you&rsquo;ve already generated stay viewable by admins. This
+        can&rsquo;t be undone.
+      </p>
+      <button type="button" class="button danger" data-delete-open>
+        Delete client
+      </button>
+      <form method="post" action="/api/client" id="delete-form">
+        <input type="hidden" name="mode" value="delete" />
+        <input type="hidden" name="slug" value={client!.slug} />
+      </form>
+    </div>
+  )
+}
+
+<div class="sticky-actions">
+  <a class="button ghost" href="/">Cancel</a>
+  <button
+    class="button primary"
+    type="submit"
+    form="client-form"
+    data-save
+    style="min-width: 150px">{isEdit ? "Save changes" : "Create client"}</button
+  >
+</div>
+
+{
+  isEdit && (
+    <div
+      class="modal-scrim"
+      data-delete-modal
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="del-title"
+      hidden
+    >
+      <div class="modal-card" data-delete-card>
+        <h2 id="del-title" style="font-size: 1.15rem; font-weight: 700; color: var(--ss-ink); margin: 0 0 10px">
+          Delete {client!.name}?
+        </h2>
+        <p style="font-size: 0.88rem; color: var(--ss-text-soft); line-height: 1.6; margin: 0 0 16px">
+          This removes the report form at
+          <code style="color: var(--ss-text)">/c/{client!.slug}/</code> and revokes
+          the coordinator password. Reports you&rsquo;ve already generated stay
+          viewable by admins. This can&rsquo;t be undone.
+        </p>
+        <div class="field" style="margin-bottom: 18px">
+          <label class="field-label" for="del-input">Type the client&rsquo;s name to confirm</label>
+          <input id="del-input" data-delete-input placeholder={client!.name} autocomplete="off" />
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px">
+          <button type="button" class="button secondary" data-delete-cancel>Cancel</button>
+          <button
+            type="button"
+            class="button danger"
+            data-delete-confirm
+            disabled
+            style="min-width: 132px">Delete client</button
+          >
+        </div>
+      </div>
+    </div>
+  )
+}
+
+<script>
+  import { initClientForm } from "../scripts/client-form";
+  initClientForm();
+</script>

@@ -1,0 +1,43 @@
+---
+// A dismissible success toast, shown when a flash message is present. Green so
+// success reads distinct from brand-action cyan. Auto-dismisses; also manually
+// dismissible. App chrome only.
+type Props = {
+  message?: string | null;
+};
+
+const { message } = Astro.props;
+---
+
+{
+  message && (
+    <div class="toast-wrap" data-toast role="status" aria-live="polite">
+      <div class="toast">
+        <span class="toast-ico">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+            <path
+              d="m5 13 4 4L19 7"
+              stroke="#15803d"
+              stroke-width="2.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </span>
+        <strong>{message}</strong>
+        <button type="button" data-toast-dismiss aria-label="Dismiss">×</button>
+      </div>
+    </div>
+  )
+}
+
+<script>
+  const toast = document.querySelector("[data-toast]");
+  if (toast) {
+    const remove = () => toast.remove();
+    toast
+      .querySelector("[data-toast-dismiss]")
+      ?.addEventListener("click", remove);
+    window.setTimeout(remove, 4200);
+  }
+</script>

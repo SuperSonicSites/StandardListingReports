@@ -3,6 +3,7 @@ import type { APIRoute } from "astro";
 import { canAccessClient } from "../../lib/auth";
 import { createSnapshotId, readClient, writeSnapshot } from "../../lib/storage";
 import type { MetricSource, ReportSnapshot } from "../../lib/types";
+import { brandedErrorPage } from "../../lib/error-page";
 
 export const prerender = false;
 
@@ -54,18 +55,19 @@ function redirect(location: string) {
   });
 }
 
-// Form POSTs navigate the browser, so a bare text/plain 400 is a dead end. Entries are
-// only preserved via history back (bfcache) — a fresh GET of the form would be blank,
-// so the copy steers to the Back button and the link is a last resort.
+// Form POSTs navigate the browser, so a bare 400 is a dead end. Entries survive via
+// history back (bfcache) — a fresh GET of the form would be blank — so the primary
+// action returns to the populated form and the "start over" link is the fallback.
 function errorPage(status: number, message: string, backHref: string) {
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Report not created</title></head>
-<body style="font-family: system-ui, sans-serif; max-width: 32rem; margin: 4rem auto; padding: 0 1rem;">
-<h1 style="font-size:1.25rem;">Report not created</h1>
-<p>${message}</p>
-<p>Use your browser's <strong>Back</strong> button to return to the form — your entries are preserved there.</p>
-<p><a href="${backHref}">Or start over with a blank form</a>.</p>
-</body></html>`;
-  return new Response(html, { status, headers: { "Content-Type": "text/html; charset=utf-8" } });
+  return brandedErrorPage({
+    status,
+    eyebrow: "Report not created",
+    title: "Let’s fix one thing and try again.",
+    reason: message,
+    reassure: true,
+    primaryLabel: "← Back to the report form",
+    secondary: { label: "Start over with a blank form", href: backHref }
+  });
 }
 
 // Only Meta CDN hosts may be fetched from form-supplied media URLs — everything else is

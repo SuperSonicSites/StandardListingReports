@@ -8,21 +8,93 @@ const error = Astro.url.searchParams.get("error") === "1";
 
 <AppLayout title="Sign in | Supersonic" className="app-body">
   <main class="login-shell">
-    <section class="login-panel">
-      <div class="login-brand">
-        <SupersonicBrand size={44} />
+    <form
+      id="login-form"
+      class="card login-card reveal"
+      method="post"
+      action="/api/login"
+    >
+      <div class="login-head">
+        <SupersonicBrand size={72} />
+        <div style="text-align: center">
+          <h1>Sign in</h1>
+          <p>Enter your password to open this workspace.</p>
+        </div>
       </div>
-      <h1>Sign in</h1>
-      <p>Enter your password to open this workspace.</p>
-      {error && <p class="login-error">That password didn't match. Try again.</p>}
-      <form method="post" action="/api/login">
-        <input type="hidden" name="next" value={next} />
-        <label>
-          Password
-          <input type="password" name="password" autocomplete="current-password" required autofocus />
-        </label>
-        <button class="button primary" type="submit">Continue</button>
-      </form>
-    </section>
+
+      {
+        error && (
+          <div role="alert" class="login-error">
+            That password didn&rsquo;t match. Try again.
+          </div>
+        )
+      }
+
+      <input type="hidden" name="next" value={next} />
+
+      <div class="field">
+        <label class="field-label" for="login-pw">Password</label>
+        <div class="pw-wrap">
+          <input
+            id="login-pw"
+            type="password"
+            name="password"
+            autocomplete="current-password"
+            required
+            autofocus
+            aria-invalid={error ? "true" : undefined}
+            style="min-height: 48px; padding-right: 70px"
+          />
+          <button
+            type="button"
+            class="pw-toggle"
+            data-pw-toggle
+            aria-pressed="false"
+            aria-label="Show password">Show</button
+          >
+        </div>
+      </div>
+
+      <button
+        class="button primary block"
+        type="submit"
+        data-login-submit
+        style="min-height: 48px">Continue</button
+      >
+    </form>
   </main>
+
+  <script>
+    const form = document.getElementById("login-form") as HTMLFormElement | null;
+    const pw = document.getElementById("login-pw") as HTMLInputElement | null;
+    const toggle = document.querySelector("[data-pw-toggle]");
+    const submit = document.querySelector(
+      "[data-login-submit]"
+    ) as HTMLButtonElement | null;
+
+    toggle?.addEventListener("click", () => {
+      if (!pw) return;
+      const reveal = pw.type === "password";
+      pw.type = reveal ? "text" : "password";
+      toggle.textContent = reveal ? "Hide" : "Show";
+      toggle.setAttribute("aria-pressed", String(reveal));
+      toggle.setAttribute("aria-label", reveal ? "Hide password" : "Show password");
+      pw.focus();
+    });
+
+    form?.addEventListener("submit", () => {
+      if (!pw?.value || !submit) return;
+      submit.disabled = true;
+      form.setAttribute("aria-busy", "true");
+      submit.innerHTML = '<span class="spin"></span>Signing in…';
+    });
+
+    // bfcache: re-enable if the user lands back here via back/forward.
+    window.addEventListener("pageshow", () => {
+      if (!submit) return;
+      submit.disabled = false;
+      submit.textContent = "Continue";
+      form?.removeAttribute("aria-busy");
+    });
+  </script>
 </AppLayout>

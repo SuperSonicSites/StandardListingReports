@@ -8,8 +8,19 @@ const MAX_ATTEMPTS = 3;
 // A current desktop Chrome UA — a stale UA is itself a bot signal. Keep this fresh.
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
-// The scraper's stealth extras, layered onto the shared hardened flags/options.
-const EXTRA_ARGS = ["--disable-blink-features=AutomationControlled", `--user-agent=${UA}`];
+// The scraper's extra flags, layered onto the shared hardened flags/options.
+//   --single-process + --no-zygote: on the container host, multi-process Chromium dies
+//     right after startup (only the benign dbus line in stderr) — the zygote/namespace
+//     fork failing, or an OOM kill. Running everything in one process fixes the fork and
+//     roughly halves memory. Safe here: we only read DOM text/attributes off one page, so
+//     the renderer-stability caveat of --single-process doesn't bite (the PDF route keeps
+//     multi-process for print fidelity).
+const EXTRA_ARGS = [
+  "--single-process",
+  "--no-zygote",
+  "--disable-blink-features=AutomationControlled",
+  `--user-agent=${UA}`
+];
 
 export type RealtorStatsResult = {
   source: "realtor_page" | "manual";

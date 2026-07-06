@@ -53,6 +53,8 @@ async function getSharedBrowser(): Promise<Browser> {
   launching = puppeteer
     .launch({ executablePath, headless: true, args: LAUNCH_ARGS })
     .then((browser) => {
+      // eslint-disable-next-line no-console
+      console.info(`[chrome] shared browser launched (${executablePath})`);
       sharedBrowser = browser;
       // A wedged/killed browser must not poison every future pull — forget it so
       // the next getSharedBrowser() relaunches a clean one.
@@ -64,6 +66,8 @@ async function getSharedBrowser(): Promise<Browser> {
     })
     .catch((error) => {
       launching = null;
+      // eslint-disable-next-line no-console
+      console.error(`[chrome] browser launch FAILED (${executablePath}): ${(error as Error)?.message ?? error}`);
       throw error;
     });
 

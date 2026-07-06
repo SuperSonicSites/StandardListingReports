@@ -81,6 +81,18 @@ export async function fetchRealtorAdminStats(adminUrl: string): Promise<RealtorS
       if (error instanceof TerminalScrapeError) {
         return degraded(error.message, "terminal");
       }
+      const err = error as Error;
+      const detail = err?.message || String(error);
+      // Log the REAL cause server-side (the user-facing message is deliberately generic).
+      // eslint-disable-next-line no-console
+      console.error(`[realtor] scrape attempt ${attempt}/${MAX_ATTEMPTS} failed: ${err?.name || "Error"} - ${detail}`);
+      // A browser that won't start won't fix itself on retry — surface it clearly.
+      if (/failed to launch|spawn|ENOENT|Target closed|Protocol error|Browser was not found|executablePath|libnss|no usable sandbox/i.test(detail)) {
+        return degraded(
+          "Couldn't start the browser to read REALTOR.ca — make sure Chrome/Edge is installed (or set CHROME_PATH).",
+          "terminal"
+        );
+      }
       // Transient (or unexpected) — retry with backoff, then degrade softly.
       if (attempt >= MAX_ATTEMPTS) {
         const message =
@@ -103,6 +115,8 @@ async function scrapeOnce(page: Page, adminUrl: string): Promise<RealtorStatsRes
 
   const response = await page.goto(adminUrl, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT_MS });
   const status = response?.status() ?? 0;
+  // eslint-disable-next-line no-console
+  console.info(`[realtor] loaded status=${status} url=${page.url().slice(0, 90)}`);
   if (status === 404 || status === 410) {
     throw new TerminalScrapeError(
       "REALTOR.ca share link is invalid or expired — re-share the listing and paste a new link."
@@ -116,6 +130,8 @@ async function scrapeOnce(page: Page, adminUrl: string): Promise<RealtorStatsRes
   const pillsTab = await page
     .waitForSelector("#ui_report_all_pillsTab", { timeout: READY_TIMEOUT_MS })
     .catch(() => null);
+  // eslint-disable-next-line no-console
+  console.info(`[realtor] report readiness: pillsTab=${pillsTab ? "found" : "absent"}`);
   if (!pillsTab) {
     await classifyLoadFailure(page); // throws Terminal or Transient
   } else {

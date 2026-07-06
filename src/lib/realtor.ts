@@ -1,5 +1,5 @@
 import puppeteer, { type Page } from "puppeteer-core";
-import { browserPath, BROWSER_LAUNCH_ARGS, launchErrorDetail } from "./chrome";
+import { browserPath, browserLaunchOptions, launchErrorDetail } from "./chrome";
 
 const NAV_TIMEOUT_MS = 45_000;
 const READY_TIMEOUT_MS = 20_000;
@@ -8,12 +8,8 @@ const MAX_ATTEMPTS = 3;
 // A current desktop Chrome UA — a stale UA is itself a bot signal. Keep this fresh.
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
-// Shared hardened flags (incl. --disable-gpu) plus the scraper's stealth extras.
-const LAUNCH_ARGS = [
-  ...BROWSER_LAUNCH_ARGS,
-  "--disable-blink-features=AutomationControlled",
-  `--user-agent=${UA}`
-];
+// The scraper's stealth extras, layered onto the shared hardened flags/options.
+const EXTRA_ARGS = ["--disable-blink-features=AutomationControlled", `--user-agent=${UA}`];
 
 export type RealtorStatsResult = {
   source: "realtor_page" | "manual";
@@ -90,7 +86,7 @@ export async function fetchRealtorAdminStats(adminUrl: string): Promise<RealtorS
     // this on the deploy host; the launch itself is cheap for this low-volume tool.)
     let browser;
     try {
-      browser = await puppeteer.launch({ executablePath, headless: true, args: LAUNCH_ARGS });
+      browser = await puppeteer.launch({ executablePath, ...browserLaunchOptions(EXTRA_ARGS) });
     } catch (error) {
       // A genuine launch failure won't fix itself on retry — surface it and stop.
       // launchErrorDetail digs out Chromium's real stderr (missing lib / kill signal),

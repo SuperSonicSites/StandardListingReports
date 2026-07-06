@@ -33,6 +33,23 @@ export const BROWSER_LAUNCH_ARGS = [
   "--disable-software-rasterizer"
 ];
 
+// Common puppeteer.launch options shared by the PDF route and the scraper. Callers add
+// their own `executablePath` and any extra args.
+export function browserLaunchOptions(extraArgs: string[] = []) {
+  return {
+    headless: true as const,
+    args: [...BROWSER_LAUNCH_ARGS, ...extraArgs],
+    // A memory-pressured container can take well over puppeteer's default 30s to bring up
+    // the DevTools endpoint (the benign dbus stderr prints while it's still starting) — so
+    // the launch times out and reports a failure that isn't one. Give it more room.
+    timeout: 60_000,
+    // There's no system D-Bus in the container; point Chromium at a dead address so it
+    // doesn't keep trying the missing /run/dbus socket (the source of the noisy — and
+    // misleading — "Failed to connect to the bus" line) and stall startup on the retries.
+    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: "/dev/null" }
+  };
+}
+
 // A launch error whose Chromium stderr matches this is a real "the browser won't start"
 // problem (missing lib, killed process, bad binary) — not a page/nav failure. Retrying
 // won't help; surface it. Shared so the PDF route and scraper classify identically.

@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import puppeteer from "puppeteer-core";
-import { browserPath, BROWSER_LAUNCH_ARGS } from "../../../lib/chrome";
+import { browserPath, browserLaunchOptions } from "../../../lib/chrome";
 import { readSnapshot, slugify } from "../../../lib/storage";
 
 export const prerender = false;
@@ -28,11 +28,7 @@ export const GET: APIRoute = async ({ params, request }) => {
 
   let browser;
   try {
-    browser = await puppeteer.launch({
-      executablePath,
-      headless: true,
-      args: BROWSER_LAUNCH_ARGS
-    });
+    browser = await puppeteer.launch({ executablePath, ...browserLaunchOptions() });
     const page = await browser.newPage();
     await page.setViewport({ width: 1240, height: 1600, deviceScaleFactor: 1 });
     // The loopback self-fetch must carry the caller's auth cookie, or the

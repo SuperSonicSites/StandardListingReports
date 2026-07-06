@@ -66,6 +66,27 @@ async function fetchJson(url: string, token: string): Promise<any> {
   return body;
 }
 
+// Follow Graph API cursor paging (paging.next) to collect up to `maxItems`. A very active
+// Page posts several times a day, so a listing from even a couple of weeks ago sits well
+// past the first page — a single limit=25/50 fetch silently misses it (the exact reason a
+// Facebook listing post wouldn't appear as a candidate while its Instagram twin did).
+// Tolerates a mid-pagination error by returning what it already has; bounded by maxPages.
+async function fetchPagedData(firstUrl: string, token: string, maxItems: number): Promise<any[]> {
+  const items: any[] = [];
+  let url: string | null = firstUrl;
+  for (let page = 0; url && items.length < maxItems && page < 5; page++) {
+    let body: any;
+    try {
+      body = await fetchJson(url, token);
+    } catch {
+      break; // keep the pages we did get
+    }
+    if (Array.isArray(body?.data)) items.push(...body.data);
+    url = typeof body?.paging?.next === "string" ? body.paging.next : null;
+  }
+  return items.slice(0, maxItems);
+}
+
 async function fetchText(url: string): Promise<string> {
   const response = await fetch(url, {
     headers: { "User-Agent": BROWSER_UA },
@@ -286,11 +307,13 @@ export async function fetchFacebookPostCandidates(pageId: string | undefined): P
   try {
     const pageToken = await getPageAccessToken(pageId, token);
     if (!pageToken) return noCandidates("Facebook", "Facebook auto-fetch unavailable.");
-    const body = await fetchJson(
-      `${GRAPH}/${pageId}/posts?fields=message,full_picture,permalink_url,created_time&limit=25`,
-      pageToken
+    // Page through ~100 recent posts, not 25 — an active Page buries a 2–3-week-old listing
+    // deep in its feed. rankCandidates keeps only genuine matches, so a wider net is free.
+    const items = await fetchPagedData(
+      `${GRAPH}/${pageId}/posts?fields=message,full_picture,permalink_url,created_time&limit=50`,
+      pageToken,
+      100
     );
-    const items: any[] = Array.isArray(body?.data) ? body.data : [];
     const candidates = items
       .map((item) => ({
         id: String(item.id ?? ""),
@@ -318,8 +341,8 @@ export async function fetchInstagramMediaCandidates(igUserId: string | undefined
 
   try {
     const fields = "permalink,caption,media_url,thumbnail_url,media_type,timestamp";
-    const list = await fetchJson(`${GRAPH}/${igUserId}/media?fields=${fields}&limit=50`, token);
-    const items: any[] = Array.isArray(list?.data) ? list.data : [];
+    // Page through ~100 recent media for the same reason as Facebook (see fetchPagedData).
+    const items = await fetchPagedData(`${GRAPH}/${igUserId}/media?fields=${fields}&limit=50`, token, 100);
     const candidates = items
       .map((item) => ({
         id: String(item.id ?? ""),

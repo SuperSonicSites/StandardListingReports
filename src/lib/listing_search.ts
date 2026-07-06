@@ -69,8 +69,13 @@ export async function findListingUrl(
   listing: { mls: string | null; address: string | null }
 ): Promise<ListingSearchResult> {
   if (!websiteUrl) {
-    // No site on file — nothing to search; not an error, just fall through to manual entry.
-    return { url: null, source: "manual" };
+    // No site on file — we can't search a domain we don't know. Tell the operator so they
+    // set the client's Website URL (admin), rather than silently leaving the field blank.
+    return {
+      url: null,
+      source: "manual",
+      warning: "This client has no Website URL configured — add it in the client's admin settings to auto-find listings, or paste the listing URL below."
+    };
   }
   const host = siteHost(websiteUrl);
   if (!host) {

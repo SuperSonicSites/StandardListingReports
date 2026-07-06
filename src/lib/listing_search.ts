@@ -93,8 +93,11 @@ export async function findListingUrl(
   }
 
   try {
-    for (const query of queries) {
-      const results = await braveSearch(query, key);
+    for (let i = 0; i < queries.length; i++) {
+      // Brave's free tier allows ~1 request/second; the primary MLS query is a single call,
+      // but space the address-fallback query so it doesn't 429 back-to-back.
+      if (i > 0) await sleep(1100);
+      const results = await braveSearch(queries[i], key);
       const hit = pickListingOnDomain(results, host);
       if (hit) return { url: hit, source: "search" };
     }
@@ -103,3 +106,5 @@ export async function findListingUrl(
     return { url: null, source: "manual", warning: "Listing search unavailable — enter the listing URL manually." };
   }
 }
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

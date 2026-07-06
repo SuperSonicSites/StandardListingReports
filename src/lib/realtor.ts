@@ -1,10 +1,21 @@
-import { type Page } from "puppeteer-core";
-import { browserPath, withPage } from "./chrome";
+import puppeteer, { type Page } from "puppeteer-core";
+import { browserPath } from "./chrome";
 
 const NAV_TIMEOUT_MS = 45_000;
 const READY_TIMEOUT_MS = 20_000;
 const DATA_TIMEOUT_MS = 15_000;
 const MAX_ATTEMPTS = 3;
+// A current desktop Chrome UA — a stale UA is itself a bot signal. Keep this fresh.
+const UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+const LAUNCH_ARGS = [
+  "--no-sandbox",
+  "--disable-setuid-sandbox",
+  // container /dev/shm is often 64MB and Chrome crashes without this.
+  "--disable-dev-shm-usage",
+  "--disable-blink-features=AutomationControlled",
+  `--user-agent=${UA}`
+];
 
 export type RealtorStatsResult = {
   source: "realtor_page" | "manual";
@@ -70,30 +81,39 @@ export async function fetchRealtorAdminStats(adminUrl: string): Promise<RealtorS
       "terminal"
     );
   }
-  if (!browserPath()) {
+  const executablePath = browserPath();
+  if (!executablePath) {
     return degraded("REALTOR.ca capture needs Chrome/Edge (or CHROME_PATH) on the server.");
   }
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    // Launch a fresh browser per attempt — the SAME per-call model the PDF route uses and
+    // that captured REALTOR.ca photos before. (An earlier shared long-lived browser broke
+    // this on the deploy host; the launch itself is cheap for this low-volume tool.)
+    let browser;
     try {
-      return await withPage((page) => scrapeOnce(page, adminUrl));
+      browser = await puppeteer.launch({ executablePath, headless: true, args: LAUNCH_ARGS });
+    } catch (error) {
+      // A genuine launch failure won't fix itself on retry — surface it and stop.
+      // eslint-disable-next-line no-console
+      console.error(`[realtor] browser launch failed (${executablePath}): ${(error as Error)?.message ?? error}`);
+      return degraded(
+        "Couldn't start the browser to read REALTOR.ca — check the Chrome/Chromium install (CHROME_PATH).",
+        "terminal"
+      );
+    }
+
+    try {
+      const page = await browser.newPage();
+      return await scrapeOnce(page, adminUrl);
     } catch (error) {
       if (error instanceof TerminalScrapeError) {
         return degraded(error.message, "terminal");
       }
       const err = error as Error;
-      const detail = err?.message || String(error);
       // Log the REAL cause server-side (the user-facing message is deliberately generic).
       // eslint-disable-next-line no-console
-      console.error(`[realtor] scrape attempt ${attempt}/${MAX_ATTEMPTS} failed: ${err?.name || "Error"} - ${detail}`);
-      // A browser that won't start won't fix itself on retry — surface it clearly.
-      if (/failed to launch|spawn|ENOENT|Target closed|Protocol error|Browser was not found|executablePath|libnss|no usable sandbox/i.test(detail)) {
-        return degraded(
-          "Couldn't start the browser to read REALTOR.ca — make sure Chrome/Edge is installed (or set CHROME_PATH).",
-          "terminal"
-        );
-      }
-      // Transient (or unexpected) — retry with backoff, then degrade softly.
+      console.error(`[realtor] scrape attempt ${attempt}/${MAX_ATTEMPTS} failed: ${err?.name || "Error"} - ${err?.message || String(error)}`);
       if (attempt >= MAX_ATTEMPTS) {
         const message =
           error instanceof TransientScrapeError
@@ -102,6 +122,8 @@ export async function fetchRealtorAdminStats(adminUrl: string): Promise<RealtorS
         return degraded(message, "transient");
       }
       await sleep(500 * 2 ** (attempt - 1));
+    } finally {
+      await browser.close().catch(() => {});
     }
   }
   // Unreachable, but keeps the type checker happy.
@@ -109,7 +131,7 @@ export async function fetchRealtorAdminStats(adminUrl: string): Promise<RealtorS
 }
 
 async function scrapeOnce(page: Page, adminUrl: string): Promise<RealtorStatsResult> {
-  // UA is set at the browser level (see chrome.ts LAUNCH_ARGS); just add locale hints here.
+  // UA is set via the --user-agent launch arg (LAUNCH_ARGS); just add locale hints here.
   await page.setExtraHTTPHeaders({ "Accept-Language": "en-CA,en;q=0.9" });
   await page.setViewport({ width: 1280, height: 900 });
 

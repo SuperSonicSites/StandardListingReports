@@ -95,10 +95,13 @@ export async function fetchRealtorAdminStats(adminUrl: string): Promise<RealtorS
       browser = await puppeteer.launch({ executablePath, headless: true, args: LAUNCH_ARGS });
     } catch (error) {
       // A genuine launch failure won't fix itself on retry — surface it and stop.
+      // The real cause (missing libs, version mismatch, etc.) is included so it can be
+      // diagnosed without digging through host logs; trim once the deploy is sorted.
+      const detail = ((error as Error)?.message ?? String(error)).split("\n")[0].slice(0, 200);
       // eslint-disable-next-line no-console
       console.error(`[realtor] browser launch failed (${executablePath}): ${(error as Error)?.message ?? error}`);
       return degraded(
-        "Couldn't start the browser to read REALTOR.ca — check the Chrome/Chromium install (CHROME_PATH).",
+        `Couldn't start the browser to read REALTOR.ca (${executablePath}). Error: ${detail}`,
         "terminal"
       );
     }

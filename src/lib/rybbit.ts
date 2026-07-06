@@ -70,6 +70,13 @@ export async function fetchRybbitListingViews(
     return notConfigured("Rybbit is not configured for this client");
   }
 
+  // No listing URL yet (e.g. the auto-find didn't resolve one) — Rybbit is keyed on the
+  // page path, so there's nothing to query. Say that plainly instead of "auto-fetch
+  // unavailable", which reads like Rybbit itself failed.
+  if (!listingUrl.trim()) {
+    return notConfigured("No listing URL to check yet — set the Website URL, then Pull again");
+  }
+
   let pathname: string;
   try {
     pathname = new URL(listingUrl).pathname;

@@ -170,6 +170,19 @@ async function scrapeOnce(page: Page, adminUrl: string): Promise<RealtorStatsRes
     )
     .catch(() => {});
 
+  // Days-on-market lives in its own widget that can hydrate a beat after views. Give it a
+  // short best-effort wait so it isn't read as null (which would drop the derived reporting
+  // window and force the coordinator to set the dates by hand). Absent => proceed anyway.
+  await page
+    .waitForFunction(
+      () => {
+        const els = [...document.querySelectorAll('[id^="data_report_"][id$="_daysOnRealtor"]')];
+        return els.some((el) => /\d/.test(el.textContent ?? ""));
+      },
+      { timeout: 5_000, polling: 400 }
+    )
+    .catch(() => {});
+
   const stats = await page.evaluate(() => {
     const clean = (el: Element | null) => (el?.textContent ?? "").replace(/\s+/g, " ").trim();
     const parseCount = (text: string | null | undefined) => {
@@ -183,7 +196,10 @@ async function scrapeOnce(page: Page, adminUrl: string): Promise<RealtorStatsRes
     const counts = (visible.length ? visible : viewEls)
       .map((el) => parseCount(el.textContent))
       .filter((n): n is number => n !== null);
-    const dom = document.querySelector('[id^="data_report_"][id$="_daysOnRealtor"]');
+    // Several _daysOnRealtor widgets can exist (one per pane); take whichever actually holds
+    // a number rather than the first (which may be in a hidden/not-yet-rendered pane).
+    const daysEls = [...document.querySelectorAll('[id^="data_report_"][id$="_daysOnRealtor"]')];
+    const dom = daysEls.find((el) => /\d/.test(el.textContent ?? "")) ?? daysEls[0] ?? null;
     const imgEl = document.querySelector<HTMLImageElement>('[id^="img_report_"][id$="_propertyImage"]');
     const imgSrc = imgEl ? imgEl.currentSrc || imgEl.src : "";
     const adminImage =

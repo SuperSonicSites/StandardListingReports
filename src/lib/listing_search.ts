@@ -107,7 +107,18 @@ export async function findListingUrl(
       if (hit) return { url: hit, source: "search" };
     }
     return { url: null, source: "manual", warning: `Couldn't find this listing on ${host} — enter the listing URL manually.` };
-  } catch {
+  } catch (error) {
+    // A bad/unauthorized key is a config problem the operator can fix — point at it directly
+    // instead of the generic "unavailable" (which reads like a transient blip).
+    const status = (error as Error)?.message ?? "";
+    if (/\b(401|403|422|429)\b/.test(status)) {
+      const reason = status.includes("429") ? "rate-limited" : "key is invalid or unauthorized";
+      return {
+        url: null,
+        source: "manual",
+        warning: `Listing search ${reason} (check BRAVE_API_KEY) — enter the listing URL manually.`
+      };
+    }
     return { url: null, source: "manual", warning: "Listing search unavailable — enter the listing URL manually." };
   }
 }

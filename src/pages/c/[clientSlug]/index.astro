@@ -23,8 +23,8 @@ try {
           <p class="eyebrow">Listing report</p>
           <h1>Create Listing Report</h1>
           <p>
-            Follow the steps below: add the listing details, pull the
-            performance data (or enter it by hand), then review and create the report.
+            Paste the REALTOR.ca share link and hit Pull data — the address, MLS&reg;, reporting window,
+            website page, views, photo and matching social posts all fill in below. Then just confirm and create.
           </p>
         </div>
       </header>
@@ -38,59 +38,21 @@ try {
         <input type="hidden" name="website_source" value="manual" />
         <input type="hidden" name="facebook_source" value="manual" />
         <input type="hidden" name="instagram_source" value="manual" />
+        <input type="hidden" name="start_date" value="" />
+        <input type="hidden" name="end_date" value="" />
 
-        <section class="client-form-card">
+        <!-- ===== 1. Intake (always visible) ===== -->
+        <section class="client-form-card client-pull-card" data-pull-card>
           <div class="client-section-header">
-            <span>01</span>
+            <span>1</span>
             <div>
-              <h2>Listing</h2>
-              <p>Address, MLS&reg; and the reporting window are pulled from REALTOR.ca. Edit only if a value is wrong.</p>
+              <h2>Start here</h2>
+              <p>Paste the REALTOR.ca share link and pull. Everything else fills in below for you to confirm.</p>
             </div>
           </div>
-          <!-- Period is DERIVED (first day on market -> today) from the REALTOR.ca pull,
-               never typed. The date inputs below only appear if the pull can't determine
-               the listing date. -->
-          <input type="hidden" name="start_date" value="" />
-          <input type="hidden" name="end_date" value="" />
-          <div class="client-field-grid two">
-            <label class="client-field wide">
-              <span>Address</span>
-              <input name="address" placeholder="Pulled from REALTOR.ca" required />
-            </label>
-            <label class="client-field">
-              <span>MLS&reg; number</span>
-              <input name="mls_number" placeholder="Pulled from REALTOR.ca" />
-            </label>
-            <div class="client-field wide">
-              <span>Report period</span>
-              <p class="client-period-value" data-period-text>Pull REALTOR.ca data to set the reporting window (first day on market &rarr; today).</p>
-            </div>
-          </div>
-          <div class="client-field-grid two" data-period-fallback hidden>
-            <label class="client-field">
-              <span>First day on market</span>
-              <input type="date" data-period-start />
-            </label>
-            <label class="client-field">
-              <span>End date</span>
-              <input type="date" data-period-end />
-            </label>
-            <p class="client-field wide import-fetch-notice">
-              We couldn't read the listing date from REALTOR.ca — set the reporting window here.
-            </p>
-          </div>
-        </section>
 
-        <section class="client-form-card">
-          <div class="client-section-header">
-            <span>02</span>
-            <div>
-              <h2>Links</h2>
-              <p>Paste the REALTOR.ca share link and hit Pull data — it fills the rest.</p>
-            </div>
-          </div>
           <div class="client-field-grid two">
-            <label class="client-field wide">
+            <label class="client-field wide" data-notice-anchor="realtor">
               <span>REALTOR.ca Admin URL</span>
               <input
                 class="client-url-input"
@@ -101,98 +63,120 @@ try {
               />
               <small>
                 Signed in to REALTOR.ca, the top-right corner of your listing has a SHARE LISTING
-                button — share the link with yourself and paste it here. Pull data reads the address,
-                MLS&reg; number, days on market, listing views and photo, sets the reporting window,
-                and finds the matching Facebook/Instagram posts.
+                button — share the link with yourself, paste it here, and press Pull data.
               </small>
             </label>
-            <label class="client-field wide" data-notice-anchor="listing">
-              <span>Website URL</span>
-              <input
-                class="client-url-input"
-                type="url"
-                name="listing_url"
-                placeholder="Found automatically from the listing — or paste it here"
-                required
-              />
+          </div>
+
+          <div class="client-pull-strip">
+            <div class="client-pull-status">
+              <span aria-hidden="true"></span>
+              <div>
+                <strong data-pull-status>Ready to pull</strong>
+                <small data-pull-detail>Paste the REALTOR.ca link above, then pull — everything else fills in for you to confirm.</small>
+              </div>
+            </div>
+            <button class="client-pull-button" type="button" data-pull-trigger>Pull data</button>
+          </div>
+
+          <!-- Facebook / Instagram post pickers — revealed once the pull matches them. -->
+          <div class="client-field-grid two" data-social-picker hidden>
+            <label class="client-field" data-notice-anchor="facebook">
+              <span>Facebook post</span>
+              <select class="post-candidate-select" data-candidate-select="facebook">
+                <option value="">Pull data to match posts&hellip;</option>
+              </select>
+              <img class="post-media-preview" data-media-preview="facebook" alt="Selected Facebook post image" hidden />
+            </label>
+            <label class="client-field" data-notice-anchor="instagram">
+              <span>Instagram post</span>
+              <select class="post-candidate-select" data-candidate-select="instagram">
+                <option value="">Pull data to match posts&hellip;</option>
+              </select>
+              <img class="post-media-preview" data-media-preview="instagram" alt="Selected Instagram post image" hidden />
             </label>
           </div>
-          <p class="client-field-hint">
-            The listing page on your website is found automatically from the REALTOR.ca listing, and the
-            Facebook &amp; Instagram posts are matched too — just confirm them in the Performance section below.
-          </p>
         </section>
 
-        <section class="client-form-card">
-          <div class="client-section-header">
-            <span>03</span>
-            <div>
-              <h2>Manually entered data</h2>
-              <p>Numbers entered by hand for this reporting period.</p>
-            </div>
-          </div>
-          <div class="client-field-grid two">
-            <div>
-              <label class="client-field">
-                <span>Showings</span>
-                <input type="number" min="0" name="showings" placeholder="0" required />
-              </label>
-              <label class="client-toggle">
-                <input type="checkbox" name="hide_showings" value="yes" />
-                <span>Do not display showings on the report</span>
-              </label>
-            </div>
-          </div>
-        </section>
+        <!-- ===== Review (revealed after the pull) ===== -->
+        <div class="client-review-block" data-review-block hidden>
 
-        <section class="client-form-card client-pull-card" data-pull-card>
-          <div class="client-section-header">
-            <span>04</span>
-            <div>
-              <h2>Performance data</h2>
-              <p>Pull the numbers from the listing and social sources, or type them in directly.</p>
-            </div>
-          </div>
-          <div class="client-review-area">
-            <div class="client-pull-strip">
-              <div class="client-pull-status">
-                <span aria-hidden="true"></span>
-                <div>
-                  <strong data-pull-status>Ready to pull data</strong>
-                  <small data-pull-detail>Pull website and social performance, then review and correct the numbers below. You can also enter everything manually.</small>
-                </div>
+          <section class="client-form-card">
+            <div class="client-section-header">
+              <span>2</span>
+              <div>
+                <h2>Listing details</h2>
+                <p>Pulled from REALTOR.ca — edit only if a value is wrong.</p>
               </div>
-              <button class="client-pull-button" type="button" data-pull-trigger>Pull data</button>
             </div>
+            <div class="client-field-grid two">
+              <label class="client-field wide">
+                <span>Address</span>
+                <input name="address" placeholder="Pulled from REALTOR.ca" required />
+              </label>
+              <label class="client-field">
+                <span>MLS&reg; number</span>
+                <input name="mls_number" placeholder="Pulled from REALTOR.ca" />
+              </label>
+              <div class="client-field wide">
+                <span>Report period</span>
+                <p class="client-period-value" data-period-text>First day on market &rarr; today</p>
+              </div>
+              <label class="client-field wide" data-notice-anchor="listing">
+                <span>Website URL</span>
+                <input
+                  class="client-url-input"
+                  type="url"
+                  name="listing_url"
+                  placeholder="Found automatically from the listing — or paste it here"
+                  required
+                />
+              </label>
+            </div>
+            <div class="client-field-grid two" data-period-fallback hidden>
+              <label class="client-field">
+                <span>First day on market</span>
+                <input type="date" data-period-start />
+              </label>
+              <label class="client-field">
+                <span>End date</span>
+                <input type="date" data-period-end />
+              </label>
+              <p class="client-field wide import-fetch-notice">
+                We couldn't read the listing date from REALTOR.ca — set the reporting window here.
+              </p>
+            </div>
+          </section>
 
-            <div class="import-review-stack" data-review-stack>
+          <section class="client-form-card">
+            <div class="client-section-header">
+              <span>3</span>
+              <div>
+                <h2>Performance</h2>
+                <p>Pulled numbers — review and correct anything that looks off.</p>
+              </div>
+            </div>
+            <div class="import-review-stack">
               <article class="import-review-card">
                 <div class="import-review-head">
                   <div>
                     <span class="source-badge" data-source-badge="website">Rybbit</span>
                     <h3>Website analytics</h3>
-                    <p>Listing traffic for the selected reporting window.</p>
+                    <p>Listing traffic for the reporting window.</p>
                   </div>
                   <div class="import-primary-metric">
-                    <input
-                      class="import-metric-input"
-                      type="number"
-                      min="0"
-                      name="website_views"
-                      value="0"
-                      required
-                    />
+                    <input class="import-metric-input" type="number" min="0" name="website_views" value="0" required />
                     <small>listing page views</small>
                   </div>
                 </div>
               </article>
 
-              <article class="import-review-card" data-notice-anchor="realtor">
+              <article class="import-review-card">
                 <div class="import-review-head">
                   <div>
                     <span class="source-badge" data-source-badge="realtor">REALTOR.ca</span>
                     <h3>REALTOR.ca performance</h3>
-                    <p>All-time listing views, days on market, and the listing's first photo (shown on the report cover) — pulled from the Admin URL.</p>
+                    <p>All-time listing views, days on market, and the listing's first photo (shown on the report cover).</p>
                     <img class="post-media-preview" data-media-preview="realtor" alt="REALTOR.ca listing photo (appears on the report cover)" hidden />
                   </div>
                 </div>
@@ -225,20 +209,13 @@ try {
                   <div>
                     <span class="source-badge" data-source-badge="social">Meta</span>
                     <h3>Social performance</h3>
-                    <p>Pick the Facebook and Instagram post for this listing from the matches below. Captions and images appear on the report — review them.</p>
+                    <p>Captions and views for the Facebook &amp; Instagram posts you picked above. Edit anything that should read differently on the report.</p>
                   </div>
                 </div>
                 <div class="post-review-list">
                   <div class="post-review-row">
                     <div>
                       <strong>Facebook post</strong>
-                      <img class="post-media-preview" data-media-preview="facebook" alt="Facebook post image (appears on the report)" hidden />
-                      <label class="post-caption-field">
-                        <span>Matched post</span>
-                        <select class="post-candidate-select" data-candidate-select="facebook">
-                          <option value="">Pull data to match posts&hellip;</option>
-                        </select>
-                      </label>
                       <label class="post-caption-field">
                         <span>Post URL</span>
                         <input type="url" name="facebook_post_url" placeholder="Set from your selection, or paste a link" />
@@ -260,13 +237,6 @@ try {
                   <div class="post-review-row">
                     <div>
                       <strong>Instagram post</strong>
-                      <img class="post-media-preview" data-media-preview="instagram" alt="Instagram post image (appears on the report)" hidden />
-                      <label class="post-caption-field">
-                        <span>Matched post</span>
-                        <select class="post-candidate-select" data-candidate-select="instagram">
-                          <option value="">Pull data to match posts&hellip;</option>
-                        </select>
-                      </label>
                       <label class="post-caption-field">
                         <span>Post URL</span>
                         <input type="url" name="instagram_post_url" placeholder="Set from your selection, or paste a link" />
@@ -288,40 +258,50 @@ try {
                 </div>
               </article>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="client-form-card">
-          <div class="client-section-header">
-            <span>05</span>
-            <div>
-              <h2>Notes</h2>
-              <p>Seller-facing context added before approval.</p>
+          <section class="client-form-card">
+            <div class="client-section-header">
+              <span>4</span>
+              <div>
+                <h2>Showings &amp; notes</h2>
+                <p>The one number we can't pull, plus any seller-facing note.</p>
+              </div>
             </div>
-          </div>
-          <div class="client-field-grid two">
-            <div class="wide">
-              <label class="client-field wide">
-                <span>Notes</span>
-                <textarea name="notes" rows="4" maxlength="600" placeholder="Optional notes shown on the report's performance page."></textarea>
-              </label>
-              <label class="client-toggle">
-                <input type="checkbox" name="hide_notes" value="yes" />
-                <span>Do not display notes on the report</span>
-              </label>
+            <div class="client-field-grid two">
+              <div>
+                <label class="client-field">
+                  <span>Showings</span>
+                  <input type="number" min="0" name="showings" placeholder="0" required />
+                </label>
+                <label class="client-toggle">
+                  <input type="checkbox" name="hide_showings" value="yes" />
+                  <span>Do not display showings on the report</span>
+                </label>
+              </div>
+              <div class="wide">
+                <label class="client-field wide">
+                  <span>Notes</span>
+                  <textarea name="notes" rows="4" maxlength="600" placeholder="Optional notes shown on the report's performance page."></textarea>
+                </label>
+                <label class="client-toggle">
+                  <input type="checkbox" name="hide_notes" value="yes" />
+                  <span>Do not display notes on the report</span>
+                </label>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <div class="client-submit-panel">
-          <label class="client-approval">
-            <input type="checkbox" name="approved" value="yes" required />
-            <span>
-              <strong>Review and approve</strong>
-              <small>I have reviewed the numbers, captions, images, and notes above.</small>
-            </span>
-          </label>
-          <button class="client-submit-button" type="submit" data-submit-button>Create Report</button>
+          <div class="client-submit-panel">
+            <label class="client-approval">
+              <input type="checkbox" name="approved" value="yes" required />
+              <span>
+                <strong>Review and approve</strong>
+                <small>I have reviewed the numbers, captions, images, and notes above.</small>
+              </span>
+            </label>
+            <button class="client-submit-button" type="submit" data-submit-button>Create Report</button>
+          </div>
         </div>
       </form>
 
@@ -340,6 +320,9 @@ try {
         const statusText = document.querySelector("[data-pull-status]");
         const statusDetail = document.querySelector("[data-pull-detail]");
         const submitButton = document.querySelector("[data-submit-button]") as HTMLButtonElement | null;
+        // Everything past the intake card is hidden until a pull has run.
+        const reviewBlock = document.querySelector("[data-review-block]") as HTMLElement | null;
+        const socialPicker = document.querySelector("[data-social-picker]") as HTMLElement | null;
         const MAX_CAPTION = 300;
 
         const groups: Record<string, string[]> = {
@@ -363,7 +346,8 @@ try {
         }
 
         // One notice element per block, updated in place so refreshes replace stale text.
-        // Blocks without metric inputs (the REALTOR.ca photo) anchor via data-notice-anchor.
+        // Blocks without metric inputs (the REALTOR.ca link, the social pickers) anchor via
+        // data-notice-anchor.
         function setNotice(key: string, message: string | null) {
           const target =
             document.querySelector(`[data-notice-anchor="${key}"]`) ??
@@ -396,7 +380,7 @@ try {
           if (badge) badge.textContent = pulled ? "REALTOR.ca — pulled" : "REALTOR.ca — manual";
         }
 
-        // Facebook and Instagram share one card (and one badge) — reflect BOTH results,
+        // Facebook and Instagram share one badge — reflect BOTH results,
         // never let the second block's status overwrite the first's.
         function setSocialBadge(fbSource: string, igSource: string) {
           const badge = document.querySelector('[data-source-badge="social"]');
@@ -544,6 +528,13 @@ try {
 
         const pullModal = document.querySelector("[data-pull-modal]") as HTMLElement | null;
 
+        // Reveal the review section + social pickers once a pull has run (success OR
+        // degraded) — the report is never blocked, so the fields are always reachable.
+        function revealAfterPull() {
+          if (reviewBlock) reviewBlock.hidden = false;
+          if (socialPicker) socialPicker.hidden = false;
+        }
+
         async function pull(button: HTMLButtonElement) {
           button.disabled = true;
           button.textContent = "Pulling...";
@@ -642,6 +633,7 @@ try {
             }
           } finally {
             if (pullModal) pullModal.hidden = true;
+            revealAfterPull();
             pullButtons.forEach((trigger) => {
               if (trigger instanceof HTMLButtonElement) {
                 trigger.disabled = false;
@@ -657,9 +649,25 @@ try {
           });
         });
 
+        // Pressing Enter in the REALTOR.ca link triggers the pull rather than a premature
+        // (and invalid, since the review fields are still hidden) form submit.
+        const realtorInput = field("realtor_admin_url");
+        realtorInput?.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            const trigger = document.querySelector("[data-pull-trigger]");
+            if (trigger instanceof HTMLButtonElement) pull(trigger);
+          }
+        });
+
         // Snapshot creation embeds images server-side and can take several seconds —
-        // block the double-submit that would create duplicate reports.
-        form?.addEventListener("submit", () => {
+        // block the double-submit that would create duplicate reports. Also guard against
+        // a submit before the review section (and its required fields) has been revealed.
+        form?.addEventListener("submit", (event) => {
+          if (reviewBlock?.hidden) {
+            event.preventDefault();
+            return;
+          }
           if (submitButton) {
             submitButton.disabled = true;
             submitButton.textContent = "Creating report...";
@@ -668,7 +676,7 @@ try {
 
         // Coming back from a server-side validation error restores this page from the
         // bfcache WITH the disabled button state — re-enable so the coordinator can fix
-        // the problem and resubmit.
+        // the problem and resubmit. The review section stays revealed.
         window.addEventListener("pageshow", () => {
           if (submitButton) {
             submitButton.disabled = false;

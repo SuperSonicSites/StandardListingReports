@@ -402,29 +402,21 @@ const flash = takeFlash(Astro.cookies);
                   <span class="num">4</span>
                   <div class="head-text">
                     <h2>Showings &amp; notes</h2>
-                    <p>The one number we can&rsquo;t pull, plus any seller-facing note.</p>
+                    <p>Both optional — they appear on the report only when you fill them in.</p>
                   </div>
                 </div>
                 <div class="section-fields">
-                  <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end">
-                    <div class="field" style="max-width: 200px">
-                      <label class="field-label" for="showings">Showings <span class="req">*</span></label>
-                      <input id="showings" type="number" inputmode="numeric" min="0" name="showings" placeholder="0" style="font-weight: 600" data-field="showings" />
-                      <p class="err-note" data-err-for="showings" hidden />
-                    </div>
-                    <label class="toggle-row">
-                      <input type="checkbox" name="hide_showings" value="yes" />
-                      Do not display showings on the report
-                    </label>
+                  <div class="field">
+                    <label class="field-label" for="showings">Showings</label>
+                    <input id="showings" type="number" inputmode="numeric" min="0" name="showings" placeholder="Leave blank to omit" style="font-weight: 600" data-field="showings" />
+                    <p class="field-hint">Leave blank and showings won&rsquo;t appear on the report. Enter a number (0 counts) to show it.</p>
+                    <p class="err-note" data-err-for="showings" hidden />
                   </div>
                   <div class="field">
                     <label class="field-label" for="notes">Seller-facing note</label>
-                    <textarea id="notes" name="notes" maxlength="600" rows="4" placeholder="Optional — a short note the seller sees on the report." data-counter-src="notes" style="min-height: 88px" />
+                    <textarea id="notes" name="notes" maxlength="600" rows="4" placeholder="A short note the seller sees on the report." data-counter-src="notes" style="min-height: 88px" />
                     <div class="counter" data-counter="notes">0 / 600</div>
-                    <label class="toggle-row">
-                      <input type="checkbox" name="hide_notes" value="yes" />
-                      Do not display notes on the report
-                    </label>
+                    <p class="field-hint">Leave blank and the report won&rsquo;t include a notes section.</p>
                   </div>
                 </div>
               </section>

@@ -556,7 +556,7 @@ export function initCoordinatorForm() {
       );
 
       const listingUrlFound =
-        data.website.listing_source === "search" || data.website.listing_source === "mock";
+        data.website.listing_source === "rybbit" || data.website.listing_source === "mock";
       if (listingUrlFound && data.website.listing_url && !field("listing_url")?.value) {
         setVal("listing_url", data.website.listing_url);
       }
@@ -738,11 +738,8 @@ export function initCoordinatorForm() {
     const url = v("listing_url");
     if (!url || !/^https?:\/\//i.test(url))
       errs.listing_url = "Add the listing’s website link (starting with https://).";
-    const showings = field("showings")?.value ?? "";
-    if (showings === "") errs.showings = "Enter the number of showings (0 or higher).";
-    else if (Number.isNaN(Number(showings)) || Number(showings) < 0)
-      errs.showings = "Enter a number that’s 0 or higher.";
-    ["website_views", "realtor_listing_views", "days_on_market", "facebook_views", "instagram_views"].forEach(
+    // Showings is optional (blank = omitted from the report) — validate only when present.
+    ["showings", "website_views", "realtor_listing_views", "days_on_market", "facebook_views", "instagram_views"].forEach(
       (key) => {
         const val = field(key)?.value ?? "";
         if (val !== "" && (Number.isNaN(Number(val)) || Number(val) < 0))

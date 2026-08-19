@@ -394,8 +394,9 @@ const STREET_STOPWORDS = new Set([
 ]);
 
 // The distinctive street-name tokens (e.g. "pintail", "academy") — numbers and street-type
-// words removed. These are what a real listing post names.
-function streetNameTokens(address: string): string[] {
+// words removed. These are what a real listing post names. Also used by /api/pull to build
+// the "/civic-streetname" slug fragment for the Rybbit listing lookup.
+export function streetNameTokens(address: string): string[] {
   return tokenize(address).filter((t) => !/^\d+$/.test(t) && !STREET_STOPWORDS.has(t) && t.length >= 4);
 }
 

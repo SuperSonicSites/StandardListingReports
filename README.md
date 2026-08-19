@@ -1,15 +1,17 @@
 # Seller Report Generator
 
-A small, boring, white-label seller report generator for real estate marketing teams.
+A small, boring, white-label, **self-serve** seller report generator for real
+estate marketing teams.
 
 The product is simple:
 
 ```txt
-Create client
-Open client report form
-Enter listing/report details
-Review the frozen snapshot
-Generate a branded PDF
+Admin sets up the client once (brand + access + integration IDs)
+Client opens their report form
+Client pastes their REALTOR.ca share link (the member/backend link)
+The app gathers all the data automatically
+Client reviews and approves
+Client downloads/prints the branded PDF
 ```
 
 The PDF is the product.
@@ -34,7 +36,7 @@ Useful local routes:
 
 ```txt
 /admin/clients/new
-/c/stone-sisters/new
+/c/[client_slug]/
 /reports/[snapshot_id]
 ```
 
@@ -47,59 +49,49 @@ Copy `.env.example` to `.env` for the integration credentials. Without
 credentials, "Pull data" degrades to manual entry with a warning; set
 `DEMO_MODE=1` to get fabricated numbers labeled `mock` for demos instead.
 
-## Current Goal
+## What the app does (v0.2)
 
-v0.2: the report workflow is real end-to-end. "Pull data" hydrates the form from
-Rybbit (listing page views) and Meta (organic Facebook/Instagram post views and
-engagements); every metric stays a manually editable field, and a failed pull
-degrades to a warning. The snapshot freezes the reviewed numbers, captions, and
-images, and the PDF renders from the snapshot only.
+The coordinator's only required input is the REALTOR.ca member **"share
+listing"** link. From that one link, "Pull data" gathers everything:
 
-## v0.1 Scope
+- **REALTOR.ca** — all-time listing views, days on market, address, MLS® number,
+  and the listing's first photo, scraped from the member stats page in headless
+  Chrome (the public listing page is bot-walled).
+- **Report period** — derived, not typed: first day on market → today.
+- **Website analytics (Rybbit)** — one pathname lookup by MLS#/address slug
+  resolves the listing page on the client's own site AND its view count
+  together (no web-search dependency — Rybbit is the tracker, so it's always
+  in sync), plus site-wide views for the summary line.
+- **Facebook / Instagram (Meta)** — recent posts are listed, ranked against the
+  listing (MLS# / street name + civic number), and offered as a picker; the
+  selected post's views, caption, and image fill the form.
 
-v0.1 should do only this:
-
-1. Create or define one client brand.
-2. Open a client-specific report form.
-3. Submit listing details and mock/manual metrics.
-4. Save a frozen report snapshot.
-5. Render a branded PDF from that snapshot.
-
-No live analytics integrations are required for v0.1.
-
-No production authentication is required for v0.1.
-
-No database is required unless it is simpler than local files for the chosen
-implementation.
+The coordinator reviews the pulled values, corrects anything that looks off
+(every metric stays an editable field — the fallback, not the workflow), checks
+"Review and approve", and creates the report. The approved numbers freeze into a
+snapshot; the PDF renders from the snapshot only.
 
 ## Product Shape
 
-The eventual hosted app should support this flow:
-
 ```txt
-Admin creates client
+Admin creates client (once)
         |
-App creates private client report endpoint
+App creates private client report endpoint  /c/<slug>/
         |
-Client fills report form
+Client pastes REALTOR.ca share link -> Pull data
         |
-App creates snapshot
+App gathers everything automatically
         |
-Client reviews/edit numbers
+Client reviews and approves
         |
-App generates branded PDF
+App freezes snapshot -> renders branded report
+        |
+Client downloads the PDF
 ```
 
-Example future client endpoint:
-
-```txt
-/c/stone-sisters/new
-```
-
-Private links or access controls can be added when the app moves beyond the
-local demo. Client analytics access is delegated to us as part of the service,
-so the system can use server-side credentials later, but those credentials should
-never be exposed to the browser or stored in snapshots.
+Client analytics access is delegated to us as part of the service, so the
+system uses server-side credentials; those credentials are never exposed to the
+browser or stored in snapshots.
 
 ## Development Philosophy
 
@@ -125,32 +117,17 @@ Prefer:
 - boring code
 - explicit data
 - frozen snapshots
-- manual fallback
+- automatic gathering with manual fallback
 - one good PDF template
-- review/edit before final output
+- review/approve before final output
 
 Avoid:
 
 - speculative abstractions
 - template builders
 - workflow engines
-- premature auth systems
 - premature databases
 - pretending APIs are perfect
-
-## Build Order
-
-Build in this order:
-
-1. Form -> snapshot -> branded HTML.
-2. Branded HTML -> PDF.
-3. Local client creation or client config.
-4. Review/edit screen.
-5. Hosted client endpoint.
-6. Persistent storage.
-7. Real analytics integrations.
-
-Do not build step 7 before step 2 is good.
 
 ## Preferred Stack
 
@@ -171,10 +148,8 @@ The code is host-agnostic; these are the moving parts:
 1. Set the start command to `npm run start` **before** the first deploy
    (Railpack cannot infer it for `output: "server"`).
 2. Service variables: `HOST=0.0.0.0`, `ADMIN_PASSWORD`, `META_SYSTEM_USER_TOKEN`,
-   `RYBBIT_API_KEY`, `BRAVE_API_KEY` (optional — enables auto-finding the listing
-   page on the client's website by MLS#/address via Brave Search; without it the
-   Website URL is entered manually). The built server never loads `.env` —
-   platform env vars are the only source.
+   `RYBBIT_API_KEY`. The built server never loads `.env` — platform env vars
+   are the only source.
    **Chromium** (PDF + REALTOR.ca capture) ships bundled via `@sparticuz/chromium`
    — a headless-shell build that runs in restricted containers where the system
    apt `chromium` can't (recent Chromium needs unprivileged user namespaces the
@@ -194,9 +169,10 @@ The code is host-agnostic; these are the moving parts:
 
 ### Client
 
-A client represents one white-label brand.
+A client represents one white-label brand, set up once by the admin so the
+coordinator can self-serve afterwards.
 
-Minimum useful fields:
+Fields:
 
 ```txt
 slug
@@ -205,98 +181,99 @@ logo
 brand colors
 footer/contact text
 brokerage disclaimer details
-optional integration IDs (Meta page/IG account, Rybbit site)
+coordinator password (hash)
+website URL (for the listing auto-find)
+integration IDs (Meta page/IG account, Rybbit site)
 ```
-
-Later, a client may also hold server-side integration settings for Rybbit, Meta,
-or storage.
 
 ### Report Form
 
-The client-facing form should collect:
+The coordinator-facing form at `/c/<slug>/`. Its one required input is the
+REALTOR.ca member "share listing" link; "Pull data" fills everything else for
+review:
 
 ```txt
-address
-listing URL
-report start date
-report end date
-Facebook / Instagram post URLs
-website views (pulled from Rybbit or entered manually)
-Facebook views and engagements (pulled from Meta or entered manually)
-Instagram views and engagements (pulled from Meta or entered manually)
-post captions and images (pulled from Meta, reviewable before approval)
-REALTOR.ca views, inquiries, showings, days on market (always manual)
-notes
+address, MLS# ................. scraped from REALTOR.ca
+report period ................. derived: first day on market -> today
+listing URL + website views ... resolved together via Rybbit (MLS/slug lookup)
+site-wide views ............... pulled from Rybbit
+REALTOR.ca views, days ........ scraped from REALTOR.ca
+FB / IG post, caption, views .. picked from ranked Meta candidates
+showings, notes ............... optional, always manual; on the report only when entered
 ```
 
-The form should be easy enough for a non-technical marketing coordinator to use.
+Every pulled value stays an editable field so the coordinator can correct it
+before approving; a failed source degrades to a per-block warning and manual
+entry.
 
 ### Snapshot
 
 The snapshot is the source of truth.
 
-Reports should render from snapshot data, not live API calls. Once a report is
-generated, old reports should not change because an analytics provider changed
+Reports render from snapshot data, not live API calls. Once a report is
+generated, old reports do not change because an analytics provider changed
 historical data, removed a field, expired a token, or broke an endpoint.
 
-The snapshot should include:
+The snapshot includes:
 
 ```txt
-client branding
-report details
+client branding (frozen copy, logo embedded)
+report details (address, MLS#, period, listing/post URLs, photo, toggles, notes)
 metric values
 metric source labels
-warnings
 created timestamp
-review/approval timestamp when available
 ```
 
-Example:
+Example (shape matches `ReportSnapshot` in src/lib/types.ts):
 
 ```json
 {
   "client": {
-    "slug": "stone-sisters",
-    "name": "Stone Sisters",
+    "slug": "example-realty",
+    "name": "Example Realty",
     "logo_url": "data:image/svg+xml;base64,...",
     "brand_primary": "#111111",
     "brand_accent": "#c9a86a",
-    "footer_text": "Stone Sisters Real Estate Team",
-    "brokerage_name": "RE/MAX Kelowna",
+    "footer_text": "Example Realty Team",
+    "brokerage_name": "Example Brokerage",
     "brokerage_address": "100-1553 Harvey Avenue, Kelowna, BC",
-    "brokerage_contact": "Stone Sisters Team"
+    "brokerage_contact": "Example Realty Team"
   },
   "report": {
     "address": "985 Academy Way Unit 208",
+    "mls_number": "10345678",
+    "list_date": "2026-04-01",
     "start_date": "2026-04-01",
     "end_date": "2026-06-26",
     "listing_url": "https://www.example.com/listings/985-academy-way-unit-208",
     "created_at": "2026-06-29T14:00:00Z",
-    "notes": "Marketing activity remained steady through the reporting period."
+    "notes": "Marketing activity remained steady through the reporting period.",
+    "realtor_url": "https://member.realtor.ca/Reports/ListingDestination/...",
+    "property_image": "data:image/jpeg;base64,...",
+    "show_showings": true,
+    "show_notes": true
   },
   "website": {
     "source": "rybbit_api",
-    "listing_views": 1801
+    "listing_views": 1801,
+    "site_total_views": 38101
   },
   "facebook": {
     "source": "meta_api",
     "post_url": "https://www.facebook.com/share/p/...",
     "caption": "Spotlight listing...",
     "media_url": "data:image/jpeg;base64,...",
-    "views": 304,
-    "engagements": 2
+    "views": 304
   },
   "instagram": {
     "source": "meta_api",
     "post_url": "https://www.instagram.com/p/...",
     "caption": "New listing...",
     "media_url": "data:image/jpeg;base64,...",
-    "views": 167,
-    "engagements": 0
+    "views": 167
   },
   "manual": {
     "realtor_listing_views": 58,
-    "inquiries": 0,
     "showings": 1,
     "days_on_market": 36
   },
@@ -304,68 +281,58 @@ Example:
 }
 ```
 
-Images (the client logo and post media) are embedded as base64 data URIs at
-snapshot-creation time, so a frozen report keeps rendering after Meta's signed
-CDN URLs expire or a brand asset changes on disk. The distribution metric is
-**views** — Meta deprecated post-level reach.
+Images (the client logo, post media, and listing photo) are embedded as base64
+data URIs at snapshot-creation time, so a frozen report keeps rendering after
+Meta's signed CDN URLs expire or a brand asset changes on disk. The
+distribution metric is **views** — Meta deprecated post-level reach.
 
 ### PDF
 
-The PDF should be rendered from one designed HTML/CSS template.
-
-It should include:
+The PDF is rendered from one designed HTML/CSS template (Letter, one
+`.report-sheet` per page):
 
 ```txt
 client logo and branding
-listing address
+listing address and photo
 report date range
-large metric cards
-website performance
-social post performance
-manual listing platform numbers
-showings and days on market
-optional summary
+metric widgets (website, REALTOR.ca, days on market, showings)
+source breakdown table and total views readout
+social post performance (image, caption, views)
+reviewed-inputs and compliance/disclaimer page
 footer/contact info
 ```
 
-Do not build a template editor for the MVP.
+There is no template editor, by design.
 
-## Later Integrations
+## Integration Rules
 
-Integrations should be added only after the PDF workflow works locally.
+All integrations are live in v0.2 (Rybbit, Meta, and the REALTOR.ca scrape).
+The rules that keep them honest:
 
-Potential integration order:
-
-1. Rybbit listing page views.
-2. Facebook post metrics.
-3. Instagram media metrics.
-4. REALTOR.ca numbers, if practical.
-
-Every integration must keep manual override available.
-
-If an integration fails, the report should show a warning and let the user enter
-or correct the numbers manually. A failed API call should not kill the report
-unless the PDF itself cannot be generated.
+- APIs hydrate **form inputs only** — never the snapshot directly.
+- Every metric stays a manually-editable field for review and fallback.
+- A failed source degrades to a per-block warning; it never crashes the form or
+  blocks PDF generation.
+- Fabricated demo numbers exist only behind `DEMO_MODE=1`, labeled
+  `source: "mock"`. Mock data must never reach a real client unlabeled.
 
 ## Security Direction
 
-For the local demo, do not build production security.
-
-For the hosted app, use simple but serious security:
+Simple but serious:
 
 - server-side API calls only
 - no analytics credentials in browser code
 - no private credentials in snapshots
-- encrypted storage for per-client tokens if tokens are stored
-- high-entropy private client links or real access control
-- signed/private PDF URLs when reports contain sensitive information
+- password gate on every route (admin password + per-client coordinator
+  passwords); Cloudflare Access can be layered in front
 - redacted logs
 
 ## North Star
 
-A real estate marketing coordinator should be able to create a seller report in
-under five minutes without opening Looker Studio, GA4, Meta Business Suite, or a
-design tool.
+A client's marketing coordinator should be able to create a seller report
+themselves in under five minutes: paste one REALTOR.ca link, confirm the
+numbers, download the PDF — without opening Looker Studio, GA4, Meta Business
+Suite, or a design tool, and without asking the agency for anything.
 
 The report should look good enough to send to a seller without editing.
 

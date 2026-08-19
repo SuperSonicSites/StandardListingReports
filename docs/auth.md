@@ -8,20 +8,39 @@
 This spec predates implementation; the sections below are kept as the design
 record. Where the shipped code differs, the code is correct:
 
+- **The product is self-serve, driven by one link.** §2's flow (coordinator
+  types the date range and pastes post/listing URLs) is superseded. The
+  coordinator's only required input is the REALTOR.ca member **"share
+  listing"** link; "Pull data" gathers everything else automatically, the
+  coordinator reviews/approves, and creates the report. Manual entry remains
+  only as the per-field fallback when a source degrades.
+- **REALTOR.ca is no longer out of scope** (contra §1). The member stats page
+  is scraped in headless Chrome (`src/lib/realtor.ts`) for all-time views,
+  days on market, address, MLS® number, and the listing photo. Its views still
+  land in the snapshot's `manual` block with no `source`, as specced.
+- **The report period is derived, not typed:** first day on market → today,
+  computed from the scrape (list date or back-dated from days-on-market), with
+  manual date inputs only as the fallback.
+- **The listing URL and its views resolve together via Rybbit**, not pasted:
+  one pathname-contains query on the MLS# / "civic-streetname" slug finds the
+  listing page's tracked path and its true view count in one shot
+  (`resolveRybbitListing` in `src/lib/rybbit.ts`). A Brave web search was
+  shipped first and removed 2026-08: it returned wrong-but-on-domain pages
+  (homepage, category) and stale slug variants, freezing wrong numbers.
 - **"Reach" is "Views" everywhere.** Meta completed the post-level reach
   deprecation, so the distribution metric is views: IG `views`; FB
   `max(post_video_views, post_clicks)`. Read "reach" below as "views".
-- **Facebook discovery is not the "last 50 posts" loop-match.** Pasted FB links
-  are opaque `pfbid` share URLs, so the adapter resolves the numeric post id via
-  the post page's `og:url` (host-pinned to m.facebook.com) and reads the post
-  directly with a minted Page access token. Instagram kept the 50-item
-  shortcode loop-match as specced.
+- **Social discovery is candidate ranking, not URL matching.** Instead of the
+  coordinator pasting post URLs, the adapter lists ~100 recent Page posts / IG
+  media, keeps only genuine matches for this listing (MLS# as a whole token,
+  or street name + civic number in the caption), enriches the shortlist with
+  views, and the form offers them as a picker with the top match preselected.
 - **Stub mode is gated behind `DEMO_MODE=1`.** A missing credential in normal
   operation degrades to a per-block warning and manual entry; fabricated
   `source: "mock"` numbers require explicit opt-in.
 - **No submit-lock.** The `data-approval`/`data-submit-panel`/`is-locked` hooks
   in §9 were never wired and have been removed; metric inputs are always
-  editable (manual-first), and the approval checkbox is the only gate.
+  editable (for review and fallback), and the approval checkbox is the only gate.
 - **Snapshot `warnings` stays `[]`** at assembly (per §5.3) and the report
   template renders no warnings section — fetch warnings are a form-time,
   coordinator-facing concern, not seller-facing content.

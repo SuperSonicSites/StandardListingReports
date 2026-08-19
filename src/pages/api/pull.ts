@@ -5,12 +5,12 @@ import {
   fetchFacebookPostCandidates,
   fetchInstagramMediaCandidates,
   rankCandidates,
+  streetNameTokens,
   enrichFacebookViews,
   enrichInstagramViews
 } from "../../lib/meta";
 import { fetchRealtorAdminStats, type RealtorStatsResult } from "../../lib/realtor";
-import { fetchRybbitListingViews, fetchRybbitSiteTotalViews } from "../../lib/rybbit";
-import { findListingUrl } from "../../lib/listing_search";
+import { fetchRybbitListingViews, fetchRybbitSiteTotalViews, resolveRybbitListing } from "../../lib/rybbit";
 
 export const prerender = false;
 
@@ -20,6 +20,14 @@ const DEFAULT_WINDOW_DAYS = 90;
 
 function toIsoDate(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
+}
+
+function siteOrigin(websiteUrl: string | undefined): string | null {
+  try {
+    return websiteUrl ? new URL(websiteUrl).origin : null;
+  } catch {
+    return null;
+  }
 }
 
 // The report period is always "first day on market -> today", derived from the scrape.
@@ -85,33 +93,64 @@ export const POST: APIRoute = async ({ request }) => {
     startDate: period.start_date
   };
 
-  // Auto-find the listing on the CLIENT'S own website (web search by MLS#/address). Rybbit
-  // needs a URL, so resolve this before the Rybbit calls; fall back to whatever the form
-  // already has if the search is unconfigured or finds nothing.
-  const listingSearch = await findListingUrl(client.website_url, {
-    mls: realtorStats.mls_number,
-    address: realtorStats.address ?? typedAddress
-  });
-  const resolvedListingUrl = listingSearch.url || typedListingUrl;
+  // Resolve the listing on the client's own site via Rybbit ITSELF: the canonical listing
+  // slugs carry the MLS# (older ones "civic-streetname"), and Rybbit tracks every path, so
+  // one pathname query yields the listing URL and its true view count together. A web
+  // search was tried here and rejected — it returns wrong-but-on-domain pages (homepage,
+  // category) that freeze confidently wrong numbers into a client PDF.
+  const address = realtorStats.address ?? typedAddress;
+  const civic = address.match(/\d+/)?.[0];
+  const nameToken = streetNameTokens(address)[0];
+  // Leading slash pins the fragment to a path-segment start ("/12-oak" won't match "/412-oak...").
+  const slugFragment = civic && nameToken ? `/${civic}-${nameToken}` : null;
 
-  // Phase B: everything that needed the scrape's output — Rybbit (derived window + resolved
-  // listing URL) and the ranked+enriched social shortlists (views for the top few only).
-  const [web, siteTotal, fbTop, igTop] = await Promise.all([
-    fetchRybbitListingViews(client.rybbit_site_id, resolvedListingUrl, period.start_date, period.end_date),
+  // Phase B: everything that needed the scrape's output — the Rybbit listing lookup +
+  // site totals (derived window) and the ranked+enriched social shortlists.
+  const [listingLookup, siteTotal, fbTop, igTop] = await Promise.all([
+    resolveRybbitListing(
+      client.rybbit_site_id,
+      { mls: realtorStats.mls_number, slugFragment },
+      period.start_date,
+      period.end_date
+    ),
     fetchRybbitSiteTotalViews(client.rybbit_site_id, period.start_date, period.end_date),
     enrichFacebookViews(rankCandidates(fbList.candidates, rankContext), client.meta_page_id),
     enrichInstagramViews(rankCandidates(igList.candidates, rankContext))
   ]);
 
+  let resolvedListingUrl = typedListingUrl;
+  let listingSource: "rybbit" | "mock" | "manual" = "manual";
+  let listingWarning = listingLookup.warning ?? null;
+  let web: { source: typeof listingLookup.source; listing_views: number; warning?: string };
+
+  if (listingLookup.path) {
+    web = { source: listingLookup.source, listing_views: listingLookup.listing_views };
+    listingSource = listingLookup.source === "mock" ? "mock" : "rybbit";
+    const origin = siteOrigin(client.website_url);
+    if (origin) {
+      resolvedListingUrl = `${origin}${listingLookup.path}`;
+      listingWarning = null;
+    } else {
+      listingWarning =
+        "Views were found, but this client has no Website URL configured — add it in the client's admin settings so the listing link fills automatically, or paste it below.";
+    }
+  } else {
+    // Not resolved (no MLS/address, listing not tracked yet, or Rybbit degraded) — fall
+    // back to the exact-path query on whatever URL the coordinator typed, which also
+    // produces the right "configure / enter manually" warning for every degraded case.
+    web = await fetchRybbitListingViews(client.rybbit_site_id, typedListingUrl, period.start_date, period.end_date);
+  }
+
   const website = {
     source: web.source,
     listing_views: web.listing_views,
     site_total_views: siteTotal.site_total_views,
-    // The listing URL we resolved (search hit or the form's own value) + how we got it, so
-    // the form can auto-fill the field and show a manual-entry notice when nothing was found.
+    // The listing URL we resolved (Rybbit path on the client's site, or the form's own
+    // value) + how we got it, so the form can auto-fill the field and show a manual-entry
+    // notice when nothing was found.
     listing_url: resolvedListingUrl,
-    listing_source: listingSearch.source,
-    listing_warning: listingSearch.warning ?? null,
+    listing_source: listingSource,
+    listing_warning: listingWarning,
     warnings: [web.warning, siteTotal.warning].filter((w): w is string => Boolean(w))
   };
   const facebook = {

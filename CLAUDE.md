@@ -4,7 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A white-label **seller report generator** for real estate marketing teams (package name `seller-report-generator`; the working directory is `SupersonicAnalytics`). A coordinator fills a per-client form, optionally pulls live numbers, the reviewed numbers are frozen into a JSON **snapshot**, and a branded multi-page **PDF** is rendered from that snapshot. The PDF is the product — this is a report compiler, not a dashboard, CRM, or analytics platform.
+A white-label, **self-serve seller report generator** for real estate marketing teams (package name `seller-report-generator`; the working directory is `SupersonicAnalytics`). The client's coordinator serves themselves — no agency involvement per report:
+
+1. The coordinator pastes their REALTOR.ca member "share listing" link (the backend link) into their report form.
+2. The app gathers **all the data automatically**: REALTOR.ca views/days-on-market/address/MLS/photo (headless-Chrome scrape), the listing page on the client's own website with its true view count (one Rybbit pathname lookup by MLS#/address slug — no web-search dependency), site-wide views, and the matching Facebook/Instagram posts with their view counts (listed, ranked, and offered as a picker).
+3. The coordinator reviews and approves — every value stays editable, but typing numbers is the *fallback* for a degraded source, not the workflow.
+4. Approval freezes the numbers into a JSON **snapshot**, and a branded multi-page **PDF** is rendered from that snapshot for the coordinator to download/print.
+
+The PDF is the product — this is a report compiler, not a dashboard, CRM, or analytics platform.
 
 Current state is **v0.2**: the Meta (Facebook/Instagram organic post metrics) and Rybbit (listing page views) pulls are live, implemented in [src/lib/meta.ts](src/lib/meta.ts) and [src/lib/rybbit.ts](src/lib/rybbit.ts) behind [/api/pull](src/pages/api/pull.ts). The distribution metric is **views** (Meta deprecated post-level reach). Deployment target is Railway (see README "Deployment"); the Cloudflare stack is deferred to v0.3.
 
@@ -34,7 +41,7 @@ The end-to-end flow, and the files that own each step:
 
 1. **Create client** — `/admin/clients/new` form POSTs to `/api/client` ([src/pages/api/client.ts](src/pages/api/client.ts)), which writes `data/clients/<slug>.json`. Creating refuses to overwrite an existing slug; the edit form declares itself with a hidden `mode=edit` field.
 2. **Report form** — `/c/<slug>/` ([src/pages/c/[clientSlug]/index.astro](src/pages/c/[clientSlug]/index.astro)) loads the client and shows the form. (`/c/<slug>/new` just redirects to `/c/<slug>/`.)
-3. **Pull data (optional)** — the form's "Pull data" button POSTs to `/api/pull` ([src/pages/api/pull.ts](src/pages/api/pull.ts)), which runs all pulls concurrently and returns `{website, facebook, instagram, realtor}` blocks, each carrying a `source` label and its own warnings: Rybbit listing views + site-wide totals, Meta post views, and REALTOR.ca stats scraped from the member-portal "share listing" link via headless Chrome ([src/lib/realtor.ts](src/lib/realtor.ts) — all-time listing views from the stats page's "All" tab, days on market, and the listing's first photo; a real browser is required; realtor.ca blocks plain HTTP clients). The form JS fills the *inputs* (numbers, captions, media URLs) and shows per-block warnings; a degraded block never overwrites what the coordinator already typed.
+3. **Pull data (the core step)** — the form's "Pull data" button POSTs to `/api/pull` ([src/pages/api/pull.ts](src/pages/api/pull.ts)), which runs all pulls concurrently and returns `{website, facebook, instagram, realtor}` blocks, each carrying a `source` label and its own warnings: Rybbit listing views + site-wide totals, Meta post views, and REALTOR.ca stats scraped from the member-portal "share listing" link via headless Chrome ([src/lib/realtor.ts](src/lib/realtor.ts) — all-time listing views from the stats page's "All" tab, days on market, and the listing's first photo; a real browser is required; realtor.ca blocks plain HTTP clients). The form JS fills the *inputs* (numbers, captions, media URLs) and shows per-block warnings; a degraded block never overwrites what the coordinator already typed.
 4. **Create snapshot** — the form POSTs to `/api/snapshot` ([src/pages/api/snapshot.ts](src/pages/api/snapshot.ts)), which validates inputs (dates, numbers, URL schemes), embeds the logo and post images as base64 data URIs, assembles a `ReportSnapshot`, writes `data/snapshots/rpt-<timestamp>-<hex>.json`, then 303-redirects to the report.
 5. **Render report** — `/reports/<id>` ([src/pages/reports/[snapshotId].astro](src/pages/reports/[snapshotId].astro)) renders the branded HTML report from the snapshot. `?print=1` hides the toolbar for PDF capture.
 6. **Generate PDF** — `/api/pdf/<id>` ([src/pages/api/pdf/[snapshotId].ts](src/pages/api/pdf/[snapshotId].ts)) launches puppeteer-core, navigates to `http://127.0.0.1:<PORT>/reports/<id>?print=1` (loopback on purpose — never the request's own origin, which is client-controlled and breaks behind proxies), and returns a Letter PDF named after the listing address.
@@ -59,7 +66,7 @@ This is the central invariant. Reports render **only** from snapshot JSON, never
 ### Integration rules (non-negotiable, from docs/auth.md)
 
 - APIs hydrate **form inputs only**, never the snapshot directly; a block's `source` label is set from a hidden form field at snapshot-assembly time.
-- Every metric stays a manually-editable field.
+- Every metric stays a manually-editable field — automatic gathering is the workflow, manual entry is the review/override affordance and the fallback when a source degrades.
 - A failed API call degrades to a per-block warning — it never crashes the form or blocks PDF generation.
 - Fabricated demo numbers exist only behind `DEMO_MODE=1` (labeled `source: "mock"`). Without it, missing credentials degrade to manual entry with a warning. Never let mock data reach a real client unlabeled.
 - `embedImage` in [src/pages/api/snapshot.ts](src/pages/api/snapshot.ts) only fetches Meta CDN hosts for form-supplied URLs (SSRF guard) — extend the allowlist deliberately, never remove it.
@@ -72,7 +79,7 @@ Inter is shipped locally in `public/fonts/` (declared via `@font-face`) so PDF t
 
 ## Conventions and intent
 
-- **Development philosophy is KISS / YAGNI / boring code**, spelled out in [README.md](README.md). Prefer reuse over new abstraction; do not add a database, an in-app auth system, or template builders. Access control for the hosted app is an external gate (Cloudflare Access), not app code.
+- **Development philosophy is KISS / YAGNI / boring code**, spelled out in [README.md](README.md). Prefer reuse over new abstraction; do not add a database, a bigger auth system, or template builders. In-app auth is the minimal password gate in [src/lib/auth.ts](src/lib/auth.ts) — don't grow it; Cloudflare Access can be layered in front for defense in depth.
 - **White-label discipline:** nothing client-specific may be hardcoded as a default or fallback — no demo captions, no placeholder logos from another client, no sample brand data in `value=` attributes (placeholders are fine). A report must only ever contain its own client's assets.
 - **docs/auth.md** is the v0.2 integration spec; its "As built" preface records where the implementation deliberately differs from the original text.
 - **Security direction** (README): server-side credentials only (tokens go in `Authorization` headers, not URLs), never expose analytics tokens to the browser, never store private credentials in snapshots.

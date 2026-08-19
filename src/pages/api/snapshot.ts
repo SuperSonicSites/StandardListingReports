@@ -211,6 +211,8 @@ export const POST: APIRoute = async ({ request }) => {
     return errorPage(400, "Report data must be reviewed and approved before creation.", backHref);
   }
 
+  const notes = field(form, "notes").slice(0, MAX_NOTES_CHARS);
+
   const [logo, facebookMedia, instagramMedia, propertyImage] = await Promise.all([
     embedImage(client.logo_url, true),
     embedImage(field(form, "facebook_media_url")),
@@ -239,12 +241,13 @@ export const POST: APIRoute = async ({ request }) => {
       end_date: endDate,
       listing_url: listingUrl,
       created_at: new Date().toISOString(),
-      notes: field(form, "notes").slice(0, MAX_NOTES_CHARS),
+      notes,
       realtor_url: realtorUrl,
       property_image: propertyImage,
-      // Checkboxes are "hide" so an unticked (absent) box means "display".
-      show_showings: field(form, "hide_showings") !== "yes",
-      show_notes: field(form, "hide_notes") !== "yes"
+      // Optional blocks: entered => shown on the report, left blank => omitted.
+      // An explicit "0" showings is a real value and shows as 0.
+      show_showings: field(form, "showings") !== "",
+      show_notes: notes !== ""
     },
     website: {
       source: sourceField(form, "website_source"),

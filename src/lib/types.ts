@@ -15,8 +15,9 @@ export type ClientProfile = {
   meta_page_id?: string;
   meta_instagram_id?: string;
   rybbit_site_id?: string;
-  // The client's public website (e.g. https://acmerealty.com). Used to auto-find the
-  // listing page by MLS#/address via web search, and documents the site the Rybbit id tracks.
+  // The client's public website (e.g. https://acmerealty.com). Its origin + the
+  // Rybbit-resolved listing path builds the listing link; documents the site the
+  // Rybbit id tracks.
   website_url?: string;
 };
 
@@ -49,7 +50,8 @@ export type ReportSnapshot = {
     // social media images. Empty string when capture failed/was unavailable.
     realtor_url: string;
     property_image: string;
-    // Per-report display toggles set by the coordinator at creation time.
+    // Derived at creation time: true when the coordinator entered a value — blank
+    // showings/notes are simply omitted from the report (an explicit 0 still shows).
     show_showings: boolean;
     show_notes: boolean;
   };

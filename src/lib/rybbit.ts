@@ -91,13 +91,22 @@ export async function fetchRybbitListingViews(
     import.meta.env.RYBBIT_API_URL ??
     DEFAULT_RYBBIT_API_URL
   ).replace(/\/+$/, "");
+  // NEVER count the homepage as "listing views" — a listing page always has a slug, and
+  // homepage traffic frozen into a client PDF is the worst kind of wrong number.
+  const basePath = pathname.replace(/\/+$/, "");
+  if (basePath === "") {
+    return {
+      source: "manual",
+      listing_views: 0,
+      warning: "That looks like the site's homepage, not a listing page — paste the listing's own URL."
+    };
+  }
   // Confirmed against Rybbit's API (docs + rybbit-io/rybbit source, live-verified on site 8725):
   // GET /metric?parameter=pathname returns per-path rows whose `pageviews` is the true listing
   // view total. Rybbit records paths WITH a trailing slash (e.g. "/listings/123-main-st/") while
   // new URL(...).pathname yields none for a slash-less listing URL, so match BOTH variants
-  // (a filter value array is OR'd) to avoid a false 0. Root ("/") stays a single value.
-  const basePath = pathname.replace(/\/+$/, "");
-  const pathValues = basePath === "" ? ["/"] : [basePath, `${basePath}/`];
+  // (a filter value array is OR'd) to avoid a false 0.
+  const pathValues = [basePath, `${basePath}/`];
   const filters = JSON.stringify([{ parameter: "pathname", type: "equals", value: pathValues }]);
   const params = new URLSearchParams({
     parameter: "pathname",
@@ -127,6 +136,120 @@ export async function fetchRybbitListingViews(
     return { source: "rybbit_api", listing_views: Math.round(listingViews) };
   } catch {
     return fetchFailed();
+  }
+}
+
+export type RybbitListingResolveResult = {
+  source: "rybbit_api" | "manual" | "mock";
+  listing_views: number;
+  // Canonical pathname of the listing page (busiest matched row, no trailing slash).
+  // null = not resolved; the caller falls back to the coordinator's typed URL.
+  path: string | null;
+  warning?: string;
+};
+
+// Rows of the /metric?parameter=pathname response: one {value: pathname, pageviews} each.
+function extractRows(body: unknown): { value: string; pageviews: number }[] | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const outer = (body as Record<string, unknown>).data;
+  if (!outer || typeof outer !== "object") return undefined;
+  const rows = (outer as Record<string, unknown>).data;
+  if (!Array.isArray(rows)) return undefined;
+  const out: { value: string; pageviews: number }[] = [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const value = (row as Record<string, unknown>).value;
+    const pv = (row as Record<string, unknown>).pageviews;
+    if (typeof value === "string" && typeof pv === "number" && Number.isFinite(pv)) {
+      out.push({ value, pageviews: pv });
+    }
+  }
+  return out;
+}
+
+/**
+ * Resolve the listing page on the client's own site AND its view count in ONE Rybbit
+ * query — no web-search dependency. The sites' canonical listing slugs carry the MLS®
+ * number (older listings: "civic-streetname"), and Rybbit already tracks every path, so
+ * a pathname-contains filter on [mls, "/civic-streetname"] finds exactly this listing's
+ * URL variants and can never return a homepage or category page (which a web search
+ * happily does — eval 2026-08: homepage frozen as 18,830 "listing views").
+ * Views are summed across the matched variants (trailing-slash + legacy slug of the SAME
+ * listing); the busiest row is the canonical path. NEVER throws.
+ */
+export async function resolveRybbitListing(
+  siteId: string | undefined,
+  match: { mls: string | null; slugFragment: string | null },
+  startDate: string,
+  endDate: string
+): Promise<RybbitListingResolveResult> {
+  const apiKey = process.env.RYBBIT_API_KEY ?? import.meta.env.RYBBIT_API_KEY;
+  if (!apiKey) {
+    if ((process.env.DEMO_MODE ?? import.meta.env.DEMO_MODE) === "1") {
+      return { source: "mock", listing_views: 1801, path: "/listings/demo-listing" };
+    }
+    return { source: "manual", listing_views: 0, path: null, warning: "Rybbit API key is not configured — enter the listing URL and views manually." };
+  }
+  if (!siteId) {
+    return { source: "manual", listing_views: 0, path: null, warning: "Rybbit is not configured for this client — enter the listing URL and views manually." };
+  }
+  const values = [match.mls, match.slugFragment].filter((v): v is string => Boolean(v));
+  if (values.length === 0) {
+    return { source: "manual", listing_views: 0, path: null, warning: "No MLS® number or address captured to look the listing up — paste the listing URL below." };
+  }
+
+  const apiUrl = (
+    process.env.RYBBIT_API_URL ??
+    import.meta.env.RYBBIT_API_URL ??
+    DEFAULT_RYBBIT_API_URL
+  ).replace(/\/+$/, "");
+  // A filter value array is OR'd, so one query covers both the MLS-suffix canonical and
+  // the legacy civic-streetname slug.
+  const filters = JSON.stringify([{ parameter: "pathname", type: "contains", value: values }]);
+  const params = new URLSearchParams({
+    parameter: "pathname",
+    start_date: startDate,
+    end_date: endDate,
+    time_zone: "UTC",
+    filters
+  });
+
+  try {
+    const response = await fetch(`${apiUrl}/api/sites/${siteId}/metric?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+    if (!response.ok) throw new Error(`metric ${response.status}`);
+    const rows = extractRows(await response.json());
+    if (!rows) throw new Error("bad shape");
+    if (rows.length === 0) {
+      return {
+        source: "manual",
+        listing_views: 0,
+        path: null,
+        warning: "This listing isn't in the website analytics yet — paste the listing URL below if it's live."
+      };
+    }
+    let total = 0;
+    let best = rows[0];
+    for (const row of rows) {
+      total += row.pageviews;
+      if (row.pageviews > best.pageviews) best = row;
+    }
+    const path = best.value.replace(/\/+$/, "");
+    // Invariant: NEVER the homepage. A listing page always has a slug; the contains
+    // filter can't match "/" anyway, but a client-facing number must not depend on that.
+    if (!path) {
+      return { source: "manual", listing_views: 0, path: null, warning: "Couldn't pin down the listing page — paste the listing URL below." };
+    }
+    return { source: "rybbit_api", listing_views: Math.round(total), path };
+  } catch {
+    return {
+      source: "manual",
+      listing_views: 0,
+      path: null,
+      warning: "Rybbit auto-fetch unavailable for listing views. Please enter manually."
+    };
   }
 }
 

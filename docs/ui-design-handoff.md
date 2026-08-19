@@ -4,7 +4,7 @@ This document is the design brief for the **app chrome** of the Supersonic Selle
 
 ### The product in one minute
 
-Supersonic is a **white-label seller-report generator** for real-estate marketing teams (Canadian: en-CA, REALTOR.ca, BC brokerages). A coordinator fills a per-client form, optionally pulls live numbers (REALTOR.ca listing stats, Rybbit website views, Meta/Facebook/Instagram post views), the reviewed numbers freeze into a JSON **snapshot**, and a branded multi-page **PDF report is rendered** from it. The PDF is the product — this is a report compiler, not a dashboard or CRM. Ethos: KISS / YAGNI / boring code; **restraint is a feature.**
+Supersonic is a **white-label, self-serve seller-report generator** for real-estate marketing teams (Canadian: en-CA, REALTOR.ca, BC brokerages). The client's coordinator pastes their REALTOR.ca member "share listing" link, the app gathers all the data automatically (REALTOR.ca listing stats, the listing page on their own site, Rybbit website views, ranked Meta/Facebook/Instagram post candidates), the coordinator reviews and approves, the approved numbers freeze into a JSON **snapshot**, and a branded multi-page **PDF report is rendered** from it. The PDF is the product — this is a report compiler, not a dashboard or CRM. Ethos: KISS / YAGNI / boring code; **restraint is a feature.**
 
 **Two user types:**
 - **Agency admin** — sets up client brand profiles (logo, colors, disclaimer, integrations, coordinator password). Uses `/login`, the clients dashboard, and the client setup form.
@@ -986,7 +986,7 @@ Apply one state per `.import-review-card` (and per `.post-review-row`), driven b
 
 #### Website URL — pulled vs. must-type
 
-- **STATES:** (a) auto-found — script fills `listing_url` from `data.website.listing_url` when `listing_source` is `search`/`mock` and the field is empty; (b) not found — `setNotice("listing", …)` shows the amber notice at `[data-notice-anchor="listing"]`, field stays empty and required.
+- **STATES:** (a) auto-found — script fills `listing_url` from `data.website.listing_url` when `listing_source` is `rybbit`/`mock` and the field is empty; (b) not found — `setNotice("listing", …)` shows the amber notice at `[data-notice-anchor="listing"]`, field stays empty and required.
 - **RECOMMENDATION:** when auto-found, prefix the field with a small "auto-found" chip. When not found, ensure the field carries the "degraded — enter manually" amber ring so a required-but-empty URL is unmistakable *before* submit.
 
 ### SECTION 3 — Performance (the three source cards)

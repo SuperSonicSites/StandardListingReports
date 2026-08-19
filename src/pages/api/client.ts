@@ -127,7 +127,7 @@ export const POST: APIRoute = async ({ request }) => {
   // A malformed integration ID must be rejected, not silently dropped — otherwise the
   // admin believes the client is configured and pulls later degrade with no explanation.
   const ids: Record<string, string | undefined> = {};
-  for (const name of ["meta_page_id", "meta_instagram_id", "rybbit_site_id"] as const) {
+  for (const name of ["meta_page_id", "meta_instagram_id"] as const) {
     const value = field(form, name);
     if (!value) continue;
     if (!digits.test(value)) {
@@ -137,7 +137,12 @@ export const POST: APIRoute = async ({ request }) => {
   }
   const metaPageId = ids.meta_page_id;
   const metaInstagramId = ids.meta_instagram_id;
-  const rybbitSiteId = ids.rybbit_site_id;
+  // Rybbit site ids come in two forms: the numeric dashboard id (e.g. 9841) and the
+  // alphanumeric tracking-snippet id (e.g. e5dd5f537fc2). The API accepts both.
+  const rybbitSiteId = field(form, "rybbit_site_id") || undefined;
+  if (rybbitSiteId && !/^[a-zA-Z0-9-]{1,64}$/.test(rybbitSiteId)) {
+    return errorPage(400, "rybbit site id must be letters, numbers, or hyphens (copy it from the Rybbit dashboard or the site's tracking snippet).");
+  }
 
   // Optional client website — validated as http(s) so a typo can't silently break the
   // listing-URL search later.

@@ -78,8 +78,12 @@ async function fetchPagedData(firstUrl: string, token: string, maxItems: number)
     let body: any;
     try {
       body = await fetchJson(url, token);
-    } catch {
-      break; // keep the pages we did get
+    } catch (error) {
+      // A FIRST-page failure is a real error (no access / bad id), not "no posts" —
+      // rethrow so the caller degrades with an honest warning instead of a silent
+      // empty meta_api result. Mid-pagination errors keep the pages we did get.
+      if (items.length === 0) throw error;
+      break;
     }
     if (Array.isArray(body?.data)) items.push(...body.data);
     url = typeof body?.paging?.next === "string" ? body.paging.next : null;

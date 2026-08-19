@@ -99,17 +99,17 @@ export const POST: APIRoute = async ({ request }) => {
   // search was tried here and rejected — it returns wrong-but-on-domain pages (homepage,
   // category) that freeze confidently wrong numbers into a client PDF.
   const address = realtorStats.address ?? typedAddress;
-  const civic = address.match(/\d+/)?.[0];
-  const nameToken = streetNameTokens(address)[0];
-  // Leading slash pins the fragment to a path-segment start ("/12-oak" won't match "/412-oak...").
-  const slugFragment = civic && nameToken ? `/${civic}-${nameToken}` : null;
+  const nameTokens = streetNameTokens(address);
+  // Whole numbers from the address ("3-15 Goldeneye Place" -> ["3","15"]) — the resolver
+  // requires ALL of them in a path, so same-street neighbours can't match.
+  const addressNumbers = address.toLowerCase().split(/[^a-z0-9]+/).filter((t) => /^\d+$/.test(t));
 
   // Phase B: everything that needed the scrape's output — the Rybbit listing lookup +
   // site totals (derived window) and the ranked+enriched social shortlists.
   const [listingLookup, siteTotal, fbTop, igTop] = await Promise.all([
     resolveRybbitListing(
       client.rybbit_site_id,
-      { mls: realtorStats.mls_number, slugFragment },
+      { mls: realtorStats.mls_number, nameTokens, addressNumbers },
       period.start_date,
       period.end_date
     ),

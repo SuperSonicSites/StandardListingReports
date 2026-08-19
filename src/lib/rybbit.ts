@@ -167,19 +167,29 @@ function extractRows(body: unknown): { value: string; pageviews: number }[] | un
   return out;
 }
 
+// Whole alphanumeric tokens of a pathname/address, lowercased ("/listing/3-15-goldeneye"
+// -> {listing, 3, 15, goldeneye}). Mixed tokens like a postal "y1a" stay whole, so a
+// stray digit inside them can never satisfy a numeric match.
+function tokensOf(text: string): Set<string> {
+  return new Set(text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+}
+
 /**
  * Resolve the listing page on the client's own site AND its view count in ONE Rybbit
- * query — no web-search dependency. The sites' canonical listing slugs carry the MLS®
- * number (older listings: "civic-streetname"), and Rybbit already tracks every path, so
- * a pathname-contains filter on [mls, "/civic-streetname"] finds exactly this listing's
- * URL variants and can never return a homepage or category page (which a web search
- * happily does — eval 2026-08: homepage frozen as 18,830 "listing views").
- * Views are summed across the matched variants (trailing-slash + legacy slug of the SAME
- * listing); the busiest row is the canonical path. NEVER throws.
+ * query — no web-search dependency. Rybbit already tracks every path, so we filter
+ * pathnames containing the MLS# / street-name and keep only rows that GENUINELY match
+ * (same philosophy as the social rankCandidates): the MLS® number as a whole token, OR a
+ * street-name token plus EVERY number from the address as whole tokens — so
+ * "3-15 Goldeneye" keeps /3-15-goldeneye-place-... and excludes the 4-15 / 1-15
+ * neighbours, and slug schemes that don't carry the MLS (e.g. Yukon's
+ * /listing/<address>-<postal>-<feedid>/) still resolve. It can never return a homepage
+ * or category page (which a web search happily does — eval 2026-08: homepage frozen as
+ * 18,830 "listing views"). Views are summed across the matched variants (trailing-slash
+ * + legacy slug of the SAME listing); the busiest row is the canonical path. NEVER throws.
  */
 export async function resolveRybbitListing(
   siteId: string | undefined,
-  match: { mls: string | null; slugFragment: string | null },
+  match: { mls: string | null; nameTokens: string[]; addressNumbers: string[] },
   startDate: string,
   endDate: string
 ): Promise<RybbitListingResolveResult> {
@@ -193,7 +203,9 @@ export async function resolveRybbitListing(
   if (!siteId) {
     return { source: "manual", listing_views: 0, path: null, warning: "Rybbit is not configured for this client — enter the listing URL and views manually." };
   }
-  const values = [match.mls, match.slugFragment].filter((v): v is string => Boolean(v));
+  // Cast the Rybbit-side net wide (contains on MLS / street-name), then keep only rows
+  // that genuinely match, below.
+  const values = [match.mls, ...match.nameTokens.slice(0, 2)].filter((v): v is string => Boolean(v));
   if (values.length === 0) {
     return { source: "manual", listing_views: 0, path: null, warning: "No MLS® number or address captured to look the listing up — paste the listing URL below." };
   }
@@ -222,7 +234,19 @@ export async function resolveRybbitListing(
     if (!response.ok) throw new Error(`metric ${response.status}`);
     const rows = extractRows(await response.json());
     if (!rows) throw new Error("bad shape");
-    if (rows.length === 0) {
+    // Genuine-match filter: MLS as a whole token, OR street-name token + EVERY address
+    // number as whole tokens (excludes same-street neighbours like 305- vs 308-).
+    const mls = match.mls?.toLowerCase();
+    const matched = rows.filter((row) => {
+      const toks = tokensOf(row.value);
+      if (mls && toks.has(mls)) return true;
+      if (match.addressNumbers.length === 0) return false;
+      return (
+        match.nameTokens.some((t) => toks.has(t)) &&
+        match.addressNumbers.every((n) => toks.has(n))
+      );
+    });
+    if (matched.length === 0) {
       return {
         source: "manual",
         listing_views: 0,
@@ -231,8 +255,8 @@ export async function resolveRybbitListing(
       };
     }
     let total = 0;
-    let best = rows[0];
-    for (const row of rows) {
+    let best = matched[0];
+    for (const row of matched) {
       total += row.pageviews;
       if (row.pageviews > best.pageviews) best = row;
     }

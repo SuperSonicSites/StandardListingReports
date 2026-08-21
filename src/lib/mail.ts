@@ -30,7 +30,7 @@ export async function sendSignInLink(to: string, url: string): Promise<void> {
       console.log(`[mail] (dev, no RESEND_API_KEY) sign-in link for ${to}:\n       ${url}`);
       return;
     }
-    throw new Error("RESEND_API_KEY is not set — cannot send sign-in emails.");
+    throw new Error("not configured: RESEND_API_KEY is not set — cannot send sign-in emails.");
   }
 
   const subject = "Your Supersonic Realtors sign-in link";

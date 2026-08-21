@@ -16,6 +16,8 @@ const ERRORS: Record<string, string> = {
     "That email isn’t on the access list yet. Email hello@supersonicsites.com and we’ll add it right away.",
   rate: "Too many sign-in attempts for that address. Check your inbox (and spam) for a link we already sent, or try again in 10 minutes.",
   send: "We couldn’t send the email just now. Try again in a minute, or contact hello@supersonicsites.com.",
+  config:
+    "Sign-in email isn’t set up on this server yet (AUTH_SECRET / RESEND_API_KEY missing). If you run this app, see docs/runbook-supersonicrealtors-launch.md — Phase 4.",
   expired: "That sign-in link has expired. Enter your email and we’ll send a fresh one."
 };
 const errorKey = Astro.url.searchParams.get("error") ?? "";

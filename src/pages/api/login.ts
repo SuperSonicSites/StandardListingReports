@@ -57,17 +57,20 @@ export const POST: APIRoute = async ({ request }) => {
   const authorized = isAdminEmail(email) || clients.some((client) => emailMatches(email, client.emails));
   if (!authorized) return back("unknown");
 
+  // A missing AUTH_SECRET / RESEND_API_KEY is a deployment gap, not a transient
+  // hiccup — say so on screen instead of "try again in a minute".
   const token = createLinkToken(email, next || undefined);
   if (!token) {
     console.error("[auth] Cannot sign a link: AUTH_SECRET is not set.");
-    return back("send");
+    return back("config");
   }
 
   try {
     await sendSignInLink(email, `${appUrl()}/auth/verify?token=${encodeURIComponent(token)}`);
   } catch (error) {
-    console.error(`[mail] Sign-in email to ${email} failed:`, error instanceof Error ? error.message : error);
-    return back("send");
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[mail] Sign-in email to ${email} failed:`, message);
+    return back(message.startsWith("not configured") ? "config" : "send");
   }
   sent.push(Date.now());
 

@@ -421,7 +421,7 @@ All credentials are read **server-side only** and never sent to the browser, emb
 | `RYBBIT_API_URL` | Rybbit API base URL (default `https://app.rybbit.io`) | No (config) |
 | `CHROME_PATH` | Existing — browser path for PDF | No (config) |
 | `AUTH_SECRET` | HMAC key signing sign-in links and session cookies | **Yes — secret** |
-| `ADMIN_EMAILS` | Comma-separated agency admin addresses (open everything) | No (config) |
+| `ADMIN_EMAILS` | Comma-separated agency admin addresses (open everything); default `dev@supersonicsites.com` | No (config) |
 | `APP_URL` | Public base URL used in sign-in links (default `https://supersonicrealtors.com`) | No (config) |
 | `RESEND_API_KEY` | Resend API key for sending sign-in emails | **Yes — secret** |
 | `MAIL_FROM` | Sender on sign-in emails, on a Resend-verified domain | No (config) |

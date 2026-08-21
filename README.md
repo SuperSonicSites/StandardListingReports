@@ -44,7 +44,8 @@ Useful local routes:
 /reports/[snapshot_id]      rendered report (PDF source)
 ```
 
-To sign in locally, set `ADMIN_EMAILS` to your address in `.env` — without
+To sign in locally, use the admin address `dev@supersonicsites.com` (the default;
+`ADMIN_EMAILS` in `.env` overrides it) — without
 `RESEND_API_KEY`, `npm run dev` prints each sign-in link to the terminal instead
 of emailing it. Open the printed link and you are in.
 
@@ -161,7 +162,8 @@ The code is host-agnostic; these are the moving parts:
 
 1. Set the start command to `npm run start` **before** the first deploy
    (Railpack cannot infer it for `output: "server"`).
-2. Service variables: `HOST=0.0.0.0`, `AUTH_SECRET`, `ADMIN_EMAILS`, `APP_URL`
+2. Service variables: `HOST=0.0.0.0`, `AUTH_SECRET`, `ADMIN_EMAILS` (defaults to
+   `dev@supersonicsites.com`), `APP_URL`
    (`https://supersonicrealtors.com`), `RESEND_API_KEY` (+ optional `MAIL_FROM`
    on a Resend-verified domain), `META_SYSTEM_USER_TOKEN`, `RYBBIT_API_KEY`.
    The built server never loads `.env` — platform env vars are the only source.
@@ -178,7 +180,8 @@ The code is host-agnostic; these are the moving parts:
    A coordinator types their work email, receives a 15-minute sign-in link
    (sent through Resend), and lands on `/portal` — the chooser between
    "Submit Listing Ads" (the client's nowforsale.co form) and "Generate
-   Listing Reports" (`/c/<slug>/`). `ADMIN_EMAILS` open the admin area and
+   Listing Reports" (`/c/<slug>/`). `ADMIN_EMAILS` (default `dev@supersonicsites.com`)
+   open the admin area and
    every client; each client's own access list (addresses or `@domain.com`)
    and its ads-form link are set in the admin form. For defense in depth,
    Cloudflare Access on the domain can still be added in front.

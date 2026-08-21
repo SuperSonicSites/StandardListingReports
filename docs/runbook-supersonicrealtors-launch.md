@@ -32,7 +32,7 @@ sign-in emails from `login@supersonicrealtors.com` through Resend, and the three
 | Resend DNS records (DKIM TXT, SPF TXT, MX) | Resend → Domains → `supersonicrealtors.com` | Cloudflare DNS (Phase 1) |
 | Resend API key | Resend → API Keys (shown once) | Railway variable `RESEND_API_KEY` (Phase 4) |
 | `AUTH_SECRET` | Generated locally (Phase 4) | Railway variable `AUTH_SECRET` |
-| Admin email address(es) | Ask the owner — the Supersonic team addresses that should open the admin area | Railway variable `ADMIN_EMAILS` |
+| Admin email address(es) | `dev@supersonicsites.com` (decided by the owner; add more only if told) | Railway variable `ADMIN_EMAILS` |
 
 ---
 
@@ -127,9 +127,9 @@ variable edits — you can stage all of them and deploy once.
    `Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, "0")).join("")`
    → copy the printed string into the variable. (Alternative on a machine with a terminal:
    `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.)
-2. `ADMIN_EMAILS` — the Supersonic team addresses that should open the admin area, comma-separated,
-   e.g. `renaud@supersonicsites.com, hello@supersonicsites.com`. Ask the owner which addresses. No
-   trailing spaces or newlines.
+2. `ADMIN_EMAILS` = `dev@supersonicsites.com`. This is the agency admin address (it is also the
+   code's default, so the app still works if the variable is missing). Add more addresses
+   comma-separated only if the owner says so. No trailing spaces or newlines.
 3. `RESEND_API_KEY` — paste the key from Phase 2. Close the Resend tab afterwards.
 4. `APP_URL` = `https://supersonicrealtors.com` (no trailing slash).
 5. `MAIL_FROM` = `Supersonic Realtors <login@supersonicrealtors.com>` (the domain must be the one
@@ -169,7 +169,8 @@ variable edits — you can stage all of them and deploy once.
 1. Open `https://supersonicrealtors.com/login`.
    - **Expect:** the blue "Your real estate marketing launchpad." page with a **Work email** field and
      a **Continue securely** button. No password field anywhere.
-2. Enter one of the `ADMIN_EMAILS` addresses → Continue securely.
+2. Enter `dev@supersonicsites.com` → Continue securely (someone with access to that inbox must
+   open the email).
    - **Expect:** "Your link is on its way." page. Within a minute an email arrives from
      **Supersonic Realtors** `<login@supersonicrealtors.com>`, subject "Your Supersonic Realtors
      sign-in link". Check the spam/promotions folder if it is not in the inbox.

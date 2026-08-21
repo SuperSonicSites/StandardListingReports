@@ -61,8 +61,12 @@ export function appUrl(): string {
   return (env("APP_URL") ?? "https://supersonicrealtors.com").replace(/\/+$/, "");
 }
 
+// The agency's own sign-in address. ADMIN_EMAILS (comma-separated) overrides it;
+// this is agency config, not client data, so a default does not break white-label.
+const DEFAULT_ADMIN_EMAILS = "dev@supersonicsites.com";
+
 export function adminEmails(): string[] {
-  return (env("ADMIN_EMAILS") ?? "")
+  return (env("ADMIN_EMAILS") ?? DEFAULT_ADMIN_EMAILS)
     .split(/[\s,;]+/)
     .map(normalizeEmail)
     .filter(Boolean);

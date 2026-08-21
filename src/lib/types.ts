@@ -8,9 +8,13 @@ export type ClientProfile = {
   brokerage_name: string;
   brokerage_address: string;
   brokerage_contact: string;
-  // sha256 of the coordinator password set in the admin form. Optional so
-  // pre-auth profiles still parse; without it the client link is admin-only.
-  password_hash?: string;
+  // Who may sign in to this client (magic link): full addresses, or "@domain.com"
+  // for everyone at the team's domain. Optional so older profiles still parse;
+  // without it the client's form is admin-only.
+  emails?: string[];
+  // Where the portal's "Submit Listing Ads" card sends this client (their
+  // nowforsale.co intake form). Optional — the card explains when it's unset.
+  ads_form_url?: string;
   // --- v0.2 integration IDs (optional; NON-SECRET addressing ids) ---
   meta_page_id?: string;
   meta_instagram_id?: string;

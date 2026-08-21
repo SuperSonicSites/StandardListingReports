@@ -12,8 +12,8 @@ dist/
 data/snapshots/*.json
 !data/snapshots/.gitkeep
 
-# Client profiles are runtime data on the production volume (they carry password
-# hashes and uploaded-logo data URIs) — never committed, never touched by deploys.
+# Client profiles are runtime data on the production volume (they carry coordinator
+# email lists and uploaded-logo data URIs) — never committed, never touched by deploys.
 data/clients/*.json
 !data/clients/.gitkeep
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A white-label, **self-serve seller report generator** for real estate marketing teams (package name `seller-report-generator`; the working directory is `SupersonicAnalytics`). The client's coordinator serves themselves — no agency involvement per report:
+A white-label, **self-serve seller report generator** for real estate marketing teams (package name `seller-report-generator`; the working directory is `SupersonicAnalytics`). The app lives at **supersonicrealtors.com** and is the front door for every Supersonic client: sign in by magic link, then choose **Submit Listing Ads** (the client's external nowforsale.co form) or **Generate Listing Reports** (this app). The client's coordinator serves themselves — no agency involvement per report:
 
 1. The coordinator pastes their REALTOR.ca member "share listing" link (the backend link) into their report form.
 2. The app gathers **all the data automatically**: REALTOR.ca views/days-on-market/address/MLS/photo (headless-Chrome scrape), the listing page on the client's own website with its true view count (one Rybbit pathname lookup by MLS#/address slug — no web-search dependency), site-wide views, and the matching Facebook/Instagram posts with their view counts (listed, ranked, and offered as a picker).
@@ -39,6 +39,7 @@ Astro 7 in **SSR mode** (`output: "server"`, `@astrojs/node` standalone adapter 
 
 The end-to-end flow, and the files that own each step:
 
+0. **Sign in + portal** — `/login` ([src/pages/login.astro](src/pages/login.astro), "Realtor Hub" shell in [src/layouts/HubLayout.astro](src/layouts/HubLayout.astro)) → `/api/login` emails a link → `/auth/verify` sets the session → `/portal` ([src/pages/portal.astro](src/pages/portal.astro)) shows the client's two destinations. Details under "Access control" below.
 1. **Create client** — `/admin/clients/new` form POSTs to `/api/client` ([src/pages/api/client.ts](src/pages/api/client.ts)), which writes `data/clients/<slug>.json`. Creating refuses to overwrite an existing slug; the edit form declares itself with a hidden `mode=edit` field.
 2. **Report form** — `/c/<slug>/` ([src/pages/c/[clientSlug]/index.astro](src/pages/c/[clientSlug]/index.astro)) loads the client and shows the form. (`/c/<slug>/new` just redirects to `/c/<slug>/`.)
 3. **Pull data (the core step)** — the form's "Pull data" button POSTs to `/api/pull` ([src/pages/api/pull.ts](src/pages/api/pull.ts)), which runs all pulls concurrently and returns `{website, facebook, instagram, realtor}` blocks, each carrying a `source` label and its own warnings: Rybbit listing views + site-wide totals, Meta post views, and REALTOR.ca stats scraped from the member-portal "share listing" link via headless Chrome ([src/lib/realtor.ts](src/lib/realtor.ts) — all-time listing views from the stats page's "All" tab, days on market, and the listing's first photo; a real browser is required; realtor.ca blocks plain HTTP clients). The form JS fills the *inputs* (numbers, captions, media URLs) and shows per-block warnings; a degraded block never overwrites what the coordinator already typed.
@@ -50,14 +51,14 @@ The end-to-end flow, and the files that own each step:
 
 All disk I/O goes through [src/lib/storage.ts](src/lib/storage.ts) — never read/write `data/` files directly elsewhere. Two stores, both plain JSON files, written atomically (temp file + rename):
 
-- `data/clients/<slug>.json` — client brand profiles (**gitignored** — runtime data on the production volume; they carry coordinator password hashes and uploaded-logo data URIs).
+- `data/clients/<slug>.json` — client brand profiles (**gitignored** — runtime data on the production volume; they carry coordinator email lists and uploaded-logo data URIs).
 - `data/snapshots/<id>.json` — frozen reports (**gitignored** except `.gitkeep`).
 
 Every id/slug that becomes a file path is validated by `assertSafeId` against `^[a-z0-9-]+$`. Preserve this — it is the path-traversal guard for user-supplied ids.
 
-### Access control (v0.2.1)
+### Access control (v0.2.2 — magic links)
 
-[src/middleware.ts](src/middleware.ts) gates every route through [src/lib/auth.ts](src/lib/auth.ts): `ADMIN_PASSWORD` (env) opens everything; each client profile stores a `password_hash` (sha256, set in the admin form) that opens only `/c/<slug>/` and that client's reports/PDFs. Cookie tokens are derived hashes, never the password. `/login` + `/api/login` are open; `/api/pull|snapshot|client` authorize inside the route after parsing the slug from the body. The PDF route forwards the caller's cookie to its loopback self-fetch — remove that and PDFs print the login page.
+[src/middleware.ts](src/middleware.ts) gates every route through [src/lib/auth.ts](src/lib/auth.ts). There are no passwords: `/login` takes a work email, `/api/login` emails a 15-minute HMAC-signed link (via Resend, [src/lib/mail.ts](src/lib/mail.ts); in dev without `RESEND_API_KEY` the link is printed to the console), and `/auth/verify` swaps it for a 30-day signed session cookie that carries only the email. Authorization is re-derived on every request from that email: `ADMIN_EMAILS` (env) opens everything; a client profile's `emails` list (full addresses or `@domain.com`) opens `/c/<slug>/` and that client's reports/PDFs — so removing an email revokes access immediately. After sign-in a client lands on `/portal` (the chooser: "Submit Listing Ads" → the client's `ads_form_url`, "Generate Listing Reports" → `/c/<slug>/`); admins land on the `/` dashboard. `AUTH_SECRET` signs links and sessions (fail-closed in production; random per-process in dev) and `APP_URL` is the public base for links — never the request origin. `/api/pull|snapshot|client` authorize inside the route after parsing the slug from the body. The PDF route forwards the caller's cookie to its loopback self-fetch — remove that and PDFs print the login page.
 
 ### The snapshot is the source of truth
 
@@ -79,7 +80,7 @@ Inter is shipped locally in `public/fonts/` (declared via `@font-face`) so PDF t
 
 ## Conventions and intent
 
-- **Development philosophy is KISS / YAGNI / boring code**, spelled out in [README.md](README.md). Prefer reuse over new abstraction; do not add a database, a bigger auth system, or template builders. In-app auth is the minimal password gate in [src/lib/auth.ts](src/lib/auth.ts) — don't grow it; Cloudflare Access can be layered in front for defense in depth.
+- **Development philosophy is KISS / YAGNI / boring code**, spelled out in [README.md](README.md). Prefer reuse over new abstraction; do not add a database, a bigger auth system, or template builders. In-app auth is the minimal stateless magic-link gate in [src/lib/auth.ts](src/lib/auth.ts) — don't grow it (no token table, no user records); Cloudflare Access can be layered in front for defense in depth.
 - **White-label discipline:** nothing client-specific may be hardcoded as a default or fallback — no demo captions, no placeholder logos from another client, no sample brand data in `value=` attributes (placeholders are fine). A report must only ever contain its own client's assets.
 - **docs/auth.md** is the v0.2 integration spec; its "As built" preface records where the implementation deliberately differs from the original text.
 - **Security direction** (README): server-side credentials only (tokens go in `Authorization` headers, not URLs), never expose analytics tokens to the browser, never store private credentials in snapshots.

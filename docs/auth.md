@@ -47,6 +47,13 @@ record. Where the shipped code differs, the code is correct:
 - **Post images and the client logo are frozen into the snapshot** as base64
   data URIs at creation time; form-supplied image URLs are only fetched from
   Meta CDN hosts (SSRF guard).
+- **Sign-in is by magic link, not password (Aug 2026).** `/login` takes a work
+  email; `/api/login` sends a 15-minute HMAC-signed link through Resend;
+  `/auth/verify` exchanges it for a 30-day signed session cookie holding only
+  the email. Access is re-checked per request against `ADMIN_EMAILS` (env) and
+  each client's `emails` list (addresses or `@domain.com`), so revocation is an
+  edit in the admin form. After sign-in, `/portal` offers "Submit Listing Ads"
+  (the client's `ads_form_url`) and "Generate Listing Reports" (`/c/<slug>/`).
 
 ## 1. Objective & Scope
 
@@ -63,7 +70,7 @@ Per the README build order, this feature is implemented only after the local HTM
 - **REALTOR.ca integration.** Its value lives in the `manual` snapshot block with no `source`. No pull touches `realtor_listing_views`. There is no Google Ads metric or connection anywhere in this product — listing-level Google Ads data does not exist for these clients.
 - **Paid / "dark" / boosted Facebook ad posts.** Dark ad creatives do not appear in a Page's organic `/posts` edge, so the URL match can never succeed for them; supporting them requires the Marketing API (a different auth surface). v0.2 is **organic posts only**.
 - **Facebook reach as a guaranteed auto-fill.** Meta's post-level reach metric is in active deprecation (see §7). v0.2 treats FB reach as best-effort: it auto-fills when the call succeeds and otherwise degrades to a manual field with a notice. Coordinators should expect FB reach may frequently be manual-by-default.
-- Multi-tenant OAuth setup or login prompts for end clients (a single master System User token is used).
+- Multi-tenant OAuth setup for end clients (a single master System User token is used). End-client sign-in to the app itself is the magic-link gate described in §0.
 - Automated background metric-scraping crons or schedulers (pulls are user-initiated only).
 - Complex database synchronization models (client config stays JSON files; snapshots stay JSON files).
 - Any write path from an API into a snapshot — APIs hydrate form inputs only (§3.3, §4.2, §5).
@@ -413,6 +420,11 @@ All credentials are read **server-side only** and never sent to the browser, emb
 | `RYBBIT_API_KEY` | Global org-scoped Rybbit key (opaque string; needs a paid Rybbit Cloud plan), sent as `Authorization: Bearer <key>` | **Yes — secret** |
 | `RYBBIT_API_URL` | Rybbit API base URL (default `https://app.rybbit.io`) | No (config) |
 | `CHROME_PATH` | Existing — browser path for PDF | No (config) |
+| `AUTH_SECRET` | HMAC key signing sign-in links and session cookies | **Yes — secret** |
+| `ADMIN_EMAILS` | Comma-separated agency admin addresses (open everything) | No (config) |
+| `APP_URL` | Public base URL used in sign-in links (default `https://supersonicrealtors.com`) | No (config) |
+| `RESEND_API_KEY` | Resend API key for sending sign-in emails | **Yes — secret** |
+| `MAIL_FROM` | Sender on sign-in emails, on a Resend-verified domain | No (config) |
 
 ### 6.2 Secret vs. non-secret identifiers
 

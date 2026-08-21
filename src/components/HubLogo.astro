@@ -1,0 +1,12 @@
+---
+// "supersonic | Realtor Hub" lockup card used across the Realtor Hub pages.
+type Props = { href?: string };
+const { href } = Astro.props;
+const Tag = href ? "a" : "div";
+---
+
+<Tag class="hub-logo-card" href={href} aria-label={href ? "Supersonic Realtor Hub — portal home" : undefined}>
+  <img src="/assets/supersonic-logo.png" alt="Supersonic" width="200" height="118" />
+  <span class="hub-logo-divider" aria-hidden="true"></span>
+  <span class="hub-logo-name">Realtor Hub</span>
+</Tag>

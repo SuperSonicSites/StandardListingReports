@@ -13,7 +13,8 @@ const LABELS: Record<string, string> = {
   brokerage_name: "Brokerage",
   brokerage_contact: "Contact",
   brokerage_address: "Brokerage address",
-  password: "Coordinator password",
+  emails: "Authorized emails",
+  ads_form_url: "Listing ads form link",
   logo: "Logo"
 };
 
@@ -109,24 +110,6 @@ export function initClientForm() {
     .forEach((el) => el.addEventListener("input", updateDisclaimer));
   updateDisclaimer();
 
-  // ---- Password: show/hide + "looks good" affirmation ----
-  const pw = byName("password");
-  const pwToggle = form.querySelector("[data-pw-toggle]");
-  const pwAffirm = form.querySelector<HTMLElement>("[data-pw-affirm]");
-  pwToggle?.addEventListener("click", () => {
-    if (!pw) return;
-    const reveal = pw.type === "password";
-    pw.type = reveal ? "text" : "password";
-    pwToggle.textContent = reveal ? "Hide" : "Show";
-    pwToggle.setAttribute("aria-pressed", String(reveal));
-    pwToggle.setAttribute("aria-label", reveal ? "Hide password" : "Show password");
-    pw.focus();
-  });
-  pw?.addEventListener("input", () => {
-    if (pwAffirm) pwAffirm.hidden = pw.value.length < 8;
-    clearFieldError("password");
-  });
-
   // ---- Data-sources connected count (edit) ----
   const intCount = form.querySelector("[data-int-count]");
   if (intCount) {
@@ -207,13 +190,14 @@ export function initClientForm() {
     if (!v("brokerage_name")) errs.brokerage_name = "Enter the brokerage name.";
     if (!v("brokerage_contact")) errs.brokerage_contact = "Enter a contact name.";
     if (!v("brokerage_address")) errs.brokerage_address = "Enter the brokerage address.";
-    const pwVal = byName("password")?.value ?? "";
-    if (mode === "create") {
-      if (!pwVal) errs.password = "Set a password — it protects this client’s report link.";
-      else if (pwVal.length < 8) errs.password = "Use at least 8 characters.";
-    } else if (pwVal && pwVal.length < 8) {
-      errs.password = "Use at least 8 characters.";
-    }
+    const entries = v("emails")
+      .split(/[\s,;]+/)
+      .filter(Boolean);
+    const badEntry = entries.find((entry) => !/^(?:[^\s@]+)?@[^\s@]+\.[^\s@]+$/.test(entry));
+    if (badEntry) errs.emails = `“${badEntry}” isn’t an email address or @domain.`;
+    const ads = v("ads_form_url");
+    if (ads && !/^https?:\/\/\S+$/i.test(ads))
+      errs.ads_form_url = "Paste the full https:// link to the ads form.";
     const hasFile = (logoFile?.files?.length ?? 0) > 0;
     const hasUrl = (byName("logo_url")?.value ?? "").trim().length > 0;
     if (mode === "create" && !hasFile && !hasUrl)

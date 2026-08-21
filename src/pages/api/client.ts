@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import type { APIRoute } from "astro";
-import { isAdmin, sha256 } from "../../lib/auth";
+import { isAdmin, isValidAccessEntry, normalizeEmail } from "../../lib/auth";
 import { clientExists, deleteClient, readClient, slugify, writeClient } from "../../lib/storage";
 import type { ClientProfile } from "../../lib/types";
 import { brandedErrorPage } from "../../lib/error-page";
@@ -49,7 +49,7 @@ export const POST: APIRoute = async ({ request }) => {
 
   const form = await request.formData();
 
-  // Deleting removes the endpoint and revokes the coordinator password with it.
+  // Deleting removes the endpoint and the sign-in access list with it.
   // Snapshots stay on disk, so existing reports remain viewable by the admin.
   if (field(form, "mode") === "delete") {
     const slug = field(form, "slug");
@@ -93,14 +93,18 @@ export const POST: APIRoute = async ({ request }) => {
 
   const existing = isEdit ? await readClient(slug).catch(() => undefined) : undefined;
 
-  // Coordinator password: required on create; blank on edit keeps the current one.
-  const password = field(form, "password");
-  if (password && password.length < 8) {
-    return errorPage(400, "Coordinator password must be at least 8 characters.");
+  // Sign-in access list: addresses or "@domain.com" entries, one per line. A typo
+  // here would silently lock a coordinator out, so reject rather than drop it.
+  const emails = [...new Set(field(form, "emails").split(/[\s,;]+/).map(normalizeEmail).filter(Boolean))];
+  const badEntry = emails.find((entry) => !isValidAccessEntry(entry));
+  if (badEntry) {
+    return errorPage(400, `"${badEntry}" isn't an email address or an @domain entry.`);
   }
-  const passwordHash = password ? sha256(password) : existing?.password_hash;
-  if (!passwordHash) {
-    return errorPage(400, "A coordinator password is required — it protects this client's report link.");
+
+  // Where the portal's "Submit Listing Ads" card sends this client.
+  const adsFormUrl = field(form, "ads_form_url");
+  if (adsFormUrl && !isHttpUrl(adsFormUrl)) {
+    return errorPage(400, "Listing ads form link must be a valid http(s) link (e.g. https://nowforsale.co/your-team).");
   }
 
   // Logo resolution order: uploaded file > pasted URL > (on edit) the existing logo.
@@ -161,7 +165,8 @@ export const POST: APIRoute = async ({ request }) => {
     brokerage_name: field(form, "brokerage_name") || name,
     brokerage_address: field(form, "brokerage_address"),
     brokerage_contact: field(form, "brokerage_contact"),
-    password_hash: passwordHash,
+    emails,
+    ...(adsFormUrl ? { ads_form_url: adsFormUrl } : {}),
     ...(metaPageId ? { meta_page_id: metaPageId } : {}),
     ...(metaInstagramId ? { meta_instagram_id: metaInstagramId } : {}),
     ...(rybbitSiteId ? { rybbit_site_id: rybbitSiteId } : {}),

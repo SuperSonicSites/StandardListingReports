@@ -1,0 +1,39 @@
+---
+// "Realtor Hub" sign-in shell: the blue launchpad panel on the left, the page's
+// own content (email form / "check your inbox") on the right. App chrome only.
+import AppLayout from "./AppLayout.astro";
+import HubLogo from "../components/HubLogo.astro";
+
+type Props = { title: string };
+const { title } = Astro.props;
+---
+
+<AppLayout title={title} className="hub-body">
+  <div class="hub-split">
+    <aside class="hub-panel">
+      <HubLogo />
+      <div class="hub-panel-body">
+        <p class="hub-eyebrow is-yellow has-line">Realtor marketing portal</p>
+        <h1 class="hub-title">
+          Your real estate marketing <em>launchpad.</em>
+        </h1>
+        <p class="hub-lede">
+          One secure place for authorized realtor teams to submit listing-ad
+          requests and prepare client-facing performance reports.
+        </p>
+      </div>
+      <ol class="hub-steps" aria-label="What you can do here">
+        <li><span>01</span>Send listing details</li>
+        <li><span>02</span>Launch ad requests</li>
+        <li><span>03</span>Build performance reports</li>
+      </ol>
+      <span class="hub-stripe" aria-hidden="true"></span>
+    </aside>
+
+    <main class="hub-side">
+      <div class="hub-side-inner reveal">
+        <slot />
+      </div>
+    </main>
+  </div>
+</AppLayout>

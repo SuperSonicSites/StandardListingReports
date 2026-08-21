@@ -1,0 +1,55 @@
+---
+import HubLayout from "../../layouts/HubLayout.astro";
+import { LINK_MINUTES, LOGIN_COOKIE, readLoginCookie } from "../../lib/auth";
+import { mailFromName } from "../../lib/mail";
+
+// Only reachable right after /api/login set the login cookie; a cold visit has
+// nothing to show, so it goes back to the form.
+const { email, next } = readLoginCookie(Astro.cookies.get(LOGIN_COOKIE)?.value);
+if (!email) return Astro.redirect("/login", 303);
+const resent = Astro.url.searchParams.get("resent") === "1";
+---
+
+<HubLayout title="Check your inbox | Supersonic Realtor Hub">
+  <div class="hub-icon-tile" aria-hidden="true">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <path d="M4 7.5 12 13l8-5.5M5 6h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+  </div>
+  <p class="hub-eyebrow is-red">Check your inbox</p>
+  <h2 class="hub-h2">Your link is on its way.</h2>
+  <p class="hub-sub">
+    We sent a secure sign-in link to <strong class="hub-email">{email}</strong>.
+    It expires in {LINK_MINUTES} minutes &mdash; open it and you’re in.
+  </p>
+
+  {
+    resent && (
+      <div role="status" class="hub-affirm">
+        Sent again &mdash; give it a minute to arrive.
+      </div>
+    )
+  }
+
+  <div class="hub-privacy" style="margin-top: 6px">
+    <strong><span class="hub-diamond" aria-hidden="true"></span>Can’t find it?</strong>
+    <span>Give it a minute and check your spam or promotions folder. The sender is {mailFromName()}.</span>
+  </div>
+
+  <form method="post" action="/api/login" class="hub-form hub-form-row">
+    <input type="hidden" name="email" value={email} />
+    <input type="hidden" name="next" value={next} />
+    <input type="hidden" name="resend" value="1" />
+    <button class="hub-button is-secondary" type="submit">Resend the link</button>
+    <a class="hub-text-link" href="/login">Use a different email</a>
+  </form>
+
+  <div class="hub-help">
+    <p>Still stuck? We’re friendly.</p>
+    <p>
+      <a href="tel:+18883212666">1-888-321-2666</a>
+      <span aria-hidden="true">•</span>
+      <a href="mailto:hello@supersonicsites.com">hello@supersonicsites.com</a>
+    </p>
+  </div>
+</HubLayout>

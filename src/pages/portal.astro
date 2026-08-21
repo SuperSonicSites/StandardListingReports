@@ -1,0 +1,151 @@
+---
+// The first page after sign-in: pick a destination. A client email sees the
+// clients that list it (usually one); an admin sees every client.
+import AppLayout from "../layouts/AppLayout.astro";
+import HubLogo from "../components/HubLogo.astro";
+import Toast from "../components/Toast.astro";
+import { emailMatches, isAdminEmail, sessionEmail } from "../lib/auth";
+import { listClients } from "../lib/storage";
+import { takeFlash } from "../lib/flash";
+
+const email = sessionEmail(Astro.request) ?? "";
+const admin = isAdminEmail(email);
+const clients = (await listClients()).filter((client) => admin || emailMatches(email, client.emails));
+const flash = takeFlash(Astro.cookies);
+const single = clients.length === 1 ? clients[0] : undefined;
+---
+
+<AppLayout title="Portal | Supersonic Realtor Hub" className="hub-body">
+  <header class="hub-bar">
+    <HubLogo />
+    <div class="hub-bar-user">
+      {admin && <a class="hub-text-link" href="/">Admin dashboard</a>}
+      <span class="hub-bar-email" title={email}>{email}</span>
+      <form method="post" action="/api/logout">
+        <button type="submit" class="hub-text-link">Sign out</button>
+      </form>
+    </div>
+  </header>
+
+  <main class="hub-portal reveal">
+    <p class="hub-eyebrow is-red has-line">Realtor marketing portal</p>
+    <h1 class="hub-h1">
+      Welcome aboard{single ? `, ${single.name}` : ""}.
+    </h1>
+    <p class="hub-sub" style="max-width: 520px">
+      {
+        clients.length
+          ? "Choose where you’re headed today."
+          : admin
+            ? "No clients yet."
+            : "This email isn’t linked to a client yet."
+      }
+    </p>
+
+    {
+      clients.length === 0 && admin && (
+        <a class="hub-button is-secondary" style="display: inline-flex" href="/admin/clients/new">
+          Create the first client
+        </a>
+      )
+    }
+
+    {
+      clients.length === 0 && !admin && (
+        <div class="hub-privacy" style="max-width: 520px">
+          <strong><span class="hub-diamond" aria-hidden="true"></span>Let’s fix that.</strong>
+          <span>
+            Email{" "}
+            <a href="mailto:hello@supersonicsites.com">hello@supersonicsites.com</a>{" "}
+            from this address and we’ll connect it to your team.
+          </span>
+        </div>
+      )
+    }
+
+    {
+      clients.map((client) => (
+        <section class="hub-client" aria-label={client.name}>
+          {!single && <h2 class="hub-client-name">{client.name}</h2>}
+          <div class="hub-options">
+            {client.ads_form_url ? (
+              <a class="hub-option" href={client.ads_form_url}>
+                <span class="hub-option-top">
+                  <span class="hub-option-num">01</span>
+                  <span class="hub-option-icon" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                      <path d="M4 10v4a1 1 0 0 0 1 1h3l7 4V5L8 9H5a1 1 0 0 0-1 1Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                      <path d="M18.5 9.5a3.5 3.5 0 0 1 0 5M9 15l1.2 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                    </svg>
+                  </span>
+                </span>
+                <span class="hub-option-title">Submit Listing Ads</span>
+                <span class="hub-option-text">
+                  Send us a new listing and we’ll launch its ad campaign for you.
+                </span>
+                <span class="hub-option-cta">
+                  Open the ads form
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </span>
+              </a>
+            ) : (
+              <div class="hub-option is-unavailable" aria-disabled="true">
+                <span class="hub-option-top">
+                  <span class="hub-option-num">01</span>
+                  <span class="hub-option-icon" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                      <path d="M4 10v4a1 1 0 0 0 1 1h3l7 4V5L8 9H5a1 1 0 0 0-1 1Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                      <path d="M18.5 9.5a3.5 3.5 0 0 1 0 5M9 15l1.2 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                    </svg>
+                  </span>
+                </span>
+                <span class="hub-option-title">Submit Listing Ads</span>
+                <span class="hub-option-text">
+                  Your ads intake form isn’t linked yet. Email{" "}
+                  <a href="mailto:hello@supersonicsites.com">hello@supersonicsites.com</a>{" "}
+                  and we’ll set it up.
+                </span>
+                <span class="hub-option-cta">Not set up yet</span>
+              </div>
+            )}
+
+            <a class="hub-option" href={`/c/${client.slug}/`}>
+              <span class="hub-option-top">
+                <span class="hub-option-num">02</span>
+                <span class="hub-option-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <path d="M6 3h9l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                    <path d="M8.5 16.5v-3m3.5 3v-6m3.5 6v-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                </span>
+              </span>
+              <span class="hub-option-title">Generate Listing Reports</span>
+              <span class="hub-option-text">
+                Turn a REALTOR.ca share link into a branded seller performance report, ready to print.
+              </span>
+              <span class="hub-option-cta">
+                Create a report
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+            </a>
+          </div>
+        </section>
+      ))
+    }
+
+    <div class="hub-help" style="margin-top: 40px">
+      <p>Need a hand? We’re friendly.</p>
+      <p>
+        <a href="tel:+18883212666">1-888-321-2666</a>
+        <span aria-hidden="true">•</span>
+        <a href="mailto:hello@supersonicsites.com">hello@supersonicsites.com</a>
+      </p>
+    </div>
+  </main>
+
+  <Toast message={flash} />
+</AppLayout>

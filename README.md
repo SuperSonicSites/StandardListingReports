@@ -1,13 +1,15 @@
 # Seller Report Generator
 
 A small, boring, white-label, **self-serve** seller report generator for real
-estate marketing teams.
+estate marketing teams, behind the Supersonic **Realtor Hub** front door at
+`supersonicrealtors.com`.
 
 The product is simple:
 
 ```txt
-Admin sets up the client once (brand + access + integration IDs)
-Client opens their report form
+Admin sets up the client once (brand + sign-in emails + ads form link + integration IDs)
+Client signs in with a magic link (email -> click -> in; no password)
+Client picks a destination on the portal: Submit Listing Ads, or Generate Listing Reports
 Client pastes their REALTOR.ca share link (the member/backend link)
 The app gathers all the data automatically
 Client reviews and approves
@@ -35,10 +37,16 @@ http://127.0.0.1:4321
 Useful local routes:
 
 ```txt
-/admin/clients/new
-/c/[client_slug]/
-/reports/[snapshot_id]
+/login                      magic-link sign-in (dev prints the link to the console)
+/portal                     post-sign-in chooser: listing ads form | listing reports
+/admin/clients/new          admin: create a client
+/c/[client_slug]/           coordinator report form
+/reports/[snapshot_id]      rendered report (PDF source)
 ```
+
+To sign in locally, set `ADMIN_EMAILS` to your address in `.env` — without
+`RESEND_API_KEY`, `npm run dev` prints each sign-in link to the terminal instead
+of emailing it. Open the printed link and you are in.
 
 PDF generation uses `puppeteer-core` with a locally installed Chrome or Edge.
 If the browser is not in a standard location, set `CHROME_PATH`.
@@ -74,9 +82,12 @@ snapshot; the PDF renders from the snapshot only.
 ## Product Shape
 
 ```txt
-Admin creates client (once)
+Admin creates client (once) with its sign-in emails + ads form link
         |
-App creates private client report endpoint  /c/<slug>/
+Client signs in at /login (magic link) -> lands on /portal
+        |
+   Submit Listing Ads  ->  client's nowforsale.co form (external)
+   Generate Listing Reports -> private client report endpoint  /c/<slug>/
         |
 Client pastes REALTOR.ca share link -> Pull data
         |
@@ -143,13 +154,17 @@ do not start that rewrite now.
 
 ## Deployment (Railway)
 
+Step-by-step launch instructions for `supersonicrealtors.com` (Resend domain +
+API key, Cloudflare DNS, Railway domain + variables, smoke test) live in
+[docs/runbook-supersonicrealtors-launch.md](docs/runbook-supersonicrealtors-launch.md).
 The code is host-agnostic; these are the moving parts:
 
 1. Set the start command to `npm run start` **before** the first deploy
    (Railpack cannot infer it for `output: "server"`).
-2. Service variables: `HOST=0.0.0.0`, `ADMIN_PASSWORD`, `META_SYSTEM_USER_TOKEN`,
-   `RYBBIT_API_KEY`. The built server never loads `.env` — platform env vars
-   are the only source.
+2. Service variables: `HOST=0.0.0.0`, `AUTH_SECRET`, `ADMIN_EMAILS`, `APP_URL`
+   (`https://supersonicrealtors.com`), `RESEND_API_KEY` (+ optional `MAIL_FROM`
+   on a Resend-verified domain), `META_SYSTEM_USER_TOKEN`, `RYBBIT_API_KEY`.
+   The built server never loads `.env` — platform env vars are the only source.
    **Chromium** (PDF + REALTOR.ca capture) ships bundled via `@sparticuz/chromium`
    — a headless-shell build that runs in restricted containers where the system
    apt `chromium` can't (recent Chromium needs unprivileged user namespaces the
@@ -159,11 +174,18 @@ The code is host-agnostic; these are the moving parts:
 3. Mount a volume at `/app/data`. Client profiles and snapshots are runtime
    data that live only on this volume (gitignored) — deploys never touch them.
    Create clients via `/admin/clients/new` after the first deploy.
-4. Access: `/login` gates everything. `ADMIN_PASSWORD` opens the admin area
-   and every client workspace; each client gets its own coordinator password,
-   set in the admin form, that opens only `/c/<slug>/` and its reports. For
-   defense in depth, Cloudflare Access on a custom domain can still be added
-   in front.
+4. Access: `/login` gates everything with **magic links** (no passwords).
+   A coordinator types their work email, receives a 15-minute sign-in link
+   (sent through Resend), and lands on `/portal` — the chooser between
+   "Submit Listing Ads" (the client's nowforsale.co form) and "Generate
+   Listing Reports" (`/c/<slug>/`). `ADMIN_EMAILS` open the admin area and
+   every client; each client's own access list (addresses or `@domain.com`)
+   and its ads-form link are set in the admin form. For defense in depth,
+   Cloudflare Access on the domain can still be added in front.
+5. Upgrading from the password gate (v0.2.1): existing client profiles have no
+   `emails` list yet, so their coordinators can't sign in until an admin opens
+   each client's edit form and adds their addresses (or `@domain.com`) plus the
+   listing-ads form link. The old `password_hash` field is ignored.
 
 ## Core Concepts
 
@@ -181,7 +203,8 @@ logo
 brand colors
 footer/contact text
 brokerage disclaimer details
-coordinator password (hash)
+authorized sign-in emails (addresses or @domain)
+listing ads form link (portal "Submit Listing Ads" destination)
 website URL (for the listing auto-find)
 integration IDs (Meta page/IG account, Rybbit site)
 ```
@@ -323,8 +346,9 @@ Simple but serious:
 - server-side API calls only
 - no analytics credentials in browser code
 - no private credentials in snapshots
-- password gate on every route (admin password + per-client coordinator
-  passwords); Cloudflare Access can be layered in front
+- magic-link gate on every route (signed 15-minute links, signed session
+  cookie, access re-checked per request against `ADMIN_EMAILS` and each
+  client's email list); Cloudflare Access can be layered in front
 - redacted logs
 
 ## North Star

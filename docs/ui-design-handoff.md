@@ -1,5 +1,7 @@
 # Supersonic Seller Report Generator — UI/UX Designer Handoff
 
+> **As built (Aug 2026) — read first.** The app chrome in this brief was implemented (commit `3d1d881`). Since then **sign-in changed**: the password gate described in "Sign In (`/login`)" and in the client form's "Access" section no longer exists. `/login` is now the **Realtor Hub** magic-link page (blue launchpad panel + "Ready for takeoff?" email form — `src/pages/login.astro`, `src/layouts/HubLayout.astro`, `.hub-*` rules in `src/styles/global.css`, its own blue/yellow/red palette), followed by `/login/sent` and the `/portal` chooser (`src/pages/portal.astro`: "Submit Listing Ads" / "Generate Listing Reports"). The client form's section 3 is now **Authorized sign-in emails** + **Listing ads form link**. Treat every password reference below as historical; the rest of the brief (dashboard, client form sections 1/2/4, coordinator form, report toolbar, states) still describes the shipped chrome.
+
 This document is the design brief for the **app chrome** of the Supersonic Seller Report Generator — every screen a person touches *around* the finished report. It captures the current built state (with real tokens, measurements, and copy strings cited as baselines), then gives concrete, restrained recommendations tied to the client's design philosophy. Use it as a reference to design in Figma; each chapter is self-contained and buildable, and cross-references the shared **Design Foundations** for token names.
 
 ### The product in one minute
@@ -7,8 +9,8 @@ This document is the design brief for the **app chrome** of the Supersonic Selle
 Supersonic is a **white-label, self-serve seller-report generator** for real-estate marketing teams (Canadian: en-CA, REALTOR.ca, BC brokerages). The client's coordinator pastes their REALTOR.ca member "share listing" link, the app gathers all the data automatically (REALTOR.ca listing stats, the listing page on their own site, Rybbit website views, ranked Meta/Facebook/Instagram post candidates), the coordinator reviews and approves, the approved numbers freeze into a JSON **snapshot**, and a branded multi-page **PDF report is rendered** from it. The PDF is the product — this is a report compiler, not a dashboard or CRM. Ethos: KISS / YAGNI / boring code; **restraint is a feature.**
 
 **Two user types:**
-- **Agency admin** — sets up client brand profiles (logo, colors, disclaimer, integrations, coordinator password). Uses `/login`, the clients dashboard, and the client setup form.
-- **Client coordinator** — fills the report form for *their own client only*. Uses `/login` and `/c/<slug>/`.
+- **Agency admin** — sets up client brand profiles (logo, colors, disclaimer, integrations, authorized sign-in emails, ads form link). Uses `/login`, the clients dashboard, and the client setup form.
+- **Client coordinator** — fills the report form for *their own client only*. Uses `/login` (magic link), `/portal`, and `/c/<slug>/`.
 
 **Out of scope (already good, do not touch):** the report **preview page body** and the **PDF output** (route `/reports/<id>`). The client considers these "perfect now." The report page's sticky **toolbar** (Back link + "Download PDF") is app chrome and may be referenced for consistency, but is not a design focus. Do not spec the report sheets.
 
@@ -18,7 +20,8 @@ Supersonic is a **white-label, self-serve seller-report generator** for real-est
 
 | Screen | Route | Primary user | Its one job |
 |---|---|---|---|
-| Sign in | `/login` | both | Password gate; earn trust fast and calmly |
+| Sign in | `/login` | both | Magic-link email gate (Realtor Hub); earn trust fast and calmly |
+| Portal | `/portal` | both | Post-sign-in chooser: listing ads form vs. listing reports |
 | Clients dashboard (home) | `/` | agency admin | See every client; open a report form or create a client |
 | Client setup — create | `/admin/clients/new` | agency admin | Build a client brand profile (rarely, carefully) |
 | Client setup — edit | `/admin/clients/<slug>/edit` | agency admin | Update a profile; delete a client (danger zone) |
@@ -353,6 +356,8 @@ App chrome has **no footer** — deliberate and correct for a focused internal t
 
 ---
 ## Sign In (`/login`)
+
+> **Superseded (Aug 2026):** this chapter describes the retired password page. The live page is the Realtor Hub magic-link design — see the "As built" note at the top.
 
 **PURPOSE** — The password gate. First screen anyone sees; the moment the tool earns (or loses) trust. It must feel fast, calm, and unmistakably Supersonic. · **ROUTE** — `/login` (`src/pages/login.astro`), rules `.login-shell` / `.login-panel` / `.login-error`. · **AUDIENCE** — one screen, two user types: the **agency admin** (`ADMIN_PASSWORD`) and the **client coordinator** (per-client password). Neither is named here and neither should be — the field is password-only, so copy must stay identity-agnostic and welcoming to both.
 

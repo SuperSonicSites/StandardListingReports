@@ -40,6 +40,10 @@ const initials = context
     </div>
     <nav class="site-nav-actions">
       <slot />
+      <a class="nav-link" href="/portal">Portal</a>
+      <form method="post" action="/api/logout">
+        <button type="submit" class="nav-link">Sign out</button>
+      </form>
     </nav>
   </div>
 </header>

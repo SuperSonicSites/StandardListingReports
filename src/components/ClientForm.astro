@@ -385,50 +385,48 @@ const intCount = [
       <span class="num">3</span>
       <div class="head-text">
         <h2>Access</h2>
-        <p>The password this client&rsquo;s coordinator signs in with.</p>
+        <p>
+          Who can sign in to this client&rsquo;s portal, and where their
+          listing-ad requests go. Sign-in is by email link &mdash; no passwords.
+        </p>
       </div>
     </div>
-    <div class="field" style="max-width: 440px">
-      <label class="field-label" for="f-password">
-        Coordinator password {!isEdit && <span class="req">*</span>}
-      </label>
-      <div class="pw-wrap">
-        <input
-          id="f-password"
-          type="password"
-          name="password"
-          autocomplete="new-password"
-          placeholder={isEdit ? "Leave blank to keep current password" : ""}
-          data-field="password"
-          style="padding-right: 70px"
-        />
-        <button
-          type="button"
-          class="pw-toggle"
-          data-pw-toggle
-          aria-pressed="false"
-          aria-label="Show password">Show</button
-        >
+    <div class="section-fields">
+      <div class="field" style="max-width: 520px">
+        <label class="field-label" for="f-emails">Authorized sign-in emails</label>
+        <textarea
+          id="f-emails"
+          name="emails"
+          rows="4"
+          placeholder={"jane@acmerealty.com\n@acmerealty.com"}
+          data-field="emails"
+          style="font-family: ui-monospace, monospace; font-size: 0.9rem">{(client?.emails ?? []).join("\n")}</textarea>
+        <p class="field-hint">
+          One per line. A full address allows that person; <code>@domain.com</code>
+          allows everyone with an email at that domain. Each receives a secure
+          sign-in link when they enter their email at /login. Leave it blank and
+          only Supersonic admins can open this client.
+        </p>
+        <p class="err-note" data-err-for="emails" hidden></p>
       </div>
-      <p class="field-hint">
-        {
-          isEdit
-            ? `Leave blank to keep the current password. Coordinators sign in at /c/${slugValue}/. Minimum 8 characters.`
-            : "The coordinator signs in with this. Minimum 8 characters — share it with them securely."
-        }
-      </p>
-      <p class="affirm" data-pw-affirm hidden>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-          <path
-            d="m5 13 4 4L19 7"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"></path>
-        </svg>
-        Looks good
-      </p>
-      <p class="err-note" data-err-for="password" hidden></p>
+
+      <div class="field" style="max-width: 520px">
+        <label class="field-label" for="f-ads">Listing ads form link</label>
+        <input
+          id="f-ads"
+          name="ads_form_url"
+          type="url"
+          value={client?.ads_form_url ?? ""}
+          placeholder="https://nowforsale.co/your-team"
+          inputmode="url"
+          data-field="ads_form_url"
+        />
+        <p class="field-hint">
+          Where the portal&rsquo;s &ldquo;Submit Listing Ads&rdquo; option sends this
+          client. Leave blank until their intake form exists.
+        </p>
+        <p class="err-note" data-err-for="ads_form_url" hidden></p>
+      </div>
     </div>
   </section>
 
@@ -513,9 +511,9 @@ const intCount = [
     <div class="danger-zone">
       <h2>Delete this client</h2>
       <p>
-        This removes their report form and revokes the coordinator password.
-        Reports you&rsquo;ve already generated stay viewable by admins. This
-        can&rsquo;t be undone.
+        This removes their report form and portal access for every email on
+        their list. Reports you&rsquo;ve already generated stay viewable by
+        admins. This can&rsquo;t be undone.
       </p>
       <button type="button" class="button danger" data-delete-open>
         Delete client
@@ -555,9 +553,9 @@ const intCount = [
         </h2>
         <p style="font-size: 0.88rem; color: var(--ss-text-soft); line-height: 1.6; margin: 0 0 16px">
           This removes the report form at
-          <code style="color: var(--ss-text)">/c/{client!.slug}/</code> and revokes
-          the coordinator password. Reports you&rsquo;ve already generated stay
-          viewable by admins. This can&rsquo;t be undone.
+          <code style="color: var(--ss-text)">/c/{client!.slug}/</code> and
+          portal access for every email on their list. Reports you&rsquo;ve
+          already generated stay viewable by admins. This can&rsquo;t be undone.
         </p>
         <div class="field" style="margin-bottom: 18px">
           <label class="field-label" for="del-input">Type the client&rsquo;s name to confirm</label>

@@ -1,100 +1,113 @@
 ---
-import AppLayout from "../layouts/AppLayout.astro";
-import SupersonicBrand from "../components/SupersonicBrand.astro";
+import HubLayout from "../layouts/HubLayout.astro";
+import { LOGIN_COOKIE, readLoginCookie, safeNext, sessionEmail } from "../lib/auth";
 
-const next = Astro.url.searchParams.get("next") ?? "/";
-const error = Astro.url.searchParams.get("error") === "1";
+// Where to go after sign-in: the query string on a fresh challenge, or the
+// destination remembered from a previous attempt (error, resend, expired link).
+const remembered = readLoginCookie(Astro.cookies.get(LOGIN_COOKIE)?.value);
+const next = safeNext(Astro.url.searchParams.get("next"), remembered.next);
+
+// Already signed in? Straight through (home routes client sessions to /portal).
+if (sessionEmail(Astro.request)) return Astro.redirect(next || "/", 303);
+
+const ERRORS: Record<string, string> = {
+  invalid: "Enter a valid work email address.",
+  unknown:
+    "That email isn’t on the access list yet. Email hello@supersonicsites.com and we’ll add it right away.",
+  rate: "Too many sign-in attempts for that address. Check your inbox (and spam) for a link we already sent, or try again in 10 minutes.",
+  send: "We couldn’t send the email just now. Try again in a minute, or contact hello@supersonicsites.com.",
+  expired: "That sign-in link has expired. Enter your email and we’ll send a fresh one."
+};
+const errorKey = Astro.url.searchParams.get("error") ?? "";
+const error = Object.hasOwn(ERRORS, errorKey) ? ERRORS[errorKey] : undefined;
+const email = remembered.email;
 ---
 
-<AppLayout title="Sign in | Supersonic" className="app-body">
-  <main class="login-shell">
-    <form
-      id="login-form"
-      class="card login-card reveal"
-      method="post"
-      action="/api/login"
-    >
-      <div class="login-head">
-        <SupersonicBrand size={72} />
-        <div style="text-align: center">
-          <h1>Sign in</h1>
-          <p>Enter your password to open this workspace.</p>
-        </div>
+<HubLayout title="Sign in | Supersonic Realtor Hub">
+  <div class="hub-icon-tile" aria-hidden="true">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <path d="M7 17 17 7M9 7h8v8" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+  </div>
+  <p class="hub-eyebrow is-red">Secure team access</p>
+  <h2 class="hub-h2">Ready for takeoff?</h2>
+  <p class="hub-sub">
+    Enter your authorized work email. We’ll send you a secure sign-in
+    link&mdash;no password needed.
+  </p>
+
+  {
+    error && (
+      <div role="alert" class="hub-alert">
+        {error}
       </div>
+    )
+  }
 
-      {
-        error && (
-          <div role="alert" class="login-error">
-            That password didn&rsquo;t match. Try again.
-          </div>
-        )
-      }
+  <form id="login-form" method="post" action="/api/login" class="hub-form">
+    <input type="hidden" name="next" value={next} />
+    <label class="hub-label" for="login-email">Work email</label>
+    <div class="hub-input-wrap">
+      <span class="hub-input-at" aria-hidden="true">@</span>
+      <input
+        id="login-email"
+        type="email"
+        name="email"
+        value={email}
+        placeholder="you@company.com"
+        autocomplete="email"
+        inputmode="email"
+        spellcheck="false"
+        required
+        autofocus
+        aria-invalid={error ? "true" : undefined}
+      />
+      <svg class="hub-input-badge" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6L12 3Z" stroke="#0b5fd7" stroke-width="1.7" stroke-linejoin="round"></path>
+        <path d="m9.3 12.2 1.9 1.9 3.6-3.8" stroke="#0b5fd7" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+    </div>
+    <button class="hub-button" type="submit" data-login-submit>
+      <span data-label>Continue securely</span>
+      <span class="hub-button-arrow" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M5 12h14m-6-6 6 6-6 6" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+      </span>
+    </button>
+    <p class="hub-fine">Only authorized Supersonic Sites clients can sign in.</p>
+  </form>
 
-      <input type="hidden" name="next" value={next} />
+  <div class="hub-privacy">
+    <strong><span class="hub-diamond" aria-hidden="true"></span>Your privacy, protected.</strong>
+    <span>We never publish client accounts or share portal access.</span>
+  </div>
 
-      <div class="field">
-        <label class="field-label" for="login-pw">Password</label>
-        <div class="pw-wrap">
-          <input
-            id="login-pw"
-            type="password"
-            name="password"
-            autocomplete="current-password"
-            required
-            autofocus
-            aria-invalid={error ? "true" : undefined}
-            style="min-height: 48px; padding-right: 70px"
-          />
-          <button
-            type="button"
-            class="pw-toggle"
-            data-pw-toggle
-            aria-pressed="false"
-            aria-label="Show password">Show</button
-          >
-        </div>
-      </div>
-
-      <button
-        class="button primary block"
-        type="submit"
-        data-login-submit
-        style="min-height: 48px">Continue</button
-      >
-    </form>
-  </main>
+  <div class="hub-help">
+    <p>Need a hand? We’re friendly.</p>
+    <p>
+      <a href="tel:+18883212666">1-888-321-2666</a>
+      <span aria-hidden="true">•</span>
+      <a href="mailto:hello@supersonicsites.com">hello@supersonicsites.com</a>
+    </p>
+  </div>
 
   <script>
     const form = document.getElementById("login-form") as HTMLFormElement | null;
-    const pw = document.getElementById("login-pw") as HTMLInputElement | null;
-    const toggle = document.querySelector("[data-pw-toggle]");
-    const submit = document.querySelector(
-      "[data-login-submit]"
-    ) as HTMLButtonElement | null;
-
-    toggle?.addEventListener("click", () => {
-      if (!pw) return;
-      const reveal = pw.type === "password";
-      pw.type = reveal ? "text" : "password";
-      toggle.textContent = reveal ? "Hide" : "Show";
-      toggle.setAttribute("aria-pressed", String(reveal));
-      toggle.setAttribute("aria-label", reveal ? "Hide password" : "Show password");
-      pw.focus();
-    });
-
+    const submit = document.querySelector("[data-login-submit]") as HTMLButtonElement | null;
+    const label = submit?.querySelector("[data-label]");
     form?.addEventListener("submit", () => {
-      if (!pw?.value || !submit) return;
+      if (!submit || !form.checkValidity()) return;
       submit.disabled = true;
       form.setAttribute("aria-busy", "true");
-      submit.innerHTML = '<span class="spin"></span>Signing in…';
+      if (label) label.innerHTML = '<span class="spin"></span>Sending your link…';
     });
-
     // bfcache: re-enable if the user lands back here via back/forward.
     window.addEventListener("pageshow", () => {
       if (!submit) return;
       submit.disabled = false;
-      submit.textContent = "Continue";
+      if (label) label.textContent = "Continue securely";
       form?.removeAttribute("aria-busy");
     });
   </script>
-</AppLayout>
+</HubLayout>

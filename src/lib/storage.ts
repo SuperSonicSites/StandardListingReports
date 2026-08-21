@@ -100,7 +100,7 @@ export async function clientExists(slug: string) {
 export async function deleteClient(slug: string) {
   assertSafeId(slug, "client slug");
   // Snapshots are intentionally left in place: existing reports stay viewable
-  // (admin-only once the client's password hash is gone with the profile).
+  // (admin-only once the client's email list is gone with the profile).
   await unlink(path.join(clientsDir, `${slug}.json`));
 }
 

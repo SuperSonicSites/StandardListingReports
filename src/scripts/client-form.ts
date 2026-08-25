@@ -15,6 +15,7 @@ const LABELS: Record<string, string> = {
   brokerage_address: "Brokerage address",
   emails: "Authorized emails",
   ads_form_url: "Listing ads form link",
+  dashboard_url: "Analytics dashboard link",
   logo: "Logo"
 };
 
@@ -198,6 +199,9 @@ export function initClientForm() {
     const ads = v("ads_form_url");
     if (ads && !/^https?:\/\/\S+$/i.test(ads))
       errs.ads_form_url = "Paste the full https:// link to the ads form.";
+    const dashboard = v("dashboard_url");
+    if (dashboard && !/^https?:\/\/\S+$/i.test(dashboard))
+      errs.dashboard_url = "Paste the full https:// link to the dashboard.";
     const hasFile = (logoFile?.files?.length ?? 0) > 0;
     const hasUrl = (byName("logo_url")?.value ?? "").trim().length > 0;
     if (mode === "create" && !hasFile && !hasUrl)

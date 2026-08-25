@@ -427,6 +427,24 @@ const intCount = [
         </p>
         <p class="err-note" data-err-for="ads_form_url" hidden></p>
       </div>
+
+      <div class="field" style="max-width: 520px">
+        <label class="field-label" for="f-dashboard">Analytics dashboard link</label>
+        <input
+          id="f-dashboard"
+          name="dashboard_url"
+          type="url"
+          value={client?.dashboard_url ?? ""}
+          placeholder="https://dashboard.example.com/your-team"
+          inputmode="url"
+          data-field="dashboard_url"
+        />
+        <p class="field-hint">
+          Where this client&rsquo;s analytics live (GA4, social media, etc.).
+          When set, a &ldquo;Dashboard&rdquo; option appears on their portal.
+        </p>
+        <p class="err-note" data-err-for="dashboard_url" hidden></p>
+      </div>
     </div>
   </section>
 

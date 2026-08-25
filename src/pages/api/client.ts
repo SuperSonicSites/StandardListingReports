@@ -107,6 +107,12 @@ export const POST: APIRoute = async ({ request }) => {
     return errorPage(400, "Listing ads form link must be a valid http(s) link (e.g. https://nowforsale.co/your-team).");
   }
 
+  // The client's analytics dashboard — the portal shows a "Dashboard" card when set.
+  const dashboardUrl = field(form, "dashboard_url");
+  if (dashboardUrl && !isHttpUrl(dashboardUrl)) {
+    return errorPage(400, "Dashboard link must be a valid http(s) link.");
+  }
+
   // Logo resolution order: uploaded file > pasted URL > (on edit) the existing logo.
   // A white-label profile must carry its own logo — never another client's.
   let logoUrl = field(form, "logo_url");
@@ -167,6 +173,7 @@ export const POST: APIRoute = async ({ request }) => {
     brokerage_contact: field(form, "brokerage_contact"),
     emails,
     ...(adsFormUrl ? { ads_form_url: adsFormUrl } : {}),
+    ...(dashboardUrl ? { dashboard_url: dashboardUrl } : {}),
     ...(metaPageId ? { meta_page_id: metaPageId } : {}),
     ...(metaInstagramId ? { meta_instagram_id: metaInstagramId } : {}),
     ...(rybbitSiteId ? { rybbit_site_id: rybbitSiteId } : {}),

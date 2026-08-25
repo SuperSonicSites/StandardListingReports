@@ -15,6 +15,9 @@ export type ClientProfile = {
   // Where the portal's "Submit Listing Ads" card sends this client (their
   // nowforsale.co intake form). Optional — the card explains when it's unset.
   ads_form_url?: string;
+  // The client's analytics dashboard (GA4, social media, etc.). Optional — the
+  // portal only shows the "Dashboard" card when this is set.
+  dashboard_url?: string;
   // --- v0.2 integration IDs (optional; NON-SECRET addressing ids) ---
   meta_page_id?: string;
   meta_instagram_id?: string;

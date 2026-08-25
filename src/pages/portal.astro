@@ -132,6 +132,32 @@ const single = clients.length === 1 ? clients[0] : undefined;
                 </svg>
               </span>
             </a>
+
+            {client.dashboard_url && (
+              <a class="hub-option" href={client.dashboard_url}>
+                <span class="hub-option-top">
+                  <span class="hub-option-num">03</span>
+                  <span class="hub-option-icon" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                      <rect x="3.5" y="3.5" width="7.5" height="9.5" rx="1" stroke="currentColor" stroke-width="1.8" />
+                      <rect x="13" y="3.5" width="7.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.8" />
+                      <rect x="13" y="11" width="7.5" height="9.5" rx="1" stroke="currentColor" stroke-width="1.8" />
+                      <rect x="3.5" y="15" width="7.5" height="5.5" rx="1" stroke="currentColor" stroke-width="1.8" />
+                    </svg>
+                  </span>
+                </span>
+                <span class="hub-option-title">Dashboard</span>
+                <span class="hub-option-text">
+                  All your analytics and data in one place — website traffic, social media, and more.
+                </span>
+                <span class="hub-option-cta">
+                  Open the dashboard
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </span>
+              </a>
+            )}
           </div>
         </section>
       ))

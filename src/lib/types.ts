@@ -12,9 +12,10 @@ export type ClientProfile = {
   // for everyone at the team's domain. Optional so older profiles still parse;
   // without it the client's form is admin-only.
   emails?: string[];
-  // Where the portal's "Submit Listing Ads" card sends this client (their
-  // nowforsale.co intake form). Optional — the card explains when it's unset.
-  ads_form_url?: string;
+  // The client's brokerage Account in Zoho CRM (record id). Listing-ad requests
+  // from /c/<slug>/ads are filed under it — set by the agency here, never taken
+  // from the browser. Optional: without it the portal shows listing ads as not set up.
+  zoho_account_id?: string;
   // The client's analytics dashboard (GA4, social media, etc.). Optional — the
   // portal only shows the "Dashboard" card when this is set.
   dashboard_url?: string;

@@ -83,11 +83,11 @@ snapshot; the PDF renders from the snapshot only.
 ## Product Shape
 
 ```txt
-Admin creates client (once) with its sign-in emails + ads form link
+Admin creates client (once) with its sign-in emails + Zoho CRM Account ID
         |
 Client signs in at /login (magic link) -> lands on /portal
         |
-   Submit Listing Ads  ->  client's nowforsale.co form (external)
+   Submit Listing Ads  ->  /c/<slug>/ads  ->  one Listing_Ads record in Zoho CRM
    Generate Listing Reports -> private client report endpoint  /c/<slug>/
         |
 Client pastes REALTOR.ca share link -> Pull data
@@ -165,7 +165,9 @@ The code is host-agnostic; these are the moving parts:
 2. Service variables: `HOST=0.0.0.0`, `AUTH_SECRET`, `ADMIN_EMAILS` (defaults to
    `dev@supersonicsites.com`), `APP_URL`
    (`https://supersonicrealtors.com`), `RESEND_API_KEY` (+ optional `MAIL_FROM`
-   on a Resend-verified domain), `META_SYSTEM_USER_TOKEN`, `RYBBIT_API_KEY`.
+   on a Resend-verified domain), `META_SYSTEM_USER_TOKEN`, `RYBBIT_API_KEY`, and
+   for listing ads the Zoho CRM OAuth client `client_id`, `client_secret`,
+   `refresh_token`, `api_domain` (`https://www.zohoapis.ca` — Canadian data centre).
    The built server never loads `.env` — platform env vars are the only source.
    **Chromium** (PDF + REALTOR.ca capture) ships bundled via `@sparticuz/chromium`
    — a headless-shell build that runs in restricted containers where the system
@@ -179,16 +181,20 @@ The code is host-agnostic; these are the moving parts:
 4. Access: `/login` gates everything with **magic links** (no passwords).
    A coordinator types their work email, receives a 15-minute sign-in link
    (sent through Resend), and lands on `/portal` — the chooser between
-   "Submit Listing Ads" (the client's nowforsale.co form) and "Generate
-   Listing Reports" (`/c/<slug>/`). `ADMIN_EMAILS` (default `dev@supersonicsites.com`)
+   "Submit Listing Ads" (`/c/<slug>/ads`, filed straight into Zoho CRM) and
+   "Generate Listing Reports" (`/c/<slug>/`). `ADMIN_EMAILS` (default `dev@supersonicsites.com`)
    open the admin area and
    every client; each client's own access list (addresses or `@domain.com`)
-   and its ads-form link are set in the admin form. For defense in depth,
+   and its Zoho CRM Account ID are set in the admin form. For defense in depth,
    Cloudflare Access on the domain can still be added in front.
 5. Upgrading from the password gate (v0.2.1): existing client profiles have no
    `emails` list yet, so their coordinators can't sign in until an admin opens
    each client's edit form and adds their addresses (or `@domain.com`) plus the
-   listing-ads form link. The old `password_hash` field is ignored.
+   Zoho CRM Account ID. The old `password_hash` and `ads_form_url` fields are ignored.
+6. Listing ads replace the Zoho Form: each request creates one `Listing_Ads`
+   record with CRM workflows on, but the Zoho Flow "Form Listing Submission"
+   (Kim's task, the REALTOR import Worker webhook) only runs for the old form —
+   post-create automation for in-app requests must hang off new CRM records.
 
 ## Core Concepts
 

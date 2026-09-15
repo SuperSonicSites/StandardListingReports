@@ -101,10 +101,10 @@ export const POST: APIRoute = async ({ request }) => {
     return errorPage(400, `"${badEntry}" isn't an email address or an @domain entry.`);
   }
 
-  // Where the portal's "Submit Listing Ads" card sends this client.
-  const adsFormUrl = field(form, "ads_form_url");
-  if (adsFormUrl && !isHttpUrl(adsFormUrl)) {
-    return errorPage(400, "Listing ads form link must be a valid http(s) link (e.g. https://nowforsale.co/your-team).");
+  // The Zoho CRM Account that this client's listing-ad requests are filed under.
+  const zohoAccountId = field(form, "zoho_account_id");
+  if (zohoAccountId && !/^\d{10,25}$/.test(zohoAccountId)) {
+    return errorPage(400, "Zoho CRM Account ID must be the Account's record ID — the long number from its Zoho CRM page address.");
   }
 
   // The client's analytics dashboard — the portal shows a "Dashboard" card when set.
@@ -172,7 +172,7 @@ export const POST: APIRoute = async ({ request }) => {
     brokerage_address: field(form, "brokerage_address"),
     brokerage_contact: field(form, "brokerage_contact"),
     emails,
-    ...(adsFormUrl ? { ads_form_url: adsFormUrl } : {}),
+    ...(zohoAccountId ? { zoho_account_id: zohoAccountId } : {}),
     ...(dashboardUrl ? { dashboard_url: dashboardUrl } : {}),
     ...(metaPageId ? { meta_page_id: metaPageId } : {}),
     ...(metaInstagramId ? { meta_instagram_id: metaInstagramId } : {}),

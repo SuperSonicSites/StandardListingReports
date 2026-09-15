@@ -14,7 +14,7 @@ const LABELS: Record<string, string> = {
   brokerage_contact: "Contact",
   brokerage_address: "Brokerage address",
   emails: "Authorized emails",
-  ads_form_url: "Listing ads form link",
+  zoho_account_id: "Zoho CRM Account ID",
   dashboard_url: "Analytics dashboard link",
   logo: "Logo"
 };
@@ -196,9 +196,9 @@ export function initClientForm() {
       .filter(Boolean);
     const badEntry = entries.find((entry) => !/^(?:[^\s@]+)?@[^\s@]+\.[^\s@]+$/.test(entry));
     if (badEntry) errs.emails = `“${badEntry}” isn’t an email address or @domain.`;
-    const ads = v("ads_form_url");
-    if (ads && !/^https?:\/\/\S+$/i.test(ads))
-      errs.ads_form_url = "Paste the full https:// link to the ads form.";
+    const zoho = v("zoho_account_id");
+    if (zoho && !/^\d{10,25}$/.test(zoho))
+      errs.zoho_account_id = "Paste the Account’s record ID — the long number from its Zoho CRM page address.";
     const dashboard = v("dashboard_url");
     if (dashboard && !/^https?:\/\/\S+$/i.test(dashboard))
       errs.dashboard_url = "Paste the full https:// link to the dashboard.";

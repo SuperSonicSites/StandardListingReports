@@ -1,0 +1,285 @@
+---
+// Listing-ad request form. Replaces the external Zoho Form: the page posts to
+// /api/listing-ad, which files one Listing_Ads record in Zoho CRM under this
+// client's Account and answers only once CRM has confirmed it.
+import AppLayout from "../../../layouts/AppLayout.astro";
+import SiteHeader from "../../../components/SiteHeader.astro";
+import ErrorCard from "../../../components/ErrorCard.astro";
+import { readClient } from "../../../lib/storage";
+import { AD_BUDGETS, CAMPAIGN_TYPES, LIMITS, MAX_CITIES } from "../../../lib/listing-ads";
+
+const clientSlug = Astro.params.clientSlug ?? "";
+let client;
+
+try {
+  client = await readClient(clientSlug);
+} catch {
+  Astro.response.status = 404;
+}
+const connected = Boolean(client?.zoho_account_id);
+---
+
+<AppLayout
+  title={client ? `Listing ads | ${client.name}` : "Client not found | Supersonic"}
+  className="client-form-body"
+>
+  {
+    client ? (
+      <>
+        <SiteHeader context={client.name} contextAccent={client.brand_accent} />
+        <main class="client-workspace">
+          <div class="co-hero reveal">
+            <a class="back-link" href="/portal">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              Back to portal
+            </a>
+            <p class="eyebrow">Listing ads</p>
+            <h1>Submit a Listing Ad</h1>
+            <p>
+              Tell us about the listing and how the campaign should run. As soon as
+              it&rsquo;s in, you can start the next one.
+            </p>
+          </div>
+
+          <div data-ads-entry>
+            {!connected && (
+              <div class="notice" role="status" style="margin-top: 16px">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 9v4m0 4h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>
+                  Listing ads aren&rsquo;t connected for {client.name} yet, so requests
+                  can&rsquo;t be sent from here. Email{" "}
+                  <a href="mailto:hello@supersonicsites.com">hello@supersonicsites.com</a>{" "}
+                  and we&rsquo;ll set it up.
+                </span>
+              </div>
+            )}
+
+            <div id="ads-summary" class="card err-summary" role="alert" hidden style="margin: 16px 0 0">
+              <h2 id="ads-summary-h" tabindex="-1" />
+              <ul data-summary-list />
+            </div>
+
+            <form id="ads-form" novalidate data-client-slug={client.slug} data-connected={String(connected)}>
+              {/* ===== 1. Listing & campaign ===== */}
+              <section class="card co-section">
+                <div class="numbered-head">
+                  <span class="num">1</span>
+                  <div class="head-text">
+                    <h2>Listing &amp; campaign</h2>
+                    <p>Which listing to advertise, the budget, and where to show it.</p>
+                  </div>
+                </div>
+                <div class="section-fields">
+                  <div class="field">
+                    <label class="field-label" for="ads-address">
+                      Listing Address <span class="req">*</span>
+                    </label>
+                    <input
+                      id="ads-address"
+                      name="listing_address"
+                      maxlength={LIMITS.address}
+                      autocomplete="off"
+                      required
+                      aria-describedby="ads-err-listing_address"
+                      data-field="listing_address"
+                    />
+                    <p class="err-note" id="ads-err-listing_address" data-err-for="listing_address" hidden />
+                  </div>
+
+                  <div class="two-up">
+                    <div class="field">
+                      <label class="field-label" for="ads-budget">
+                        Ad Budget <span class="req">*</span>
+                      </label>
+                      <select id="ads-budget" name="ad_budget" required aria-describedby="ads-err-ad_budget" data-field="ad_budget">
+                        <option value="">Choose a budget</option>
+                        {AD_BUDGETS.map((budget) => <option value={budget}>{budget}</option>)}
+                      </select>
+                      <p class="err-note" id="ads-err-ad_budget" data-err-for="ad_budget" hidden />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="ads-campaign">
+                        Campaign Type <span class="req">*</span>
+                      </label>
+                      <select id="ads-campaign" name="campaign_type" required aria-describedby="ads-err-campaign_type" data-field="campaign_type">
+                        <option value="">Choose a campaign type</option>
+                        {CAMPAIGN_TYPES.map((type) => <option value={type}>{type}</option>)}
+                      </select>
+                      <p class="err-note" id="ads-err-campaign_type" data-err-for="campaign_type" hidden />
+                    </div>
+                  </div>
+
+                  <div class="field">
+                    <label class="field-label" for="ads-location">
+                      Location Targeting <span class="req">*</span>
+                    </label>
+                    <input
+                      id="ads-location"
+                      name="location_targeting"
+                      maxlength={LIMITS.location}
+                      autocomplete="off"
+                      required
+                      aria-describedby="ads-location-help ads-err-location_targeting"
+                      data-field="location_targeting"
+                    />
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px">
+                      <p class="field-hint" id="ads-location-help">
+                        List up to 10 target cities. Example: Whitehorse, Kelowna, Ucluelet, Toronto, Ottawa.
+                      </p>
+                      <span class="counter" data-city-count style="flex: none; color: var(--ss-muted)">
+                        0 / {MAX_CITIES} cities
+                      </span>
+                    </div>
+                    <p class="err-note" id="ads-err-location_targeting" data-err-for="location_targeting" hidden />
+                  </div>
+                </div>
+              </section>
+
+              {/* ===== 2. Photos & stats ===== */}
+              <section class="card co-section">
+                <div class="numbered-head">
+                  <span class="num">2</span>
+                  <div class="head-text">
+                    <h2>Photos &amp; REALTOR.ca stats</h2>
+                    <p>Where to find the photos, and the listing&rsquo;s stats link.</p>
+                  </div>
+                </div>
+                <div class="section-fields">
+                  <div class="field">
+                    <label class="field-label" for="ads-photos">Photos: Dropbox / Google Drive Link</label>
+                    <input
+                      id="ads-photos"
+                      type="url"
+                      inputmode="url"
+                      name="photos_url"
+                      maxlength={LIMITS.url}
+                      placeholder="https://"
+                      aria-describedby="ads-photos-help ads-err-photos_url"
+                      data-field="photos_url"
+                    />
+                    <p class="field-hint" id="ads-photos-help">Optional — a shared folder with the listing photos.</p>
+                    <p class="err-note" id="ads-err-photos_url" data-err-for="photos_url" hidden />
+                  </div>
+
+                  <div class="field">
+                    <label class="field-label" for="ads-realtor">
+                      REALTOR.ca Report Stats Link <span class="req">*</span>
+                    </label>
+                    <input
+                      id="ads-realtor"
+                      type="url"
+                      inputmode="url"
+                      name="realtor_stats_url"
+                      maxlength={LIMITS.url}
+                      placeholder="https://member.realtor.ca/Reports/ListingDestination/..."
+                      required
+                      aria-describedby="ads-realtor-help ads-err-realtor_stats_url"
+                      data-field="realtor_stats_url"
+                    />
+                    <p class="field-hint" id="ads-realtor-help">
+                      When signed into REALTOR.ca, use the Share Listing button in the top-right corner. Share the link with yourself, then paste it here.
+                    </p>
+                    <p class="err-note" id="ads-err-realtor_stats_url" data-err-for="realtor_stats_url" hidden />
+                  </div>
+                </div>
+              </section>
+
+              {/* ===== 3. Notes ===== */}
+              <section class="card co-section">
+                <div class="numbered-head">
+                  <span class="num">3</span>
+                  <div class="head-text">
+                    <h2>Special notes</h2>
+                    <p>Optional — anything we should know about this campaign.</p>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="field-label" for="ads-notes">Special Notes</label>
+                  <textarea
+                    id="ads-notes"
+                    name="special_notes"
+                    rows="4"
+                    maxlength={LIMITS.notes}
+                    aria-describedby="ads-err-special_notes"
+                    data-field="special_notes"
+                    style="min-height: 88px"
+                  />
+                  <div class="counter" data-notes-count style="color: var(--ss-muted)">0 / {LIMITS.notes}</div>
+                  <p class="err-note" id="ads-err-special_notes" data-err-for="special_notes" hidden />
+                </div>
+              </section>
+
+              {/* Amber: the last attempt's outcome is unknown (timeout / connection lost). */}
+              <div class="notice" data-ads-notice role="alert" hidden style="margin-top: 16px">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 9v4m0 4h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span />
+              </div>
+
+              <div class="card co-submit">
+                <p data-ads-status aria-live="polite" style="margin: 0; max-width: 520px; font-size: 0.84rem; color: var(--ss-text-soft); line-height: 1.5">
+                  Fields marked <span class="req" style="color: var(--ss-danger)">*</span> are required.
+                </p>
+                <div class="co-submit-right">
+                  <button class="button primary" type="submit" data-ads-submit disabled={!connected} style="min-width: 190px">
+                    Submit listing ad
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* Confirmation — shown only after CRM has confirmed the record. */}
+          <section
+            class="card co-section reveal"
+            data-ads-success
+            aria-labelledby="ads-success-h"
+            hidden
+            style="text-align: center; padding: 40px 24px"
+          >
+            <div style="width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--ss-success-border); background: var(--ss-success-soft); display: grid; place-items: center; margin: 0 auto 16px">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="m5 13 4 4L19 7" stroke="#15803d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <p class="eyebrow" style="color: var(--ss-success-ink); margin-bottom: 8px">Request received</p>
+            <h2 id="ads-success-h" tabindex="-1" style="margin: 0 0 10px; outline: none; color: var(--ss-ink); font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em">
+              Your listing ad is in.
+            </h2>
+            <p style="max-width: 460px; margin: 0 auto; color: var(--ss-text-soft); line-height: 1.6">
+              We&rsquo;ve got the request for <strong data-success-address style="color: var(--ss-ink)" />.
+              Our team takes it from here.
+            </p>
+            <p class="field-hint" style="margin-top: 10px">
+              Reference: <span data-success-ref />
+            </p>
+            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 22px">
+              <button type="button" class="button primary" data-ads-another>Create another listing ad</button>
+              <a class="button ghost" href="/portal">Back to portal</a>
+            </div>
+          </section>
+        </main>
+
+        <script>
+          import { initAdsForm } from "../../../scripts/ads-form";
+          initAdsForm();
+        </script>
+      </>
+    ) : (
+      <>
+        <SiteHeader />
+        <ErrorCard
+          eyebrow="Missing client"
+          title="Client not found"
+          reason={`No client profile exists for "${clientSlug}". The link may be out of date.`}
+          actions={[{ label: "Back to the portal", href: "/portal", variant: "primary" }]}
+        />
+      </>
+    )
+  }
+</AppLayout>

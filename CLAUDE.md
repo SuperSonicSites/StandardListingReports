@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A white-label, **self-serve seller report generator** for real estate marketing teams (package name `seller-report-generator`; the working directory is `SupersonicAnalytics`). The app lives at **supersonicrealtors.com** and is the front door for every Supersonic client: sign in by magic link, then choose **Submit Listing Ads** (the client's external nowforsale.co form) or **Generate Listing Reports** (this app). The client's coordinator serves themselves — no agency involvement per report:
+A white-label, **self-serve seller report generator** for real estate marketing teams (package name `seller-report-generator`; the working directory is `SupersonicAnalytics`). The app lives at **supersonicrealtors.com** and is the front door for every Supersonic client: sign in by magic link, then choose **Submit Listing Ads** (the in-app `/c/<slug>/ads` form, which files one `Listing_Ads` record in Zoho CRM) or **Generate Listing Reports** (the report generator below). The client's coordinator serves themselves — no agency involvement per report:
 
 1. The coordinator pastes their REALTOR.ca member "share listing" link (the backend link) into their report form.
 2. The app gathers **all the data automatically**: REALTOR.ca views/days-on-market/address/MLS/photo (headless-Chrome scrape), the listing page on the client's own website with its true view count (one Rybbit pathname lookup by MLS#/address slug — no web-search dependency), site-wide views, and the matching Facebook/Instagram posts with their view counts (listed, ranked, and offered as a picker).
@@ -23,9 +23,10 @@ npm run dev        # astro dev on http://127.0.0.1:4321
 npm run build      # astro build -> dist/ (SSR, standalone node server)
 npm run preview    # node ./dist/server/entry.mjs  (runs the BUILT server; run build first)
 npm run start      # same as preview (production start command)
+npm run check:listing-ad   # /api/listing-ad against a fake Zoho CRM (no network)
 ```
 
-There is **no test runner and no lint script.** Type checking comes from `tsconfig` (extends `astro/tsconfigs/strict`); run `npx astro check` if you need to typecheck.
+There is **no test runner and no lint script.** Type checking comes from `tsconfig` (extends `astro/tsconfigs/strict`); run `npx astro check` if you need to typecheck. The one runnable check (`check:listing-ad`) is a plain Node script using Node's TypeScript type stripping.
 
 Run all commands from the repo root — storage paths are resolved against `process.cwd()`.
 
@@ -47,6 +48,10 @@ The end-to-end flow, and the files that own each step:
 5. **Render report** — `/reports/<id>` ([src/pages/reports/[snapshotId].astro](src/pages/reports/[snapshotId].astro)) renders the branded HTML report from the snapshot. `?print=1` hides the toolbar for PDF capture.
 6. **Generate PDF** — `/api/pdf/<id>` ([src/pages/api/pdf/[snapshotId].ts](src/pages/api/pdf/[snapshotId].ts)) launches puppeteer-core, navigates to `http://127.0.0.1:<PORT>/reports/<id>?print=1` (loopback on purpose — never the request's own origin, which is client-controlled and breaks behind proxies), and returns a Letter PDF named after the listing address.
 
+### Listing ads (Zoho CRM)
+
+`/c/<slug>/ads` ([src/pages/c/[clientSlug]/ads.astro](src/pages/c/[clientSlug]/ads.astro), behavior in [src/scripts/ads-form.ts](src/scripts/ads-form.ts)) replaced the external Zoho Form. It POSTs JSON to `/api/listing-ad` ([src/pages/api/listing-ad.ts](src/pages/api/listing-ad.ts)), which re-checks the rules shared with the browser in [src/lib/listing-ads.ts](src/lib/listing-ads.ts), takes `Brokerage` **only** from the profile's `zoho_account_id` (never from the request), and creates one `Listing_Ads` record via [src/lib/zoho.ts](src/lib/zoho.ts) (Canadian DC; env `client_id`/`client_secret`/`refresh_token`/`api_domain`; one cached access token). Success is shown only after CRM returns the record id. Duplicates: every request carries a submission id (one id = one request, remembered in memory for 24 h). An unanswered request stays pending in the browser (fields locked, kept in sessionStorage across reloads); its retries wait 30 s for Zoho to settle, reuse the first attempt's record, and look for a record matching every written field (Get Records by `Created_Time`, not Search — search lags creates; picklists read back as labels) before creating. No `trigger` key, so CRM workflows run — but the old Zoho Flow ("Form Listing Submission": Kim's task, the REALTOR import Worker webhook) does not. `npm run check:listing-ad` runs the route against a fake CRM.
+
 ### Storage layer
 
 All disk I/O goes through [src/lib/storage.ts](src/lib/storage.ts) — never read/write `data/` files directly elsewhere. Two stores, both plain JSON files, written atomically (temp file + rename):
@@ -58,7 +63,7 @@ Every id/slug that becomes a file path is validated by `assertSafeId` against `^
 
 ### Access control (v0.2.2 — magic links)
 
-[src/middleware.ts](src/middleware.ts) gates every route through [src/lib/auth.ts](src/lib/auth.ts). There are no passwords: `/login` takes a work email, `/api/login` emails a 15-minute HMAC-signed link (via Resend, [src/lib/mail.ts](src/lib/mail.ts); in dev without `RESEND_API_KEY` the link is printed to the console), and `/auth/verify` swaps it for a 30-day signed session cookie that carries only the email. Authorization is re-derived on every request from that email: `ADMIN_EMAILS` (env; defaults to `dev@supersonicsites.com`) opens everything; a client profile's `emails` list (full addresses or `@domain.com`) opens `/c/<slug>/` and that client's reports/PDFs — so removing an email revokes access immediately. After sign-in a client lands on `/portal` (the chooser: "Submit Listing Ads" → the client's `ads_form_url`, "Generate Listing Reports" → `/c/<slug>/`); admins land on the `/` dashboard. `AUTH_SECRET` signs links and sessions (fail-closed in production; random per-process in dev) and `APP_URL` is the public base for links — never the request origin. `/api/pull|snapshot|client` authorize inside the route after parsing the slug from the body. The PDF route forwards the caller's cookie to its loopback self-fetch — remove that and PDFs print the login page.
+[src/middleware.ts](src/middleware.ts) gates every route through [src/lib/auth.ts](src/lib/auth.ts). There are no passwords: `/login` takes a work email, `/api/login` emails a 15-minute HMAC-signed link (via Resend, [src/lib/mail.ts](src/lib/mail.ts); in dev without `RESEND_API_KEY` the link is printed to the console), and `/auth/verify` swaps it for a 30-day signed session cookie that carries only the email. Authorization is re-derived on every request from that email: `ADMIN_EMAILS` (env; defaults to `dev@supersonicsites.com`) opens everything; a client profile's `emails` list (full addresses or `@domain.com`) opens `/c/<slug>/` and that client's reports/PDFs — so removing an email revokes access immediately. After sign-in a client lands on `/portal` (the chooser: "Submit Listing Ads" → `/c/<slug>/ads` once the profile has a `zoho_account_id`, "Generate Listing Reports" → `/c/<slug>/`); admins land on the `/` dashboard. `AUTH_SECRET` signs links and sessions (fail-closed in production; random per-process in dev) and `APP_URL` is the public base for links — never the request origin. `/api/pull|snapshot|client|listing-ad` authorize inside the route after parsing the slug from the body. The PDF route forwards the caller's cookie to its loopback self-fetch — remove that and PDFs print the login page.
 
 ### The snapshot is the source of truth
 

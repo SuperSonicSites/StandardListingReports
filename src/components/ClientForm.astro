@@ -411,21 +411,23 @@ const intCount = [
       </div>
 
       <div class="field" style="max-width: 520px">
-        <label class="field-label" for="f-ads">Listing ads form link</label>
+        <label class="field-label" for="f-zoho">Zoho CRM Account ID</label>
         <input
-          id="f-ads"
-          name="ads_form_url"
-          type="url"
-          value={client?.ads_form_url ?? ""}
-          placeholder="https://nowforsale.co/your-team"
-          inputmode="url"
-          data-field="ads_form_url"
+          id="f-zoho"
+          name="zoho_account_id"
+          value={client?.zoho_account_id ?? ""}
+          placeholder="3201000001234567"
+          inputmode="numeric"
+          data-field="zoho_account_id"
+          style="font-family: ui-monospace, monospace"
         />
         <p class="field-hint">
-          Where the portal&rsquo;s &ldquo;Submit Listing Ads&rdquo; option sends this
-          client. Leave blank until their intake form exists.
+          The brokerage Account this client&rsquo;s listing-ad requests are filed
+          under &mdash; the long number at the end of the Account&rsquo;s page
+          address in Zoho CRM. Leave blank and the portal shows listing ads as not
+          set up yet.
         </p>
-        <p class="err-note" data-err-for="ads_form_url" hidden></p>
+        <p class="err-note" data-err-for="zoho_account_id" hidden></p>
       </div>
 
       <div class="field" style="max-width: 520px">

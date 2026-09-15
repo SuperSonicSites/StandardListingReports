@@ -68,8 +68,8 @@ const single = clients.length === 1 ? clients[0] : undefined;
         <section class="hub-client" aria-label={client.name}>
           {!single && <h2 class="hub-client-name">{client.name}</h2>}
           <div class="hub-options">
-            {client.ads_form_url ? (
-              <a class="hub-option" href={client.ads_form_url}>
+            {client.zoho_account_id ? (
+              <a class="hub-option" href={`/c/${client.slug}/ads`}>
                 <span class="hub-option-top">
                   <span class="hub-option-num">01</span>
                   <span class="hub-option-icon" aria-hidden="true">
@@ -84,7 +84,7 @@ const single = clients.length === 1 ? clients[0] : undefined;
                   Send us a new listing and we’ll launch its ad campaign for you.
                 </span>
                 <span class="hub-option-cta">
-                  Open the ads form
+                  Submit a listing ad
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
                   </svg>
@@ -103,7 +103,7 @@ const single = clients.length === 1 ? clients[0] : undefined;
                 </span>
                 <span class="hub-option-title">Submit Listing Ads</span>
                 <span class="hub-option-text">
-                  Your ads intake form isn’t linked yet. Email{" "}
+                  Listing ads aren’t connected for your team yet. Email{" "}
                   <a href="mailto:hello@supersonicsites.com">hello@supersonicsites.com</a>{" "}
                   and we’ll set it up.
                 </span>

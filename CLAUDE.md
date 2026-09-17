@@ -8,7 +8,7 @@ A white-label, **self-serve seller report generator** for real estate marketing 
 
 1. The coordinator pastes their REALTOR.ca member "share listing" link (the backend link) into their report form.
 2. The app gathers **all the data automatically**: REALTOR.ca views/days-on-market/address/MLS/photo (headless-Chrome scrape), the listing page on the client's own website with its true view count (one Rybbit pathname lookup by MLS#/address slug — no web-search dependency), site-wide views, and the matching Facebook/Instagram posts with their view counts (listed, ranked, and offered as a picker).
-3. The coordinator reviews and approves — every value stays editable, but typing numbers is the *fallback* for a degraded source, not the workflow.
+3. When every source answers, the report is created straight away and opens — the report page is the review. The form's review section appears only when something must be resolved by hand (a listing page not found, no dates, no market data), and "Adjust numbers" on any report reopens the form prefilled from that snapshot (`?from=<id>`, images copied server-side) to fix a value and regenerate. Every value stays editable, but typing numbers is the *fallback* for a degraded source, not the workflow.
 4. Approval freezes the numbers into a JSON **snapshot**, and a branded multi-page **PDF** is rendered from that snapshot for the coordinator to download/print.
 
 The PDF is the product — this is a report compiler, not a dashboard, CRM, or analytics platform.

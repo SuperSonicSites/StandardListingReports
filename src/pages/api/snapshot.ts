@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import type { APIRoute } from "astro";
 import { canAccessClient } from "../../lib/auth";
-import { createSnapshotId, readClient, writeSnapshot } from "../../lib/storage";
+import { createSnapshotId, readClient, readSnapshot, writeSnapshot } from "../../lib/storage";
 import type { MarketBlock, MetricSource, ReportSnapshot } from "../../lib/types";
 import { brandedErrorPage } from "../../lib/error-page";
 import { exposureBenchmark, recordExposure } from "../../lib/market";
@@ -310,12 +310,28 @@ export const POST: APIRoute = async ({ request }) => {
 
   const notes = field(form, "notes").slice(0, MAX_NOTES_CHARS);
 
+  // "Adjust numbers": a form prefilled from an earlier report carries no image bytes (data
+  // URIs are refused from the browser), so copy them from that report — same client only,
+  // and only where the form supplied nothing new.
+  const copyFrom = field(form, "copy_media_from");
+  let inherited = { facebook: "", instagram: "", property: "" };
+  if (copyFrom) {
+    try {
+      const source = await readSnapshot(copyFrom);
+      if (source.client.slug === client.slug) {
+        inherited = { facebook: source.facebook.media_url, instagram: source.instagram.media_url, property: source.report.property_image };
+      }
+    } catch {
+      // unknown snapshot: nothing to inherit
+    }
+  }
+
   // A market update shows social views as numbers only, so its snapshot carries no post images.
   const [logo, facebookMedia, instagramMedia, propertyImage] = await Promise.all([
     embedImage(client.logo_url, true),
-    kind === "market" ? "" : embedImage(field(form, "facebook_media_url")),
-    kind === "market" ? "" : embedImage(field(form, "instagram_media_url")),
-    embedImage(field(form, "property_image_url"))
+    kind === "market" ? "" : embedImage(field(form, "facebook_media_url")).then((v) => v || inherited.facebook),
+    kind === "market" ? "" : embedImage(field(form, "instagram_media_url")).then((v) => v || inherited.instagram),
+    embedImage(field(form, "property_image_url")).then((v) => v || inherited.property)
   ]);
 
   const snapshot: ReportSnapshot = {

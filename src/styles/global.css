@@ -151,7 +151,7 @@ code {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  width: min(1120px, 100vw - 32px);
+  width: var(--ss-container);
   min-height: 60px;
   margin: 0 auto;
 }
@@ -285,7 +285,7 @@ button.nav-link {
 
 .app-shell,
 .form-shell {
-  width: min(1120px, calc(100vw - 32px));
+  width: var(--ss-container);
   margin: 0 auto;
 }
 
@@ -294,7 +294,6 @@ button.nav-link {
 }
 
 .form-shell {
-  width: min(880px, calc(100vw - 32px));
   padding: 28px 0 64px;
 }
 
@@ -858,7 +857,7 @@ textarea {
 
 /* --- Coordinator report form ----------------------------------------------- */
 .client-workspace {
-  width: min(1120px, calc(100vw - 32px));
+  width: var(--ss-container);
   margin: 0 auto;
   padding: 28px 0 100px;
 }
@@ -4044,7 +4043,7 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  width: min(1120px, calc(100vw - 40px));
+  width: var(--ss-container);
   margin: 0 auto;
   padding: 24px 0;
 }
@@ -4075,7 +4074,7 @@ textarea {
 }
 
 .hub-portal {
-  width: min(1120px, calc(100vw - 40px));
+  width: var(--ss-container);
   margin: 0 auto;
   padding: clamp(24px, 5vw, 56px) 0 72px;
 }
@@ -4095,9 +4094,8 @@ textarea {
 
 .hub-options {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 20px;
-  max-width: 900px;
 }
 
 .hub-option {
@@ -4105,7 +4103,7 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 250px;
+  min-height: 224px;
   border: 1px solid var(--hub-border);
   border-radius: 18px;
   background: #ffffff;
@@ -4127,8 +4125,8 @@ a.hub-option:focus-visible {
 .hub-option-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 22px;
+  justify-content: flex-start;
+  margin-bottom: 18px;
 }
 
 .hub-option-num {
@@ -4307,4 +4305,94 @@ a.hub-option:focus-visible {
 .market-mode .social-row .tile-label,
 .market-mode .social-row input[name$="_post_url"] {
   display: none;
+}
+
+/* ---- One container width for every page shell (portal, forms, admin, header). ---- */
+:root {
+  --ss-container: min(1120px, calc(100vw - 32px));
+}
+
+/* ---- Portal: a labelled row of primary actions, then slim secondary rows. ---- */
+.hub-group-label {
+  margin: 0 0 12px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hub-muted);
+}
+
+.hub-secondary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.hub-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--hub-border);
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 14px 18px;
+  color: var(--hub-ink);
+  text-decoration: none;
+  transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+}
+
+a.hub-row:hover,
+a.hub-row:focus-visible {
+  border-color: var(--hub-blue);
+  box-shadow: 0 16px 28px -24px rgba(11, 95, 215, 0.55);
+}
+
+.hub-row-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--hub-blue);
+  color: #ffffff;
+}
+
+.hub-row-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--hub-text);
+}
+
+.hub-row-text strong {
+  display: block;
+  color: var(--hub-ink);
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.hub-row-end {
+  flex: none;
+  color: var(--hub-blue);
+}
+
+.hub-row.is-unavailable {
+  background: #fbfbfc;
+  border-style: dashed;
+}
+
+.hub-row.is-unavailable .hub-row-icon {
+  background: #cbd5e1;
+}
+
+.hub-row-badge {
+  flex: none;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hub-muted);
 }

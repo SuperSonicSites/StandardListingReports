@@ -196,7 +196,8 @@ const marketSummary =
       {!printMode && (
         <div class="report-toolbar">
           <div class="report-toolbar-left">
-            <a class="back-link" href={clientReportHref}>&larr; Back</a>
+            <a class="back-link" href={`${clientReportHref}?from=${snapshotId}${isMarketUpdate ? "&type=market" : ""}`}>&larr; Adjust numbers</a>
+            <a class="back-link" href="/portal">Portal</a>
             <span class="report-toolbar-label">
               <SupersonicBrand wordmark={false} size={18} />
               Report preview

@@ -17,7 +17,7 @@ No comparables. No pricing advice. The agent holds the conversation; the report 
 
 ## User flow
 
-Portal card **Seller Market Update** → the report form in market mode → paste the REALTOR.ca share link → **Pull data** (listing performance and the latest market statistics arrive together) → pick the property type if it is not single-family → review, edit anything wrong → approve → **Create Market Update** → branded PDF.
+Portal card **Seller Market Update** → the report form in market mode → pick the property type if it is not single-family → paste the REALTOR.ca share link → **Pull data** → the update opens as a report page (owner decision, 18 September 2026: no confirm step on a clean pull). The review form appears only when a source came back without something the report needs; "Adjust numbers" on the report reopens the prefilled form to fix a value and regenerate.
 
 The coordinator never researches or types market statistics. Typing is the fallback when a source is down.
 

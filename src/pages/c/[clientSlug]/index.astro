@@ -3,10 +3,11 @@ import AppLayout from "../../../layouts/AppLayout.astro";
 import SiteHeader from "../../../components/SiteHeader.astro";
 import ErrorCard from "../../../components/ErrorCard.astro";
 import Toast from "../../../components/Toast.astro";
-import { readClient } from "../../../lib/storage";
+import { readClient, readSnapshot } from "../../../lib/storage";
 import { takeFlash } from "../../../lib/flash";
 import { MARKETS } from "../../../lib/market";
-import { PROPERTY_TYPES } from "../../../lib/market-rules";
+import { PROPERTY_TYPES, type MarketValues } from "../../../lib/market-rules";
+import type { ReportSnapshot } from "../../../lib/types";
 
 const clientSlug = Astro.params.clientSlug ?? "";
 let client;
@@ -17,9 +18,27 @@ try {
   Astro.response.status = 404;
 }
 const flash = takeFlash(Astro.cookies);
+
+// "Adjust numbers" from a report: prefill every field from that snapshot (same client
+// only) and open the review section straight away. A clean pull creates the report
+// without a review step, so this is the way back to fix one value and regenerate.
+const fromId = Astro.url.searchParams.get("from") ?? "";
+let prefill: ReportSnapshot | null = null;
+if (client && fromId) {
+  try {
+    const source = await readSnapshot(fromId);
+    if (source.client.slug === client.slug) prefill = source;
+  } catch {
+    // unknown snapshot: plain form
+  }
+}
+const str = (value: unknown) => (value === null || value === undefined ? "" : String(value));
+const mv = (key: keyof MarketValues) => str(prefill?.market?.[key] ?? "");
+
 // Seller Market Update: the same form plus a property type and the market section.
-const marketMode = Astro.url.searchParams.get("type") === "market";
+const marketMode = Astro.url.searchParams.get("type") === "market" || prefill?.report.kind === "market";
 const marketInfo = client?.market ? MARKETS[client.market] : null;
+const propertyType = prefill?.report.property_type ?? "single_family";
 ---
 
 <AppLayout
@@ -36,8 +55,8 @@ const marketInfo = client?.market ? MARKETS[client.market] : null;
             <h1>{marketMode ? "Create Seller Market Update" : "Create Listing Report"}</h1>
             <p>
               {marketMode
-                ? "Paste your REALTOR.ca share link and pull. We fetch the listing's numbers and this month's market statistics for your area — you confirm and create the update."
-                : "Paste your REALTOR.ca share link and pull. We find the listing, the matching posts, and the numbers — you just confirm and create the report."}
+                ? "Paste your REALTOR.ca share link and pull. We fetch the listing's numbers and this month's market statistics for your area, then open your update."
+                : "Paste your REALTOR.ca share link and pull. We find the listing, the matching posts, and the numbers, then open your report."}
             </p>
             <p class="field-hint" style="margin-top: 10px">
               {marketMode ? (
@@ -48,18 +67,28 @@ const marketInfo = client?.market ? MARKETS[client.market] : null;
             </p>
           </div>
 
-          <form id="report-form" method="post" action="/api/snapshot" class={marketMode ? "market-mode" : undefined} novalidate>
+          <form
+            id="report-form"
+            method="post"
+            action="/api/snapshot"
+            class={marketMode ? "market-mode" : undefined}
+            data-prefilled={prefill ? "1" : undefined}
+            novalidate
+          >
             <input type="hidden" name="client_slug" value={client.slug} />
             <input type="hidden" name="report_kind" value={marketMode ? "market" : "listing"} />
+            {/* Images can't travel through the form as data URIs; a prefilled form points at the
+                report they came from and /api/snapshot copies them (same client only). */}
+            <input type="hidden" name="copy_media_from" value={prefill ? fromId : ""} />
             <input type="hidden" name="facebook_media_url" value="" />
             <input type="hidden" name="instagram_media_url" value="" />
             <input type="hidden" name="property_image_url" value="" />
-            <input type="hidden" name="site_total_views" value="0" />
-            <input type="hidden" name="website_source" value="manual" />
-            <input type="hidden" name="facebook_source" value="manual" />
-            <input type="hidden" name="instagram_source" value="manual" />
-            <input type="hidden" name="start_date" value="" />
-            <input type="hidden" name="end_date" value="" />
+            <input type="hidden" name="site_total_views" value={str(prefill?.website.site_total_views ?? 0)} />
+            <input type="hidden" name="website_source" value={prefill?.website.source ?? "manual"} />
+            <input type="hidden" name="facebook_source" value={prefill?.facebook.source ?? "manual"} />
+            <input type="hidden" name="instagram_source" value={prefill?.instagram.source ?? "manual"} />
+            <input type="hidden" name="start_date" value={prefill?.report.start_date ?? ""} />
+            <input type="hidden" name="end_date" value={prefill?.report.end_date ?? ""} />
 
             {/* ===== 1. Intake ===== */}
             <section class="card co-section" data-pull-card>
@@ -68,8 +97,9 @@ const marketInfo = client?.market ? MARKETS[client.market] : null;
                 <div class="head-text">
                   <h2>Start here</h2>
                   <p>
-                    Paste the REALTOR.ca share link and pull. Everything else
-                    fills in below for you to confirm.
+                    Paste the REALTOR.ca share link and pull. Your report opens
+                    as soon as everything is found; if something can&rsquo;t be,
+                    we&rsquo;ll ask you for it below.
                   </p>
                 </div>
               </div>
@@ -82,6 +112,7 @@ const marketInfo = client?.market ? MARKETS[client.market] : null;
                   id="coord-url"
                   type="url"
                   name="realtor_admin_url"
+                  value={prefill?.report.realtor_url ?? ""}
                   placeholder="https://member.realtor.ca/Reports/ListingDestination/..."
                   aria-describedby="url-help"
                   autofocus
@@ -93,14 +124,30 @@ const marketInfo = client?.market ? MARKETS[client.market] : null;
                 </p>
               </div>
 
+              {marketMode && (
+                <div class="field">
+                  <label class="field-label" for="ptype">Property type</label>
+                  <select id="ptype" name="property_type">
+                    {PROPERTY_TYPES.map((type) => (
+                      <option value={type.value} selected={propertyType === type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p class="field-hint">
+                    Picks which market figures apply. Set it before you pull if this isn&rsquo;t a single-family home.
+                  </p>
+                </div>
+              )}
+
               <div class="pull-strip">
                 <div class="pull-status" aria-live="polite">
                   <span class="pull-dot" data-pull-dot aria-hidden="true" />
                   <div style="min-width: 0">
                     <strong data-pull-status>Ready to pull</strong>
                     <div class="detail" data-pull-detail>
-                      Paste the REALTOR.ca link above, then pull — everything else
-                      fills in for you to confirm.
+                      Paste the REALTOR.ca link above, then pull — your report opens
+                      when everything is found.
                     </div>
                   </div>
                 </div>
@@ -197,24 +244,13 @@ const marketInfo = client?.market ? MARKETS[client.market] : null;
                 <div class="section-fields">
                   <div class="field">
                     <label class="field-label" for="addr">Address <span class="req">*</span></label>
-                    <input id="addr" name="address" placeholder="Pulled from REALTOR.ca" data-field="address" />
+                    <input id="addr" name="address" value={prefill?.report.address ?? ""} placeholder="Pulled from REALTOR.ca" data-field="address" />
                     <p class="err-note" data-err-for="address" hidden />
                   </div>
                   <div class="field">
                     <label class="field-label" for="mls">MLS&reg; number</label>
-                    <input id="mls" name="mls_number" placeholder="Pulled from REALTOR.ca" />
+                    <input id="mls" name="mls_number" value={prefill?.report.mls_number ?? ""} placeholder="Pulled from REALTOR.ca" />
                   </div>
-                  {marketMode && (
-                    <div class="field">
-                      <label class="field-label" for="ptype">Property type</label>
-                      <select id="ptype" name="property_type">
-                        {PROPERTY_TYPES.map((type) => (
-                          <option value={type.value}>{type.label}</option>
-                        ))}
-                      </select>
-                      <p class="field-hint">Picks which market figures apply below. Not read from REALTOR.ca — set it if this isn&rsquo;t a single-family home.</p>
-                    </div>
-                  )}
 
                   <div class="field" data-period-pill>
                     <span class="field-label">Report period</span>
@@ -259,7 +295,7 @@ const marketInfo = client?.market ? MARKETS[client.market] : null;
                         <span class="tooltip" data-tip="listing" hidden />
                       </span>
                     </label>
-                    <input id="listing-url" type="url" name="listing_url" placeholder="https://…" data-field="listing_url" />
+                    <input id="listing-url" type="url" name="listing_url" value={prefill?.report.listing_url ?? ""} placeholder="https://…" data-field="listing_url" />
                     <p class="err-note" data-err-for="listing_url" hidden />
                   </div>
                 </div>
@@ -289,7 +325,7 @@ const marketInfo = client?.market ? MARKETS[client.market] : null;
                         <p class="co-card-desc">Listing traffic for the reporting window.</p>
                       </div>
                       <div style="text-align: right">
-                        <input class="import-metric-input metric-big" type="number" inputmode="numeric" min="0" name="website_views" value="0" aria-label="Website listing page views" data-field="website_views" />
+                        <input class="import-metric-input metric-big" type="number" inputmode="numeric" min="0" name="website_views" value={str(prefill?.website.listing_views ?? 0)} aria-label="Website listing page views" data-field="website_views" />
                         <div class="metric-cap">listing page views</div>
                       </div>
                     </div>
@@ -311,18 +347,18 @@ const marketInfo = client?.market ? MARKETS[client.market] : null;
                         <div style="display: flex; gap: 12px; margin-top: 12px">
                           <div class="stat-tile" style="flex: 1">
                             <div class="stat-label">Total views</div>
-                            <input class="import-metric-input" type="number" inputmode="numeric" min="0" name="realtor_listing_views" value="0" aria-label="Total views" data-field="realtor_listing_views" />
+                            <input class="import-metric-input" type="number" inputmode="numeric" min="0" name="realtor_listing_views" value={str(prefill?.manual.realtor_listing_views ?? 0)} aria-label="Total views" data-field="realtor_listing_views" />
                           </div>
                           <div class="stat-tile" style="flex: 1">
                             <div class="stat-label">Days on market</div>
-                            <input class="import-metric-input" type="number" inputmode="numeric" min="0" name="days_on_market" value="0" aria-label="Days on market" data-field="days_on_market" />
+                            <input class="import-metric-input" type="number" inputmode="numeric" min="0" name="days_on_market" value={str(prefill?.manual.days_on_market ?? 0)} aria-label="Days on market" data-field="days_on_market" />
                           </div>
                         </div>
                       </div>
                       <div style="min-width: 0">
                         <div class="tile-label">Cover photo</div>
                         <div class="cover-tile" data-cover-tile aria-label="Listing cover photo">
-                          <img data-media-preview="realtor" alt="Listing cover photo (appears on the report cover)" hidden />
+                          <img data-media-preview="realtor" src={prefill?.report.property_image || undefined} alt="Listing cover photo (appears on the report cover)" hidden={!prefill?.report.property_image} />
                           <svg width="42" height="42" viewBox="0 0 24 24" fill="none" data-cover-icon>
                             <path d="M4 11 12 4l8 7" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                             <path d="M6 10v9h12v-9" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
@@ -357,14 +393,14 @@ const marketInfo = client?.market ? MARKETS[client.market] : null;
                           <span class="net-ico" style="background: #1877f2; font-weight: 800; font-size: 0.7rem">f</span>
                           Facebook
                         </div>
-                        <input name="facebook_post_url" placeholder="Post URL" aria-label="Facebook post URL" style="min-height: 38px" />
+                        <input name="facebook_post_url" value={prefill?.facebook.post_url ?? ""} placeholder="Post URL" aria-label="Facebook post URL" style="min-height: 38px" />
                         <div class="field" style="gap: 4px">
-                          <textarea name="facebook_caption" maxlength="300" rows="2" aria-label="Facebook caption — appears on the report" placeholder="Caption — appears on the report" data-counter-src="facebook" />
+                          <textarea name="facebook_caption" maxlength="300" rows="2" aria-label="Facebook caption — appears on the report" placeholder="Caption — appears on the report" data-counter-src="facebook">{prefill?.facebook.caption ?? ""}</textarea>
                           <div class="counter" data-counter="facebook">0 / 300</div>
                         </div>
                         <div class="stat-tile">
                           <div class="stat-label">Views</div>
-                          <input class="import-metric-input" type="number" inputmode="numeric" min="0" name="facebook_views" value="0" aria-label="Facebook views" data-field="facebook_views" />
+                          <input class="import-metric-input" type="number" inputmode="numeric" min="0" name="facebook_views" value={str(prefill?.facebook.views ?? 0)} aria-label="Facebook views" data-field="facebook_views" />
                         </div>
                       </div>
                       <div style="min-width: 0">
@@ -391,14 +427,14 @@ const marketInfo = client?.market ? MARKETS[client.market] : null;
                           </span>
                           Instagram
                         </div>
-                        <input name="instagram_post_url" placeholder="Post URL" aria-label="Instagram post URL" style="min-height: 38px" />
+                        <input name="instagram_post_url" value={prefill?.instagram.post_url ?? ""} placeholder="Post URL" aria-label="Instagram post URL" style="min-height: 38px" />
                         <div class="field" style="gap: 4px">
-                          <textarea name="instagram_caption" maxlength="300" rows="2" aria-label="Instagram caption — appears on the report" placeholder="Caption — appears on the report" data-counter-src="instagram" />
+                          <textarea name="instagram_caption" maxlength="300" rows="2" aria-label="Instagram caption — appears on the report" placeholder="Caption — appears on the report" data-counter-src="instagram">{prefill?.instagram.caption ?? ""}</textarea>
                           <div class="counter" data-counter="instagram">0 / 300</div>
                         </div>
                         <div class="stat-tile">
                           <div class="stat-label">Views</div>
-                          <input class="import-metric-input" type="number" inputmode="numeric" min="0" name="instagram_views" value="0" aria-label="Instagram views" data-field="instagram_views" />
+                          <input class="import-metric-input" type="number" inputmode="numeric" min="0" name="instagram_views" value={str(prefill?.instagram.views ?? 0)} aria-label="Instagram views" data-field="instagram_views" />
                         </div>
                       </div>
                       <div style="min-width: 0">
@@ -436,72 +472,72 @@ const marketInfo = client?.market ? MARKETS[client.market] : null;
                       </p>
                     </div>
                   </div>
-                  <input type="hidden" name="market_source" value="manual" />
-                  <input type="hidden" name="market_source_url" value="" />
-                  <input type="hidden" name="market_retrieved_at" value="" />
-                  <input type="hidden" name="market_region_label" value={marketInfo?.region_label ?? ""} />
-                  <input type="hidden" name="market_board_label" value={marketInfo?.board_label ?? ""} />
-                  <input type="hidden" name="market_type_label" value="" />
-                  <input type="hidden" name="market_price_label" value="Benchmark price" />
-                  <input type="hidden" name="market_local_label" value={marketInfo?.local?.label ?? ""} />
-                  <input type="hidden" name="market_local_source_url" value="" />
+                  <input type="hidden" name="market_source" value={prefill?.market?.source ?? "manual"} />
+                  <input type="hidden" name="market_source_url" value={prefill?.market?.source_url ?? ""} />
+                  <input type="hidden" name="market_retrieved_at" value={prefill?.market?.retrieved_at ?? ""} />
+                  <input type="hidden" name="market_region_label" value={prefill?.market?.region_label ?? marketInfo?.region_label ?? ""} />
+                  <input type="hidden" name="market_board_label" value={prefill?.market?.board_label ?? marketInfo?.board_label ?? ""} />
+                  <input type="hidden" name="market_type_label" value={prefill?.market?.type_label ?? ""} />
+                  <input type="hidden" name="market_price_label" value={prefill?.market?.price_label ?? "Benchmark price"} />
+                  <input type="hidden" name="market_local_label" value={prefill?.market?.local_label ?? marketInfo?.local?.label ?? ""} />
+                  <input type="hidden" name="market_local_source_url" value={prefill?.market?.local_source_url ?? ""} />
                   <p class="field-hint" data-market-meta style="margin: 0 0 14px">Pull data to load this month&rsquo;s statistics.</p>
                   <div class="market-grid">
                     <div class="field">
                       <label class="field-label" for="m-month">Reporting month</label>
-                      <input id="m-month" name="market_reporting_month" placeholder="2026-08" data-market-input />
+                      <input id="m-month" name="market_reporting_month" value={prefill?.market?.reporting_month ?? ""} placeholder="2026-08" data-market-input />
                     </div>
                     <div class="field">
                       <label class="field-label" for="m-local">For sale <span data-market-local-label>{marketInfo?.local ? `in ${marketInfo.local.label}` : "locally"}</span> now</label>
-                      <input id="m-local" name="market_local_active" inputmode="numeric" placeholder={marketInfo?.local ? "—" : "not published here"} data-market-input />
+                      <input id="m-local" name="market_local_active" value={mv("local_active")} inputmode="numeric" placeholder={marketInfo?.local ? "—" : "not published here"} data-market-input />
                     </div>
                     <div class="field">
                       <label class="field-label" for="m-local-yoy">Local listings vs last year (%)</label>
-                      <input id="m-local-yoy" name="market_local_active_yoy_pct" inputmode="decimal" placeholder="—" data-market-input />
+                      <input id="m-local-yoy" name="market_local_active_yoy_pct" value={mv("local_active_yoy_pct")} inputmode="decimal" placeholder="—" data-market-input />
                     </div>
                     <div class="field">
                       <label class="field-label" for="m-sales">Sales</label>
-                      <input id="m-sales" name="market_sales" inputmode="numeric" placeholder="—" data-market-input />
+                      <input id="m-sales" name="market_sales" value={mv("sales")} inputmode="numeric" placeholder="—" data-market-input />
                     </div>
                     <div class="field">
                       <label class="field-label" for="m-sales-yoy">Sales vs last year (%)</label>
-                      <input id="m-sales-yoy" name="market_sales_yoy_pct" inputmode="decimal" placeholder="e.g. -12.3" data-market-input />
+                      <input id="m-sales-yoy" name="market_sales_yoy_pct" value={mv("sales_yoy_pct")} inputmode="decimal" placeholder="e.g. -12.3" data-market-input />
                     </div>
                     <div class="field">
                       <label class="field-label" for="m-active">Active listings</label>
-                      <input id="m-active" name="market_active_inventory" inputmode="numeric" placeholder="—" data-market-input />
+                      <input id="m-active" name="market_active_inventory" value={mv("active_inventory")} inputmode="numeric" placeholder="—" data-market-input />
                     </div>
                     <div class="field">
                       <label class="field-label" for="m-active-yoy">Active listings vs last year (%)</label>
-                      <input id="m-active-yoy" name="market_inventory_yoy_pct" inputmode="decimal" placeholder="e.g. 15" data-market-input />
+                      <input id="m-active-yoy" name="market_inventory_yoy_pct" value={mv("inventory_yoy_pct")} inputmode="decimal" placeholder="e.g. 15" data-market-input />
                     </div>
                     <div class="field">
                       <label class="field-label" for="m-moi">Months of inventory</label>
-                      <input id="m-moi" name="market_months_of_inventory" inputmode="decimal" placeholder="active ÷ sales" data-market-input />
+                      <input id="m-moi" name="market_months_of_inventory" value={mv("months_of_inventory")} inputmode="decimal" placeholder="active ÷ sales" data-market-input />
                     </div>
                     <div class="field">
                       <label class="field-label" for="m-new">New listings</label>
-                      <input id="m-new" name="market_new_listings" inputmode="numeric" placeholder="—" data-market-input />
+                      <input id="m-new" name="market_new_listings" value={mv("new_listings")} inputmode="numeric" placeholder="—" data-market-input />
                     </div>
                     <div class="field">
                       <label class="field-label" for="m-new-yoy">New listings vs last year (%)</label>
-                      <input id="m-new-yoy" name="market_new_listings_yoy_pct" inputmode="decimal" placeholder="—" data-market-input />
+                      <input id="m-new-yoy" name="market_new_listings_yoy_pct" value={mv("new_listings_yoy_pct")} inputmode="decimal" placeholder="—" data-market-input />
                     </div>
                     <div class="field">
                       <label class="field-label" for="m-days">Days to sell</label>
-                      <input id="m-days" name="market_days_to_sell" inputmode="numeric" placeholder="—" data-market-input />
+                      <input id="m-days" name="market_days_to_sell" value={mv("days_to_sell")} inputmode="numeric" placeholder="—" data-market-input />
                     </div>
                     <div class="field">
                       <label class="field-label" for="m-days-yoy">Days to sell vs last year (%)</label>
-                      <input id="m-days-yoy" name="market_days_to_sell_yoy_pct" inputmode="decimal" placeholder="—" data-market-input />
+                      <input id="m-days-yoy" name="market_days_to_sell_yoy_pct" value={mv("days_to_sell_yoy_pct")} inputmode="decimal" placeholder="—" data-market-input />
                     </div>
                     <div class="field">
                       <label class="field-label" for="m-price"><span data-market-price-label>Price</span> ($)</label>
-                      <input id="m-price" name="market_price" inputmode="numeric" placeholder="—" data-market-input />
+                      <input id="m-price" name="market_price" value={mv("price")} inputmode="numeric" placeholder="—" data-market-input />
                     </div>
                     <div class="field">
                       <label class="field-label" for="m-price-yoy">Price vs last year (%)</label>
-                      <input id="m-price-yoy" name="market_price_yoy_pct" inputmode="decimal" placeholder="—" data-market-input />
+                      <input id="m-price-yoy" name="market_price_yoy_pct" value={mv("price_yoy_pct")} inputmode="decimal" placeholder="—" data-market-input />
                     </div>
                   </div>
                   <div class="market-preview" style="margin-top: 16px">
@@ -531,13 +567,13 @@ const marketInfo = client?.market ? MARKETS[client.market] : null;
                 <div class="section-fields">
                   <div class="field">
                     <label class="field-label" for="showings">Showings</label>
-                    <input id="showings" type="number" inputmode="numeric" min="0" name="showings" placeholder="Leave blank to omit" style="font-weight: 600" data-field="showings" />
+                    <input id="showings" type="number" inputmode="numeric" min="0" name="showings" value={prefill?.report.show_showings ? str(prefill.manual.showings) : ""} placeholder="Leave blank to omit" style="font-weight: 600" data-field="showings" />
                     <p class="field-hint">Leave blank and showings won&rsquo;t appear on the report. Enter a number (0 counts) to show it.</p>
                     <p class="err-note" data-err-for="showings" hidden />
                   </div>
                   <div class="field">
                     <label class="field-label" for="notes">Seller-facing note</label>
-                    <textarea id="notes" name="notes" maxlength="600" rows="4" placeholder="A short note the seller sees on the report." data-counter-src="notes" style="min-height: 88px" />
+                    <textarea id="notes" name="notes" maxlength="600" rows="4" placeholder="A short note the seller sees on the report." data-counter-src="notes" style="min-height: 88px">{prefill?.report.notes ?? ""}</textarea>
                     <div class="counter" data-counter="notes">0 / 600</div>
                     <p class="field-hint">Leave blank and the report won&rsquo;t include a notes section.</p>
                   </div>

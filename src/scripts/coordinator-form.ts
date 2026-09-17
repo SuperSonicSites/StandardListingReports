@@ -46,7 +46,7 @@ const STRIP: Record<string, Strip> = {
     dot: "hollow",
     status: "Ready to pull",
     detail:
-      "Paste the REALTOR.ca link above, then pull — everything else fills in for you to confirm.",
+      "Paste the REALTOR.ca link above, then pull — your report opens when everything is found.",
     btn: "Pull data",
     primary: true,
     disabled: false
@@ -93,6 +93,14 @@ const STRIP: Record<string, Strip> = {
       "Check the link and try again — it should start with https:// and be from realtor.ca.",
     btn: "Pull data",
     primary: true,
+    disabled: false
+  },
+  prefilled: {
+    dot: "accent",
+    status: "Loaded from your report",
+    detail: "Adjust anything below and create it again — or pull fresh numbers from the sources.",
+    btn: "Pull fresh data",
+    primary: false,
     disabled: false
   }
 };
@@ -626,6 +634,30 @@ export function initCoordinatorForm() {
       marketForm?.applyPull(null);
     }
 
+    // Straight to the report: when the pull found everything the report needs, create
+    // it now — the report page is the review, and "Adjust numbers" on it brings the
+    // filled form back. The form stays as the fallback for anything the coordinator
+    // has to resolve by hand (a listing page that wasn't found, no dates, no market data).
+    const needsReview =
+      !data ||
+      !(field("address")?.value ?? "").trim() ||
+      !(field("listing_url")?.value ?? "").trim() ||
+      !(field("start_date")?.value ?? "") ||
+      (data.realtor?.source ?? "manual") === "manual" ||
+      (marketForm ? !data.market?.reporting_month : false);
+    if (!needsReview && Object.keys(validateSnapshot()).length === 0) {
+      timers.forEach((t) => clearTimeout(t));
+      if (stageEl) stageEl.textContent = "Creating your report…";
+      if (progressEl) progressEl.style.width = "100%";
+      if (approval) {
+        approval.checked = true;
+        syncApproval();
+      }
+      revealAfterPull();
+      form?.requestSubmit();
+      return;
+    }
+
     stopModal(() => {
       pullCard?.classList.add("is-pulled");
       revealAfterPull();
@@ -818,4 +850,26 @@ export function initCoordinatorForm() {
 
   // Initial paint.
   setStrip("ready");
+
+  // "Adjust numbers": the page arrived prefilled from a report. Open the review section
+  // straight away with the sources that report recorded; no pull needed to fix a value.
+  if (form.dataset.prefilled === "1") {
+    ["website", "facebook", "instagram"].forEach((key) => {
+      state[key] = field(`${key}_source`)?.value || "manual";
+    });
+    state.realtor = Number(field("realtor_listing_views")?.value ?? 0) > 0 ? "realtor_page" : "manual";
+    refreshPeriodText();
+    const cover = document.querySelector('[data-media-preview="realtor"]') as HTMLImageElement | null;
+    if (cover?.getAttribute("src")) {
+      const tile = document.querySelector("[data-cover-tile]") as HTMLElement | null;
+      const icon = document.querySelector("[data-cover-icon]") as HTMLElement | null;
+      if (tile) tile.hidden = false;
+      if (icon) icon.style.display = "none";
+    }
+    pullCard?.classList.add("is-pulled");
+    revealAfterPull();
+    refreshStates();
+    setStrip("prefilled");
+    marketForm?.refreshPreview();
+  }
 }

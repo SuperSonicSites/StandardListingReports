@@ -112,28 +112,28 @@ If on-demand refresh ever proves insufficient, the same function can be called b
 
 Thresholds are constants in `src/lib/market-rules.ts`.
 
-Voice (owner, 18 September 2026): written for the seller, so the agent never has to translate. Every sentence is a plain fact followed by what it means, in everyday words. No "inventory", "absorption" or "supply-side". "Your home", not "the listing".
+Voice (owner, 18 September 2026): written for the seller, so the agent never has to translate. Every sentence is a plain fact followed by what it means, in everyday words. No "inventory", "absorption" or "supply-side". "Your property", never "your home" (client feedback, 18 September 2026: not every listing is someone's home; it may be a rental or a secondary dwelling). "Single-family homes" stays only as the board's category name.
 
 Year-over-year changes read in three bands so the words never fight the number: under 5 percent is "about the same as a year ago", 5 to 15 percent is stated as the figure ("9.6% fewer than a year ago"), 15 percent and over likewise. The meaning clause follows from the direction.
 
 Market sentences, in order:
 
-- Local inventory (where a board exposes it): the count of homes of this type for sale in the local area right now, then "Those are the homes buyers compare yours against."
+- Local inventory (where a board exposes it): the count of homes of this type for sale in the local area right now, then "Those are the properties buyers compare yours against."
 - Sales: the count and change, then "Buyer demand is steady / has softened / is stronger."
 - **Small-market guardrail:** under 30 sales in the month, the sentence gives the count and says the percentages swing a lot with this few sales, and draws no demand conclusion.
-- Homes for sale at month end: the count and change against the same month last year, then "Fewer / More homes are competing for buyers."
-- Months of inventory, said as "at August's pace of sales it would take 8.6 months to sell every home listed", then the rule: over six months is a buyer's market; under four a seller's market; between is balanced. The thresholds are spelled out so the seller learns the rule; the Bottom line says what it means.
+- Homes for sale at month end: the count and change against the same month last year, then "Fewer / More properties are competing for buyers."
+- Months of inventory, said as "at August's pace of sales it would take 8.6 months to sell every property listed", then the rule: over six months is a buyer's market; under four a seller's market; between is balanced. The thresholds are spelled out so the seller learns the rule; the Bottom line says what it means.
 - New listings, only when they moved by 5 percent or more: the count and change, then "so fewer / more new competitors are arriving."
-- Days to sell: "Homes that sold in August had been on the market for 60 days on average", with the change, then whether buyers are taking longer or deciding faster than last year.
+- Days to sell: "Properties that sold in August had been on the market for 60 days on average", with the change, then whether buyers are taking longer or deciding faster than last year.
 - **Bottom line**, from months of inventory: buyers have the upper hand / sellers have the upper hand / the market is balanced, in one sentence.
 
-Home sentences, in order:
+Property sentences, in order:
 
 - Local choice: "Buyers shopping for townhouses in Tofino-Ucluelet right now have 9 to choose from." Never assumes this home is inside the count.
-- Days on market against the average sale: "still early" when under it; "longer than most homes that sold" when over it; "about twice as long" at double. Against months of inventory when the board publishes no days to sell.
+- Days on market against the average sale: "still early" when under it; "longer than most properties that sold" when over it; "about twice as long" at double. Against months of inventory when the board publishes no days to sell.
 - Exposure: REALTOR.ca views per day compared with the median of Supersonic's own archive, **only when the archive holds at least 30 qualifying reports**; whole numbers, sample size stated. Above typical ends "Exposure is not the problem." Below typical ends "Exposure is the first thing to fix." Without a benchmark the sentence states the home's own views per day and nothing more.
 - Showings, when entered, including "No showings have taken place yet" for an explicit zero.
-- **What this means for you**, only when both an exposure verdict and days to sell exist: strong exposure but longer than most sales reads "buyers are choosing other homes they see as better value. Price and presentation are what they weigh."; strong exposure and early reads "the coming weeks will tell"; weak exposure reads "exposure comes first".
+- **What this means for you**, only when both an exposure verdict and days to sell exist: strong exposure but longer than most sales reads "buyers are choosing other properties they see as better value. Price and presentation are what they weigh."; strong exposure and early reads "the coming weeks will tell"; weak exposure reads "exposure comes first".
 
 The rules never call the home overpriced and never recommend a price change. Only sentences supported by available data are produced.
 

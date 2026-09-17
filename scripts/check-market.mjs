@@ -157,10 +157,10 @@ assert.equal(market.monthsBetween("2026-08", "2026-05"), 3);
   const m = rules.interpretMarket(values, ctx);
   assert.deepEqual(m, [
     "142 single-family homes sold in Central Okanagan in August 2026, 12.3% fewer than a year ago. Buyer demand has softened.",
-    "1,219 single-family homes were for sale at the end of August 2026, 15% more than last August. More homes are competing for buyers.",
-    "At August's pace of sales it would take 8.6 months to sell every home listed. Over six months is a buyer's market.",
-    "Homes that sold in August 2026 had been on the market for 60 days on average, 11% longer than a year ago. Buyers are taking longer to decide than they did last year.",
-    "Bottom line: buyers have the upper hand right now. They can compare many homes, take their time, and walk away from any that don't measure up."
+    "1,219 single-family homes were for sale at the end of August 2026, 15% more than last August. More properties are competing for buyers.",
+    "At August's pace of sales it would take 8.6 months to sell every property listed. Over six months is a buyer's market.",
+    "Properties that sold in August 2026 had been on the market for 60 days on average, 11% longer than a year ago. Buyers are taking longer to decide than they did last year.",
+    "Bottom line: buyers have the upper hand right now. They can compare many properties, take their time, and walk away from any that don't measure up."
   ]);
 
   // The words never fight the number: under 5% reads "about the same"; larger moves are stated as the figure.
@@ -197,18 +197,18 @@ assert.equal(market.monthsBetween("2026-08", "2026-05"), 3);
   const property = { days_on_market: 90, realtor_views: 900, showings: 3 };
   const p = rules.interpretProperty(values, ctx, property, null);
   assert.deepEqual(p, [
-    "Your home has been on the market for 90 days, longer than the 60 days it took the average August 2026 sale. It has now been available longer than most homes that sold.",
-    "Your home has drawn 900 views on REALTOR.ca over 90 days, about 10 a day.",
+    "Your property has been on the market for 90 days, longer than the 60 days it took the average August 2026 sale. It has now been available longer than most properties that sold.",
+    "Your property has drawn 900 views on REALTOR.ca over 90 days, about 10 a day.",
     "3 showings have taken place so far."
   ]);
   assert.match(
     rules.interpretProperty(values, ctx, { ...property, days_on_market: 30 }, null)[0],
-    /^Your home has been on the market for 30 days\. Homes that sold in August 2026 had been listed for 60 days on average, so it is still early\.$/
+    /^Your property has been on the market for 30 days\. Properties that sold in August 2026 had been listed for 60 days on average, so it is still early\.$/
   );
-  assert.match(rules.interpretProperty(values, ctx, { ...property, days_on_market: 130 }, null)[0], /about twice as long as the homes that sold\.$/);
+  assert.match(rules.interpretProperty(values, ctx, { ...property, days_on_market: 130 }, null)[0], /about twice as long as the properties that sold\.$/);
   assert.match(
     rules.interpretProperty({ ...values, days_to_sell: null }, ctx, property, null)[0],
-    /^Your home has been on the market for 90 days, in a market where it would take 8.6 months to sell every home listed\.$/
+    /^Your property has been on the market for 90 days, in a market where it would take 8.6 months to sell every property listed\.$/
   );
   assert.equal(rules.interpretProperty(values, ctx, { ...property, showings: 0 }, null)[2], "No showings have taken place yet.");
   assert.equal(rules.interpretProperty(values, ctx, { ...property, showings: 1 }, null)[2], "1 showing has taken place so far.");
@@ -218,27 +218,27 @@ assert.equal(market.monthsBetween("2026-08", "2026-05"), 3);
   const above = rules.interpretProperty(values, ctx, property, bench);
   assert.equal(
     above[1],
-    "Buyers are seeing your home more than most: about 10 views a day on REALTOR.ca, against a typical 5 a day across the 30 listings we have reported on. Exposure is not the problem."
+    "Buyers are seeing your property more than most: about 10 views a day on REALTOR.ca, against a typical 5 a day across the 30 listings we have reported on. Exposure is not the problem."
   );
   assert.equal(
     above[3],
-    "What this means for you: plenty of buyers have looked, yet the home has been available longer than most that sold. When that happens, buyers are choosing other homes they see as better value. Price and presentation are what they weigh."
+    "What this means for you: plenty of buyers have looked, yet the property has been available longer than most that sold. When that happens, buyers are choosing other properties they see as better value. Price and presentation are what they weigh."
   );
   const early = rules.interpretProperty(values, ctx, { ...property, days_on_market: 30 }, bench);
-  assert.equal(early[3], "What this means for you: exposure is strong and it is early. Most homes that sold took about 60 days, so the coming weeks will tell.");
-  assert.match(rules.interpretProperty(values, ctx, property, { ...bench, benchmark_views_per_day: 10 })[1], /^Your home is getting typical exposure: about 10 views a day/);
+  assert.equal(early[3], "What this means for you: exposure is strong and it is early. Most properties that sold took about 60 days, so the coming weeks will tell.");
+  assert.match(rules.interpretProperty(values, ctx, property, { ...bench, benchmark_views_per_day: 10 })[1], /^Your property is getting typical exposure: about 10 views a day/);
   const below = rules.interpretProperty(values, ctx, property, { ...bench, benchmark_views_per_day: 20 });
-  assert.match(below[1], /^Fewer buyers than usual are seeing your home.*Exposure is the first thing to fix\.$/);
-  assert.match(below[3], /^What this means for you: until more buyers see the home/);
+  assert.match(below[1], /^Fewer buyers than usual are seeing your property.*Exposure is the first thing to fix\.$/);
+  assert.match(below[3], /^What this means for you: until more buyers see the property/);
   const tooFew = rules.interpretProperty(values, ctx, property, { ...bench, sample_size: rules.MIN_BENCHMARK_SAMPLE - 1 });
-  assert.equal(tooFew[1], "Your home has drawn 900 views on REALTOR.ca over 90 days, about 10 a day.");
+  assert.equal(tooFew[1], "Your property has drawn 900 views on REALTOR.ca over 90 days, about 10 a day.");
   assert.equal(tooFew.length, 3, "no verdict without a defensible benchmark");
 
-  // Cover summary: a digest of the sheets, market first, then the home's own numbers.
+  // Cover summary: a digest of the sheets, market first, then the property's own numbers.
   const summary = rules.summarizeMarketUpdate(values, ctx, { ...property, showings: null, website_views: 52, social_views: 920, site_total_views: 8746 });
   assert.deepEqual(summary, [
     "In August 2026, 142 single-family homes sold in Central Okanagan, 12.3% fewer than a year ago. 1,219 were for sale at month end, 15% more than last August, and at that pace it would take 8.6 months to sell them all. The average sale took 60 days, 11% longer than a year ago.",
-    "Your home has been on the market for 90 days and has drawn 900 REALTOR.ca views, 52 website views, and 920 social media views."
+    "Your property has been on the market for 90 days and has drawn 900 REALTOR.ca views, 52 website views, and 920 social media views."
   ]);
   assert.match(
     rules.summarizeMarketUpdate(values, ctx, { ...property, showings: null, website_views: 52, social_views: 920, site_total_views: 0 }, bench)[1],
@@ -249,13 +249,13 @@ assert.equal(market.monthsBetween("2026-08", "2026-05"), 3);
     { ...ctx, region_label: "Yukon", type_label: "all residential properties" },
     { days_on_market: 0, realtor_views: 0, showings: null, website_views: 0, social_views: 0, site_total_views: 0 }
   );
-  assert.deepEqual(sparse, ["In August 2026, 56 all residential properties sold in Yukon.", "Your home."]);
+  assert.deepEqual(sparse, ["In August 2026, 56 all residential properties sold in Yukon.", "Your property."]);
 
   // Local inventory leads every list when the board exposes it.
   const localCtx = { region_label: "Vancouver Island", reporting_month: "2026-08", type_label: "townhouses", local_label: "Tofino-Ucluelet" };
   const localValues = { ...rules.EMPTY_MARKET_VALUES, sales: 79, sales_yoy_pct: 11, local_active: 9 };
   const lm = rules.interpretMarket(localValues, localCtx);
-  assert.equal(lm[0], "9 townhouses are for sale in Tofino-Ucluelet right now. Those are the homes buyers compare yours against.");
+  assert.equal(lm[0], "9 townhouses are for sale in Tofino-Ucluelet right now. Those are the properties buyers compare yours against.");
   assert.equal(lm[1], "79 townhouses sold in Vancouver Island in August 2026, 11% more than a year ago. Buyer demand is stronger.");
   assert.match(rules.interpretMarket({ ...localValues, local_active_yoy_pct: 28.6 }, localCtx)[0], /^9 townhouses are for sale in Tofino-Ucluelet right now, 28.6% more than a year ago\./);
   const lp = rules.interpretProperty(localValues, localCtx, { days_on_market: 15, realtor_views: 432, showings: null }, null);

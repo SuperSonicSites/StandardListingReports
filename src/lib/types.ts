@@ -1,3 +1,5 @@
+import type { ExposureBenchmark, MarketValues, PropertyType, RecordType } from "./market-rules";
+
 export type ClientProfile = {
   slug: string;
   name: string;
@@ -19,6 +21,14 @@ export type ClientProfile = {
   // The client's analytics dashboard (GA4, social media, etc.). Optional — the
   // portal only shows the "Dashboard" card when this is set.
   dashboard_url?: string;
+  // Listing websites: the client's portfolio host (e.g. portfolio.grayteam.ca).
+  // Every micro-site is a path under it. The portal shows "Order a Listing
+  // Website" only when this and zoho_account_id are set.
+  portfolio_host?: string;
+  // The client's Stripe Customer (cus_…). Checkout always attaches to it, so a
+  // client never gets a second Customer. Admin-set; created once by the app
+  // only when blank.
+  stripe_customer_id?: string;
   // --- v0.2 integration IDs (optional; NON-SECRET addressing ids) ---
   meta_page_id?: string;
   meta_instagram_id?: string;
@@ -27,9 +37,56 @@ export type ClientProfile = {
   // Rybbit-resolved listing path builds the listing link; documents the site the
   // Rybbit id tracks.
   website_url?: string;
+  // Seller Market Update: which board's monthly statistics this client's market updates
+  // use (a key of MARKETS in src/lib/market.ts). Admin-set. Without it the market
+  // section degrades to manual entry.
+  market?: MarketKey;
 };
 
 export type MetricSource = "rybbit_api" | "meta_api" | "manual" | "mock";
+
+// --- Seller Market Update -----------------------------------------------------------
+export type MarketKey = "central-okanagan" | "vancouver-island" | "vancouver-island-west-coast" | "yukon";
+
+export type MarketRecord = MarketValues & { type: RecordType; type_label: string; price_label: string };
+
+// One cached month for one market: data/market/<key>-<YYYY-MM>.json. Replaceable by an
+// admin refresh; snapshots copy what they need, so a refresh never changes a report.
+export type MarketMonth = {
+  key: MarketKey;
+  reporting_month: string;
+  region_label: string;
+  board_label: string;
+  source: "interior_dashboard" | "crea_stats";
+  source_url: string;
+  retrieved_at: string;
+  by_type: Partial<Record<RecordType, MarketRecord>>;
+  // Local inventory (active listings in the client's own area, by type, in by_type[*].local_active).
+  local?: { label: string; source_url: string; retrieved_at: string };
+};
+
+export type MarketAttempt = { at: string; ok: boolean; error: string; month?: string };
+
+// REALTOR.ca views per day on market for every qualifying report, so the exposure
+// benchmark never has to reopen the (image-carrying) snapshot files.
+export type ExposureLedger = { entries: { id: string; views_per_day: number }[] };
+
+// Frozen into a snapshot: the reviewed market figures, their provenance, and the
+// rule-generated interpretation computed at creation time.
+export type MarketBlock = MarketValues & {
+  source: "board_stats" | "manual";
+  region_label: string;
+  board_label: string;
+  reporting_month: string;
+  type_label: string;
+  price_label: string;
+  source_url: string;
+  retrieved_at: string;
+  local_label: string;
+  local_source_url: string;
+  interpretation: { market: string[]; property: string[] };
+  exposure: ExposureBenchmark | null;
+};
 
 export type ReportSnapshot = {
   client: {
@@ -62,6 +119,10 @@ export type ReportSnapshot = {
     // showings/notes are simply omitted from the report (an explicit 0 still shows).
     show_showings: boolean;
     show_notes: boolean;
+    // "market" = Seller Market Update (adds the market sheet). Older snapshots have
+    // neither key and render as listing reports.
+    kind?: "listing" | "market";
+    property_type?: PropertyType;
   };
   website: {
     source: MetricSource;
@@ -89,5 +150,89 @@ export type ReportSnapshot = {
     showings: number;
     days_on_market: number;
   };
+  // Present only on a Seller Market Update whose market figures were available.
+  market?: MarketBlock;
   warnings: string[];
+};
+
+// --- Listing websites (micro-site orders) -----------------------------------
+// One order = one route on the client's portfolio site. Listings inside it are
+// rows (one for a single listing, several for a project). The app owns intake,
+// payment and fulfilment evidence; production stages live in Zoho CRM.
+
+export type OrderListing = {
+  unit_name: string;
+  mls_number: string;
+  realtor_stats_url: string;
+  price: string;
+  beds: string;
+  baths: string;
+  area: string;
+  plan_name: string;
+  photos_subfolder: string;
+  floor_plan_link: string;
+};
+
+export type SiteOrderPackage = "single" | "project";
+export type SiteOrderState = "draft" | "paid" | "expired" | "cancelled";
+
+export type SiteOrderIntake = {
+  property_address: string;
+  property_type: string;
+  source_url: string;
+  photos_url: string;
+  video_url: string;
+  hero_preference: string;
+  selling_points: string;
+  client_notes: string;
+  target_date: string;
+  agent_name: string;
+  agent_email: string;
+  agent_phone: string;
+  listings: OrderListing[];
+};
+
+export type SiteOrder = {
+  id: string;
+  client_slug: string;
+  purchaser_email: string;
+  package: SiteOrderPackage;
+  route: string;
+  page_url: string;
+  state: SiteOrderState;
+  created_at: string;
+  updated_at: string;
+  intake: SiteOrderIntake;
+  agreement: { terms_version: string; terms_hash: string; accepted_at: string };
+  payment: {
+    provider: "stripe";
+    customer_id: string;
+    session_id: string;
+    session_url: string;
+    session_expires_at: string;
+    attempts: number;
+    payment_intent: string;
+    invoice: string;
+    amount_total: number;
+    currency: string;
+    paid_at: string;
+    event_id: string;
+  };
+  hosting: {
+    subscription_id: string;
+    status: string;
+    current_period_end: string;
+    trial_end: string;
+    cancel_at_period_end: boolean;
+    ended_at: string;
+  };
+  // Persisted step ladder: a step with a result recorded is never repeated.
+  fulfillment: {
+    paid_recorded_at: string;
+    crm_record_id: string;
+    crm_error: string;
+    email_message_id: string;
+    email_error: string;
+  };
+  history: { at: string; by: string; note: string }[];
 };

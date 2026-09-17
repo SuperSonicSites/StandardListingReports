@@ -1,4 +1,5 @@
 ---
+import { MARKET_KEYS, MARKETS } from "../lib/market";
 import type { ClientProfile } from "../lib/types";
 
 interface Props {
@@ -431,6 +432,44 @@ const intCount = [
       </div>
 
       <div class="field" style="max-width: 520px">
+        <label class="field-label" for="f-portfolio">Portfolio host (listing websites)</label>
+        <input
+          id="f-portfolio"
+          name="portfolio_host"
+          value={client?.portfolio_host ?? ""}
+          placeholder="portfolio.acmerealty.com"
+          autocomplete="off"
+          data-field="portfolio_host"
+          style="font-family: ui-monospace, monospace"
+        />
+        <p class="field-hint">
+          The client&rsquo;s portfolio site host. Every listing website lives at
+          this host plus a page address. Set it once the portfolio is live; with it
+          and the Zoho Account ID set, the portal offers &ldquo;Order a Listing Website&rdquo;.
+        </p>
+        <p class="err-note" data-err-for="portfolio_host" hidden></p>
+      </div>
+
+      <div class="field" style="max-width: 520px">
+        <label class="field-label" for="f-stripe">Stripe Customer ID</label>
+        <input
+          id="f-stripe"
+          name="stripe_customer_id"
+          value={client?.stripe_customer_id ?? ""}
+          placeholder="cus_…"
+          autocomplete="off"
+          data-field="stripe_customer_id"
+          style="font-family: ui-monospace, monospace"
+        />
+        <p class="field-hint">
+          The client&rsquo;s existing Customer in Stripe, so every order lands on
+          their account. Leave blank for a brand-new client and the app creates one
+          on their first order.
+        </p>
+        <p class="err-note" data-err-for="stripe_customer_id" hidden></p>
+      </div>
+
+      <div class="field" style="max-width: 520px">
         <label class="field-label" for="f-dashboard">Analytics dashboard link</label>
         <input
           id="f-dashboard"
@@ -517,6 +556,18 @@ const intCount = [
           data-int
         />
         <p class="field-hint">The site ID from your Rybbit dashboard — numeric or the letters-and-numbers ID from the tracking snippet; both work.</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="f-market">Market statistics region</label>
+        <select id="f-market" name="market">
+          <option value="">Not set — Seller Market Update falls back to manual entry</option>
+          {MARKET_KEYS.map((key) => (
+            <option value={key} selected={client?.market === key}>
+              {MARKETS[key].label}
+            </option>
+          ))}
+        </select>
+        <p class="field-hint">Which board&rsquo;s monthly statistics the Seller Market Update pulls for this client&rsquo;s listings.</p>
       </div>
       <p style="font-size: 0.82rem; color: var(--ss-muted); margin: 0">
         Missing a source? The coordinator can still enter that number by hand when

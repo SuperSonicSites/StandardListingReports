@@ -2,8 +2,21 @@ import { Buffer } from "node:buffer";
 import type { APIRoute } from "astro";
 import { canAccessClient } from "../../lib/auth";
 import { createSnapshotId, readClient, writeSnapshot } from "../../lib/storage";
-import type { MetricSource, ReportSnapshot } from "../../lib/types";
+import type { MarketBlock, MetricSource, ReportSnapshot } from "../../lib/types";
 import { brandedErrorPage } from "../../lib/error-page";
+import { exposureBenchmark, recordExposure } from "../../lib/market";
+import {
+  computeMonthsOfInventory,
+  EMPTY_MARKET_VALUES,
+  interpretMarket,
+  interpretProperty,
+  MARKET_VALUE_KEYS,
+  MIN_DAYS_FOR_EXPOSURE,
+  PROPERTY_TYPES,
+  TYPE_LABELS,
+  type MarketValues,
+  type PropertyType
+} from "../../lib/market-rules";
 
 export const prerender = false;
 
@@ -24,6 +37,16 @@ function numberField(form: FormData, name: string): number | null {
   const value = Number(raw);
   if (!Number.isFinite(value) || value < 0) return null;
   return Math.round(value);
+}
+
+// Market figures: blank means "the board doesn't publish it" (null). Anything else must
+// be a finite number — year-over-year changes are signed and months of inventory has a
+// decimal, so this is looser than numberField. `undefined` = invalid input.
+function marketNumber(form: FormData, name: string): number | null | undefined {
+  const raw = field(form, name).replace(/,/g, "").replace(/%$/, "");
+  if (raw === "") return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : undefined;
 }
 
 function sourceField(form: FormData, name: string): MetricSource {
@@ -211,12 +234,87 @@ export const POST: APIRoute = async ({ request }) => {
     return errorPage(400, "Report data must be reviewed and approved before creation.", backHref);
   }
 
+  // Seller Market Update: the reviewed market figures plus the rule-generated
+  // interpretation, computed here from the submitted values (never trusted from the
+  // browser) and frozen with everything else. No figures at all => no market block,
+  // and the update still generates without the market sheet.
+  const kind = field(form, "report_kind") === "market" ? "market" : "listing";
+  const propertyTypeRaw = field(form, "property_type");
+  const propertyType: PropertyType = PROPERTY_TYPES.some((t) => t.value === propertyTypeRaw)
+    ? (propertyTypeRaw as PropertyType)
+    : "single_family";
+  let market: MarketBlock | undefined;
+  if (kind === "market") {
+    const values: MarketValues = { ...EMPTY_MARKET_VALUES };
+    const badMarket: string[] = [];
+    for (const key of MARKET_VALUE_KEYS) {
+      const value = marketNumber(form, `market_${key}`);
+      if (value === undefined) badMarket.push(key.replaceAll("_", " "));
+      else values[key] = value;
+    }
+    if (badMarket.length > 0) {
+      return errorPage(
+        400,
+        `These market fields must be numbers (leave a field blank when the board doesn't publish it): ${badMarket.join(", ")}.`,
+        backHref
+      );
+    }
+    const reportingMonth = field(form, "market_reporting_month");
+    const hasFigures =
+      values.sales !== null ||
+      values.active_inventory !== null ||
+      values.months_of_inventory !== null ||
+      values.days_to_sell !== null ||
+      values.local_active !== null;
+    if (hasFigures) {
+      if (!/^\d{4}-\d{2}$/.test(reportingMonth)) {
+        return errorPage(400, "The market reporting month must look like 2026-08.", backHref);
+      }
+      values.months_of_inventory ??= computeMonthsOfInventory(values.active_inventory, values.sales);
+      const localSourceUrl = field(form, "market_local_source_url");
+      const ctx = {
+        region_label: field(form, "market_region_label") || "the local market",
+        reporting_month: reportingMonth,
+        type_label: field(form, "market_type_label") || TYPE_LABELS[propertyType],
+        local_label: field(form, "market_local_label")
+      };
+      const property = {
+        days_on_market: numbers.days_on_market!,
+        realtor_views: numbers.realtor_listing_views!,
+        showings: field(form, "showings") === "" ? null : numbers.showings!
+      };
+      // Exposure against our own archive; the rules only quote it once the sample is big enough.
+      const benchmark = await exposureBenchmark().catch(() => null);
+      const exposure =
+        benchmark && property.days_on_market >= MIN_DAYS_FOR_EXPOSURE && property.realtor_views > 0
+          ? { views_per_day: Math.round((property.realtor_views / property.days_on_market) * 10) / 10, ...benchmark }
+          : null;
+      const sourceUrl = field(form, "market_source_url");
+      market = {
+        ...values,
+        source: field(form, "market_source") === "board_stats" ? "board_stats" : "manual",
+        region_label: ctx.region_label,
+        board_label: field(form, "market_board_label"),
+        reporting_month: reportingMonth,
+        type_label: ctx.type_label,
+        price_label: field(form, "market_price_label") || "Benchmark price",
+        source_url: isHttpUrl(sourceUrl) ? sourceUrl : "",
+        retrieved_at: field(form, "market_retrieved_at"),
+        local_label: ctx.local_label,
+        local_source_url: isHttpUrl(localSourceUrl) ? localSourceUrl : "",
+        interpretation: { market: interpretMarket(values, ctx), property: interpretProperty(values, ctx, property, exposure) },
+        exposure
+      };
+    }
+  }
+
   const notes = field(form, "notes").slice(0, MAX_NOTES_CHARS);
 
+  // A market update shows social views as numbers only, so its snapshot carries no post images.
   const [logo, facebookMedia, instagramMedia, propertyImage] = await Promise.all([
     embedImage(client.logo_url, true),
-    embedImage(field(form, "facebook_media_url")),
-    embedImage(field(form, "instagram_media_url")),
+    kind === "market" ? "" : embedImage(field(form, "facebook_media_url")),
+    kind === "market" ? "" : embedImage(field(form, "instagram_media_url")),
     embedImage(field(form, "property_image_url"))
   ]);
 
@@ -247,7 +345,9 @@ export const POST: APIRoute = async ({ request }) => {
       // Optional blocks: entered => shown on the report, left blank => omitted.
       // An explicit "0" showings is a real value and shows as 0.
       show_showings: field(form, "showings") !== "",
-      show_notes: notes !== ""
+      show_notes: notes !== "",
+      kind,
+      ...(kind === "market" ? { property_type: propertyType } : {})
     },
     website: {
       source: sourceField(form, "website_source"),
@@ -275,10 +375,13 @@ export const POST: APIRoute = async ({ request }) => {
       showings: numbers.showings!,
       days_on_market: numbers.days_on_market!
     },
+    ...(market ? { market } : {}),
     warnings: []
   };
 
   const snapshotId = createSnapshotId();
   await writeSnapshot(snapshotId, snapshot);
+  // Feed the exposure benchmark (views per day on market) for future market updates.
+  await recordExposure(snapshotId, snapshot).catch((error) => console.warn("[market] exposure ledger not updated:", error));
   return redirect(`/reports/${snapshotId}`);
 };

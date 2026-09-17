@@ -1,0 +1,155 @@
+---
+// Order page: where Stripe sends the client back. On return with a session id the
+// payment is confirmed server-side (fulfil), which is also what the webhook does,
+// so whichever arrives first wins and the other is a no-op. Everything after this
+// page happens by email.
+import AppLayout from "../../../../layouts/AppLayout.astro";
+import SiteHeader from "../../../../components/SiteHeader.astro";
+import ErrorCard from "../../../../components/ErrorCard.astro";
+import { fulfil } from "../../../../lib/site-order-fulfil";
+import { retrieveCheckoutSession } from "../../../../lib/stripe";
+import { readClient, readOrder } from "../../../../lib/storage";
+import { PRICE_LINE } from "../../../../lib/site-orders";
+import type { SiteOrder } from "../../../../lib/types";
+
+export const prerender = false;
+
+const clientSlug = Astro.params.clientSlug ?? "";
+const orderId = Astro.params.orderId ?? "";
+let client;
+let order: SiteOrder | undefined;
+try {
+  client = await readClient(clientSlug);
+  order = await readOrder(orderId);
+  if (order.client_slug !== clientSlug) order = undefined;
+} catch {
+  // missing client or order: handled below
+}
+if (!client || !order) Astro.response.status = 404;
+
+// Back from Checkout: confirm with Stripe now rather than waiting for the webhook.
+let confirming = false;
+const sessionId = Astro.url.searchParams.get("session_id");
+if (order && order.state === "draft" && sessionId && sessionId === order.payment.session_id) {
+  try {
+    const session = await retrieveCheckoutSession(sessionId);
+    order = await fulfil(order.id, { session, by: order.purchaser_email });
+    confirming = order.state === "draft" && session.payment_status !== "paid";
+  } catch (error) {
+    console.error(`[site-order] ${order.id}: return-path confirmation failed:`, error instanceof Error ? error.message : error);
+    confirming = true;
+  }
+}
+const title = client ? `Order ${orderId} | ${client.name}` : "Order not found | Supersonic";
+---
+
+<AppLayout title={title} className="client-form-body">
+  {
+    client && order ? (
+      <>
+        <SiteHeader context={client.name} contextAccent={client.brand_accent} />
+        <main class="client-workspace" style="max-width: 720px">
+          <div class="co-hero reveal">
+            <a class="back-link" href="/portal">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              Back to portal
+            </a>
+            <p class="eyebrow">Listing website</p>
+            <h1>{order.intake.property_address}</h1>
+            <p style="font-family: ui-monospace, monospace">{order.page_url}</p>
+          </div>
+
+          {order.state === "paid" && (
+            <section class="card co-section reveal" style="text-align: center; padding: 40px 24px">
+              <div style="width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--ss-success-border); background: var(--ss-success-soft); display: grid; place-items: center; margin: 0 auto 16px">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="m5 13 4 4L19 7" stroke="#15803d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </div>
+              <p class="eyebrow" style="color: var(--ss-success-ink); margin-bottom: 8px">Paid, in the queue</p>
+              <h2 style="margin: 0 0 10px; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; color: var(--ss-ink)">Your listing website is ordered.</h2>
+              <p style="max-width: 500px; margin: 0 auto; color: var(--ss-text-soft); line-height: 1.6">
+                We build the page from your details and your photo folder. You get a review link by email, and the page goes live on your portfolio once you approve it. We aim to publish within seven calendar days once we have everything we need.
+              </p>
+              <p class="field-hint" style="margin-top: 12px">Reference: {order.id}</p>
+              <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 22px">
+                <a class="button primary" href={`/c/${client.slug}/site`}>Order another listing website</a>
+                <a class="button ghost" href="/portal">Back to portal</a>
+              </div>
+            </section>
+          )}
+
+          {order.state === "draft" && confirming && (
+            <section class="card co-section reveal">
+              <p class="eyebrow">Confirming payment</p>
+              <h2 style="margin: 0 0 8px">One moment.</h2>
+              <p style="color: var(--ss-text-soft); line-height: 1.6">We are confirming your payment with Stripe. Refresh this page in a few seconds. If it still shows this message after a minute, email <a href="mailto:hello@supersonicsites.com">hello@supersonicsites.com</a> with reference {order.id}; nothing is lost.</p>
+              <a class="button secondary" href={`/c/${client.slug}/orders/${order.id}${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`}>Refresh</a>
+            </section>
+          )}
+
+          {order.state === "draft" && !confirming && (
+            <section class="card co-section reveal">
+              <p class="eyebrow">Not paid yet</p>
+              <h2 style="margin: 0 0 8px">Finish your order.</h2>
+              <p style="color: var(--ss-text-soft); line-height: 1.6">The page address is held for you for 24 hours. {PRICE_LINE}</p>
+              <p class="err-note" data-resume-error hidden />
+              <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px">
+                <button type="button" class="button primary" data-resume-pay data-client-slug={client.slug} data-order-id={order.id}>Continue to payment</button>
+                <a class="button ghost" href={`/c/${client.slug}/site`}>Start over</a>
+              </div>
+            </section>
+          )}
+
+          {(order.state === "expired" || order.state === "cancelled") && (
+            <section class="card co-section reveal">
+              <p class="eyebrow">{order.state === "expired" ? "Expired" : "Cancelled"}</p>
+              <h2 style="margin: 0 0 8px">{order.state === "expired" ? "This order was never paid and has expired." : "This order was cancelled."}</h2>
+              <p style="color: var(--ss-text-soft); line-height: 1.6">You can place a new order any time.</p>
+              <a class="button primary" href={`/c/${client.slug}/site`}>Order a listing website</a>
+            </section>
+          )}
+        </main>
+
+        <script>
+          const button = document.querySelector<HTMLButtonElement>("[data-resume-pay]");
+          const error = document.querySelector<HTMLElement>("[data-resume-error]");
+          button?.addEventListener("click", async () => {
+            button.disabled = true;
+            button.textContent = "Opening Stripe…";
+            try {
+              const response = await fetch("/api/site-order", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ client_slug: button.dataset.clientSlug, order_id: button.dataset.orderId })
+              });
+              const body = await response.json().catch(() => null);
+              if (response.ok && body?.url) {
+                window.location.assign(body.url);
+                return;
+              }
+              if (error) {
+                error.textContent = body?.error ?? "We couldn’t open the payment page. Try again in a minute.";
+                error.hidden = false;
+              }
+            } catch {
+              if (error) {
+                error.textContent = "We couldn’t reach the server. Try again in a minute.";
+                error.hidden = false;
+              }
+            }
+            button.disabled = false;
+            button.textContent = "Continue to payment";
+          });
+        </script>
+      </>
+    ) : (
+      <>
+        <SiteHeader />
+        <ErrorCard eyebrow="Missing order" title="Order not found" reason="That order doesn’t exist, or it belongs to another team." actions={[{ label: "Back to the portal", href: "/portal", variant: "primary" }]} />
+      </>
+    )
+  }
+</AppLayout>

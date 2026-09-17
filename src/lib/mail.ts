@@ -23,6 +23,32 @@ function esc(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+/** One transactional email through Resend. Returns Resend's message id ("dev-console" when printed instead). */
+export async function sendMail(message: { to: string[]; subject: string; text: string; html: string }): Promise<{ id: string }> {
+  const apiKey = env("RESEND_API_KEY");
+  if (!apiKey) {
+    if (import.meta.env.DEV) {
+      console.log(`[mail] (dev, no RESEND_API_KEY) "${message.subject}" to ${message.to.join(", ")}:\n${message.text}`);
+      return { id: "dev-console" };
+    }
+    throw new Error("not configured: RESEND_API_KEY is not set — cannot send email.");
+  }
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from: env("MAIL_FROM") ?? DEFAULT_FROM, to: message.to, reply_to: SUPPORT_EMAIL, subject: message.subject, text: message.text, html: message.html }),
+    signal: AbortSignal.timeout(15_000)
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Resend ${response.status}: ${detail.slice(0, 300)}`);
+  }
+  const body = (await response.json().catch(() => ({}))) as { id?: string };
+  return { id: String(body.id ?? "") };
+}
+
+export { esc as escapeHtml };
+
 export async function sendSignInLink(to: string, url: string): Promise<void> {
   const apiKey = env("RESEND_API_KEY");
   if (!apiKey) {

@@ -9,7 +9,7 @@ The product is simple:
 ```txt
 Admin sets up the client once (brand + sign-in emails + ads form link + integration IDs)
 Client signs in with a magic link (email -> click -> in; no password)
-Client picks a destination on the portal: Submit Listing Ads, or Generate Listing Reports
+Client picks a destination on the portal: Submit Listing Ads, Generate Listing Reports, or Order a Listing Website
 Client pastes their REALTOR.ca share link (the member/backend link)
 The app gathers all the data automatically
 Client reviews and approves
@@ -41,6 +41,7 @@ Useful local routes:
 /portal                     post-sign-in chooser: listing ads form | listing reports
 /admin/clients/new          admin: create a client
 /c/[client_slug]/           coordinator report form
+/c/[client_slug]/?type=market   Seller Market Update (same form + this month's board statistics)
 /reports/[snapshot_id]      rendered report (PDF source)
 ```
 
@@ -74,6 +75,12 @@ listing"** link. From that one link, "Pull data" gathers everything:
 - **Facebook / Instagram (Meta)** — recent posts are listed, ranked against the
   listing (MLS# / street name + civic number), and offered as a picker; the
   selected post's views, caption, and image fill the form.
+- **Seller Market Update** (`?type=market`) — the same pull plus the client's
+  board statistics for the latest month (sales, inventory, months of inventory,
+  days to sell and price where the board publishes them, with year-over-year),
+  fetched on demand and cached monthly under `data/market/`, and a short
+  rule-written interpretation. For the seller asking "why isn't it selling?".
+  No comparables, no pricing advice. Spec: `docs/seller-market-update-prd.md`.
 
 The coordinator reviews the pulled values, corrects anything that looks off
 (every metric stays an editable field — the fallback, not the workflow), checks
@@ -88,6 +95,7 @@ Admin creates client (once) with its sign-in emails + Zoho CRM Account ID
 Client signs in at /login (magic link) -> lands on /portal
         |
    Submit Listing Ads  ->  /c/<slug>/ads  ->  one Listing_Ads record in Zoho CRM
+   Order a Listing Website -> /c/<slug>/site -> Stripe Checkout -> one Listing_Websites record in Zoho CRM
    Generate Listing Reports -> private client report endpoint  /c/<slug>/
         |
 Client pastes REALTOR.ca share link -> Pull data
@@ -167,7 +175,10 @@ The code is host-agnostic; these are the moving parts:
    (`https://supersonicrealtors.com`), `RESEND_API_KEY` (+ optional `MAIL_FROM`
    on a Resend-verified domain), `META_SYSTEM_USER_TOKEN`, `RYBBIT_API_KEY`, and
    for listing ads the Zoho CRM OAuth client `client_id`, `client_secret`,
-   `refresh_token`, `api_domain` (`https://www.zohoapis.ca` — Canadian data centre).
+   `refresh_token`, `api_domain` (`https://www.zohoapis.ca` — Canadian data centre),
+   and for listing websites `STRIPE_SECRET_KEY` (a restricted key: Checkout Sessions write,
+   Customers write, Prices read, Subscriptions read) plus `STRIPE_WEBHOOK_SECRET` from the
+   webhook endpoint `https://supersonicrealtors.com/api/stripe-webhook`.
    The built server never loads `.env` — platform env vars are the only source.
    **Chromium** (PDF + REALTOR.ca capture) ships bundled via `@sparticuz/chromium`
    — a headless-shell build that runs in restricted containers where the system
@@ -191,7 +202,12 @@ The code is host-agnostic; these are the moving parts:
    `emails` list yet, so their coordinators can't sign in until an admin opens
    each client's edit form and adds their addresses (or `@domain.com`) plus the
    Zoho CRM Account ID. The old `password_hash` and `ads_form_url` fields are ignored.
-6. Listing ads replace the Zoho Form: each request creates one `Listing_Ads`
+6. Listing websites: each client needs `portfolio_host` and their existing `stripe_customer_id`
+   on the admin form; the two Stripe prices are found by lookup key (`listing_website_production_cad`,
+   `listing_website_hosting_cad`) and exist in both test and live mode. Hosting starts on a
+   365-day trial (first year included). `npm run check:site-order` exercises the whole flow
+   against fakes. Plan: `docs/listing-service/production-plan-v3.3.md`.
+7. Listing ads replace the Zoho Form: each request creates one `Listing_Ads`
    record with CRM workflows on, but the Zoho Flow "Form Listing Submission"
    (Kim's task, the REALTOR import Worker webhook) only runs for the old form —
    post-create automation for in-app requests must hang off new CRM records.

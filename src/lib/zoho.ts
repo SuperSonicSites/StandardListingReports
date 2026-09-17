@@ -84,7 +84,8 @@ async function call(path: string, init: RequestInit = {}, timeoutMs = TIMEOUT_MS
 export type CreateOutcome =
   | { kind: "created"; id: string }
   // CRM answered and did not create anything (bad data, permissions, rate limit, auth).
-  | { kind: "rejected"; status: number; code: string; field?: string }
+  // (DUPLICATE_DATA on a unique field also names the record that already exists.)
+  | { kind: "rejected"; status: number; code: string; field?: string; duplicateId?: string }
   // No usable answer: the record may exist. Look before trying again.
   | { kind: "uncertain" };
 
@@ -117,8 +118,15 @@ export async function createRecord(module: string, record: Record<string, unknow
   }
   const code = String(item?.code ?? body?.code ?? `HTTP_${response.status}`);
   const field = item?.details?.api_name ?? body?.details?.api_name;
+  const duplicateId = item?.details?.duplicate_record?.id;
   console.error(`[zoho] create ${module} rejected: HTTP ${response.status} ${code}${field ? ` (${field})` : ""}`);
-  return { kind: "rejected", status: response.status, code, ...(field ? { field: String(field) } : {}) };
+  return {
+    kind: "rejected",
+    status: response.status,
+    code,
+    ...(field ? { field: String(field) } : {}),
+    ...(duplicateId ? { duplicateId: String(duplicateId) } : {})
+  };
 }
 
 /** Newest records first (Created_Time desc). Throws when CRM can't be read. */

@@ -2,12 +2,20 @@
 import AppLayout from "../layouts/AppLayout.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 import Toast from "../components/Toast.astro";
-import { listClients } from "../lib/storage";
+import { listClients, listOrders } from "../lib/storage";
 import { takeFlash } from "../lib/flash";
+import { pendingOperations } from "../lib/site-order-fulfil";
+import { marketStatus } from "../lib/market";
+import { monthLabel } from "../lib/market-rules";
 
 const clients = await listClients();
+// Seller Market Update: what each market has cached and how its last fetch went.
+const markets = await marketStatus();
 const flash = takeFlash(Astro.cookies);
 const count = clients.length;
+// Listing website orders: a recovery panel, not a production board (that is CRM).
+const orders = (await listOrders()).slice(0, 50);
+const fmt = (iso: string) => (iso ? iso.slice(0, 16).replace("T", " ") : "—");
 
 const initialsOf = (name: string) =>
   name
@@ -129,6 +137,110 @@ const initialsOf = (name: string) =>
         )
       }
     </section>
+
+    <section class="panel" style="margin-top: 24px">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Seller Market Update</p>
+          <h2>Market statistics</h2>
+        </div>
+        <form method="post" action="/api/market-refresh">
+          <button type="submit" class="button secondary sm">Refresh market data</button>
+        </form>
+      </div>
+      <div style="overflow-x: auto">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.86rem">
+          <thead>
+            <tr style="text-align: left; color: var(--ss-muted)">
+              <th style="padding: 8px 6px">Market</th>
+              <th style="padding: 8px 6px">Newest cached month</th>
+              <th style="padding: 8px 6px">Last fetch</th>
+            </tr>
+          </thead>
+          <tbody>
+            {markets.map((m) => (
+              <tr style="border-top: 1px solid var(--ss-border, #e5e7eb)">
+                <td style="padding: 8px 6px">{m.label}</td>
+                <td style="padding: 8px 6px">{m.months[0] ? monthLabel(m.months[0]) : "—"}</td>
+                <td style={`padding: 8px 6px; ${m.attempt && !m.attempt.ok ? "color: var(--ss-warn-ink, #b45309)" : ""}`}>
+                  {m.attempt ? `${fmt(m.attempt.at)} — ${m.attempt.ok ? "ok" : m.attempt.error}` : "never"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="field-hint" style="margin-top: 10px">
+        Fetched on demand when a market update is created, at most once a day per market until the board publishes. Refresh forces a
+        fetch now and overwrites the cached month; existing reports keep their frozen copy.
+      </p>
+    </section>
+    {
+      orders.length > 0 && (
+        <section class="panel" style="margin-top: 24px">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Listing websites</p>
+              <h2 style="display: flex; align-items: center; gap: 10px">
+                Orders
+                <span class="pill">{orders.filter((o) => o.state === "paid").length} paid</span>
+              </h2>
+            </div>
+          </div>
+          <div style="overflow-x: auto">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.86rem">
+              <thead>
+                <tr style="text-align: left; color: var(--ss-muted)">
+                  <th style="padding: 8px 6px">Reference</th>
+                  <th style="padding: 8px 6px">Client</th>
+                  <th style="padding: 8px 6px">Page</th>
+                  <th style="padding: 8px 6px">State</th>
+                  <th style="padding: 8px 6px">Paid</th>
+                  <th style="padding: 8px 6px">CRM</th>
+                  <th style="padding: 8px 6px">Pending</th>
+                  <th style="padding: 8px 6px" />
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => {
+                  const pending = pendingOperations(order);
+                  return (
+                    <tr style="border-top: 1px solid var(--ss-border, #e5e7eb)">
+                      <td style="padding: 8px 6px; font-family: ui-monospace, monospace">{order.id}</td>
+                      <td style="padding: 8px 6px">{order.client_slug}</td>
+                      <td style="padding: 8px 6px">
+                        <a href={order.page_url}>/{order.route}</a>
+                      </td>
+                      <td style="padding: 8px 6px">{order.state}</td>
+                      <td style="padding: 8px 6px">{fmt(order.payment.paid_at)}</td>
+                      <td style="padding: 8px 6px; font-family: ui-monospace, monospace">{order.fulfillment.crm_record_id || "—"}</td>
+                      <td style="padding: 8px 6px; color: var(--ss-warn-ink, #b45309)">{pending.join("; ") || ""}</td>
+                      <td style="padding: 8px 6px; white-space: nowrap">
+                        {pending.length > 0 && (
+                          <form method="post" action="/api/order-admin" style="display: inline">
+                            <input type="hidden" name="order_id" value={order.id} />
+                            <input type="hidden" name="action" value="retry" />
+                            <button type="submit" class="button secondary sm">Retry</button>
+                          </form>
+                        )}
+                        {(order.state === "paid" || order.state === "draft") && (
+                          <form method="post" action="/api/order-admin" style="display: inline; margin-left: 6px">
+                            <input type="hidden" name="order_id" value={order.id} />
+                            <input type="hidden" name="action" value="cancel" />
+                            <button type="submit" class="button ghost sm">Mark cancelled</button>
+                          </form>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p class="field-hint" style="margin-top: 10px">Production stages live in Zoho CRM. This panel only shows payment and fulfilment; Retry re-runs the CRM record and the confirmation email for a paid order.</p>
+        </section>
+      )
+    }
   </main>
 
   <Toast message={flash} />

@@ -11,7 +11,9 @@
     "build": "astro build",
     "preview": "node ./dist/server/entry.mjs",
     "start": "node ./dist/server/entry.mjs",
-    "check:listing-ad": "node scripts/check-listing-ad.mjs"
+    "check:listing-ad": "node scripts/check-listing-ad.mjs",
+    "check:site-order": "node scripts/check-site-order.mjs",
+    "check:market": "node scripts/check-market.mjs"
   },
   "dependencies": {
     "@astrojs/node": "^11.0.0",

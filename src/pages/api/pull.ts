@@ -11,8 +11,58 @@ import {
 } from "../../lib/meta";
 import { fetchRealtorAdminStats, type RealtorStatsResult } from "../../lib/realtor";
 import { fetchRybbitListingViews, fetchRybbitSiteTotalViews, resolveRybbitListing } from "../../lib/rybbit";
+import { getMarketForReport, isMarketKey, MARKETS } from "../../lib/market";
 
 export const prerender = false;
+
+// Seller Market Update: the client's monthly market statistics, from the cache (with an
+// on-demand, throttled refresh inside). Its own block with its own warnings — a board
+// outage or an unconfigured client never touches the listing pull. NEVER throws.
+async function marketBlock(key: string | undefined) {
+  const empty = {
+    region_label: "",
+    board_label: "",
+    reporting_month: "",
+    source_url: "",
+    retrieved_at: "",
+    local_label: "",
+    local_source_url: "",
+    by_type: {}
+  };
+  if (!isMarketKey(key)) {
+    return {
+      configured: false,
+      source: "manual" as const,
+      ...empty,
+      warnings: ["This client has no market region set — ask Supersonic to add it, or enter the numbers by hand."]
+    };
+  }
+  try {
+    const { month, warnings } = await getMarketForReport(key);
+    return {
+      configured: true,
+      source: month ? ("board_stats" as const) : ("manual" as const),
+      region_label: month?.region_label ?? MARKETS[key].region_label,
+      board_label: month?.board_label ?? MARKETS[key].board_label,
+      reporting_month: month?.reporting_month ?? "",
+      source_url: month?.source_url ?? "",
+      retrieved_at: month?.retrieved_at ?? "",
+      local_label: month?.local?.label ?? "",
+      local_source_url: month?.local?.source_url ?? "",
+      by_type: month?.by_type ?? {},
+      warnings
+    };
+  } catch (error) {
+    return {
+      configured: true,
+      source: "manual" as const,
+      ...empty,
+      region_label: MARKETS[key].region_label,
+      board_label: MARKETS[key].board_label,
+      warnings: [`Market statistics couldn't be pulled: ${error instanceof Error ? error.message : String(error)}`]
+    };
+  }
+}
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
@@ -75,10 +125,12 @@ export const POST: APIRoute = async ({ request }) => {
   // result carrying its own `source` + optional warning. We LIST social candidates here
   // and rank/enrich them in Phase B (ranking needs the scraped MLS/address). Run concurrently
   // — done sequentially the per-request timeouts stack into a minute-plus hang.
-  const [fbList, igList, realtorStats] = await Promise.all([
+  const includeMarket = body.include_market === true;
+  const [fbList, igList, realtorStats, market] = await Promise.all([
     fetchFacebookPostCandidates(client.meta_page_id),
     fetchInstagramMediaCandidates(client.meta_instagram_id),
-    fetchRealtorAdminStats(realtorAdminUrl)
+    fetchRealtorAdminStats(realtorAdminUrl),
+    includeMarket ? marketBlock(client.market) : Promise.resolve(null)
   ]);
 
   // The report period is DERIVED, not typed: first day on market -> today. It comes from
@@ -183,12 +235,14 @@ export const POST: APIRoute = async ({ request }) => {
       facebook,
       instagram,
       realtor,
+      market,
       warnings: [
         ...website.warnings,
         ...(website.listing_warning ? [website.listing_warning] : []),
         ...facebook.warnings,
         ...instagram.warnings,
-        ...realtor.warnings
+        ...realtor.warnings,
+        ...(market?.warnings ?? [])
       ]
     }),
     { headers: { "Content-Type": "application/json" } }

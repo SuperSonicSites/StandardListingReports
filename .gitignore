@@ -17,6 +17,16 @@ data/snapshots/*.json
 data/clients/*.json
 !data/clients/.gitkeep
 
+# Seller Market Update: monthly board statistics cache and the exposure ledger —
+# runtime data on the volume, rebuilt on demand.
+data/market/*.json
+!data/market/.gitkeep
+
+# Listing website orders: runtime data on the volume (Stripe and CRM are the records
+# of record); they carry purchaser emails and agreement evidence.
+data/orders/*.json
+!data/orders/.gitkeep
+
 *.log
 
 .claude/

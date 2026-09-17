@@ -5,6 +5,8 @@ import ErrorCard from "../../../components/ErrorCard.astro";
 import Toast from "../../../components/Toast.astro";
 import { readClient } from "../../../lib/storage";
 import { takeFlash } from "../../../lib/flash";
+import { MARKETS } from "../../../lib/market";
+import { PROPERTY_TYPES } from "../../../lib/market-rules";
 
 const clientSlug = Astro.params.clientSlug ?? "";
 let client;
@@ -15,10 +17,13 @@ try {
   Astro.response.status = 404;
 }
 const flash = takeFlash(Astro.cookies);
+// Seller Market Update: the same form plus a property type and the market section.
+const marketMode = Astro.url.searchParams.get("type") === "market";
+const marketInfo = client?.market ? MARKETS[client.market] : null;
 ---
 
 <AppLayout
-  title={client ? `New report | ${client.name}` : "Client not found | Supersonic"}
+  title={client ? `${marketMode ? "New market update" : "New report"} | ${client.name}` : "Client not found | Supersonic"}
   className="client-form-body"
 >
   {
@@ -27,17 +32,25 @@ const flash = takeFlash(Astro.cookies);
         <SiteHeader context={client.name} contextAccent={client.brand_accent} />
         <main class="client-workspace">
           <div class="co-hero reveal">
-            <p class="eyebrow">Listing report</p>
-            <h1>Create Listing Report</h1>
+            <p class="eyebrow">{marketMode ? "Seller Market Update" : "Listing report"}</p>
+            <h1>{marketMode ? "Create Seller Market Update" : "Create Listing Report"}</h1>
             <p>
-              Paste your REALTOR.ca share link and pull. We find the listing, the
-              matching posts, and the numbers — you just confirm and create the
-              report.
+              {marketMode
+                ? "Paste your REALTOR.ca share link and pull. We fetch the listing's numbers and this month's market statistics for your area — you confirm and create the update."
+                : "Paste your REALTOR.ca share link and pull. We find the listing, the matching posts, and the numbers — you just confirm and create the report."}
+            </p>
+            <p class="field-hint" style="margin-top: 10px">
+              {marketMode ? (
+                <a href={`/c/${client.slug}/`}>Just need the listing numbers? Create a standard listing report instead.</a>
+              ) : (
+                <a href={`/c/${client.slug}/?type=market`}>Seller asking why it isn&rsquo;t selling? Create a Seller Market Update instead.</a>
+              )}
             </p>
           </div>
 
-          <form id="report-form" method="post" action="/api/snapshot" novalidate>
+          <form id="report-form" method="post" action="/api/snapshot" class={marketMode ? "market-mode" : undefined} novalidate>
             <input type="hidden" name="client_slug" value={client.slug} />
+            <input type="hidden" name="report_kind" value={marketMode ? "market" : "listing"} />
             <input type="hidden" name="facebook_media_url" value="" />
             <input type="hidden" name="instagram_media_url" value="" />
             <input type="hidden" name="property_image_url" value="" />
@@ -191,6 +204,17 @@ const flash = takeFlash(Astro.cookies);
                     <label class="field-label" for="mls">MLS&reg; number</label>
                     <input id="mls" name="mls_number" placeholder="Pulled from REALTOR.ca" />
                   </div>
+                  {marketMode && (
+                    <div class="field">
+                      <label class="field-label" for="ptype">Property type</label>
+                      <select id="ptype" name="property_type">
+                        {PROPERTY_TYPES.map((type) => (
+                          <option value={type.value}>{type.label}</option>
+                        ))}
+                      </select>
+                      <p class="field-hint">Picks which market figures apply below. Not read from REALTOR.ca — set it if this isn&rsquo;t a single-family home.</p>
+                    </div>
+                  )}
 
                   <div class="field" data-period-pill>
                     <span class="field-label">Report period</span>
@@ -322,7 +346,9 @@ const flash = takeFlash(Astro.cookies);
                       </span>
                     </div>
                     <p class="co-card-desc">
-                      Views for the featured posts. Captions land verbatim on the report.
+                      {marketMode
+                        ? "Views of the listing's posts — the market update shows the numbers only, no post images or captions."
+                        : "Views for the featured posts. Captions land verbatim on the report."}
                     </p>
 
                     <div class="social-row" data-rail="facebook">
@@ -396,10 +422,107 @@ const flash = takeFlash(Astro.cookies);
                 </div>
               </section>
 
-              {/* Section 4 — Showings & notes */}
+              {/* Section 4 (market mode) — Market conditions */}
+              {marketMode && (
+                <section class="card co-section reveal" data-market-section data-notice-anchor="market">
+                  <div class="numbered-head">
+                    <span class="num">4</span>
+                    <div class="head-text">
+                      <h2>Market conditions</h2>
+                      <p>
+                        {marketInfo
+                          ? `Pulled from the ${marketInfo.board_label} monthly statistics — edit only if a value is wrong. Blank means the board doesn't publish it.`
+                          : "No market region is set for this client yet — ask Supersonic to add it. You can still enter the numbers by hand, or leave them blank to omit the market sheet."}
+                      </p>
+                    </div>
+                  </div>
+                  <input type="hidden" name="market_source" value="manual" />
+                  <input type="hidden" name="market_source_url" value="" />
+                  <input type="hidden" name="market_retrieved_at" value="" />
+                  <input type="hidden" name="market_region_label" value={marketInfo?.region_label ?? ""} />
+                  <input type="hidden" name="market_board_label" value={marketInfo?.board_label ?? ""} />
+                  <input type="hidden" name="market_type_label" value="" />
+                  <input type="hidden" name="market_price_label" value="Benchmark price" />
+                  <input type="hidden" name="market_local_label" value={marketInfo?.local?.label ?? ""} />
+                  <input type="hidden" name="market_local_source_url" value="" />
+                  <p class="field-hint" data-market-meta style="margin: 0 0 14px">Pull data to load this month&rsquo;s statistics.</p>
+                  <div class="market-grid">
+                    <div class="field">
+                      <label class="field-label" for="m-month">Reporting month</label>
+                      <input id="m-month" name="market_reporting_month" placeholder="2026-08" data-market-input />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="m-local">For sale <span data-market-local-label>{marketInfo?.local ? `in ${marketInfo.local.label}` : "locally"}</span> now</label>
+                      <input id="m-local" name="market_local_active" inputmode="numeric" placeholder={marketInfo?.local ? "—" : "not published here"} data-market-input />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="m-local-yoy">Local listings vs last year (%)</label>
+                      <input id="m-local-yoy" name="market_local_active_yoy_pct" inputmode="decimal" placeholder="—" data-market-input />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="m-sales">Sales</label>
+                      <input id="m-sales" name="market_sales" inputmode="numeric" placeholder="—" data-market-input />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="m-sales-yoy">Sales vs last year (%)</label>
+                      <input id="m-sales-yoy" name="market_sales_yoy_pct" inputmode="decimal" placeholder="e.g. -12.3" data-market-input />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="m-active">Active listings</label>
+                      <input id="m-active" name="market_active_inventory" inputmode="numeric" placeholder="—" data-market-input />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="m-active-yoy">Active listings vs last year (%)</label>
+                      <input id="m-active-yoy" name="market_inventory_yoy_pct" inputmode="decimal" placeholder="e.g. 15" data-market-input />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="m-moi">Months of inventory</label>
+                      <input id="m-moi" name="market_months_of_inventory" inputmode="decimal" placeholder="active ÷ sales" data-market-input />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="m-new">New listings</label>
+                      <input id="m-new" name="market_new_listings" inputmode="numeric" placeholder="—" data-market-input />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="m-new-yoy">New listings vs last year (%)</label>
+                      <input id="m-new-yoy" name="market_new_listings_yoy_pct" inputmode="decimal" placeholder="—" data-market-input />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="m-days">Days to sell</label>
+                      <input id="m-days" name="market_days_to_sell" inputmode="numeric" placeholder="—" data-market-input />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="m-days-yoy">Days to sell vs last year (%)</label>
+                      <input id="m-days-yoy" name="market_days_to_sell_yoy_pct" inputmode="decimal" placeholder="—" data-market-input />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="m-price"><span data-market-price-label>Price</span> ($)</label>
+                      <input id="m-price" name="market_price" inputmode="numeric" placeholder="—" data-market-input />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="m-price-yoy">Price vs last year (%)</label>
+                      <input id="m-price-yoy" name="market_price_yoy_pct" inputmode="decimal" placeholder="—" data-market-input />
+                    </div>
+                  </div>
+                  <div class="market-preview" style="margin-top: 16px">
+                    <h3>What this means <span class="field-hint" style="font-weight: 400">— preview, written by fixed rules from the numbers above</span></h3>
+                    <ul data-interpretation-market />
+                    <h3>Your listing in this market</h3>
+                    <ul data-interpretation-property />
+                    <p class="field-hint" style="margin: 4px 0 0">
+                      The exposure comparison against past reports is added when the update is created, once enough history exists to be fair.
+                    </p>
+                  </div>
+                  <p class="field-hint" style="margin: 12px 0 0">
+                    <a data-market-source-link href="#" target="_blank" rel="noopener" hidden>Open the board&rsquo;s statistics page</a>
+                  </p>
+                </section>
+              )}
+
+              {/* Section 4 (5 in market mode) — Showings & notes */}
               <section class="card co-section reveal">
                 <div class="numbered-head">
-                  <span class="num">4</span>
+                  <span class="num">{marketMode ? "5" : "4"}</span>
                   <div class="head-text">
                     <h2>Showings &amp; notes</h2>
                     <p>Both optional — they appear on the report only when you fill them in.</p>
@@ -435,8 +558,8 @@ const flash = takeFlash(Astro.cookies);
                   </span>
                 </label>
                 <div class="co-submit-right">
-                  <button class="button primary" type="submit" data-submit-button disabled style="min-width: 172px">
-                    Create Report
+                  <button class="button primary" type="submit" data-submit-button data-label={marketMode ? "Create Market Update" : "Create Report"} disabled style="min-width: 172px">
+                    {marketMode ? "Create Market Update" : "Create Report"}
                   </button>
                   <span style="font-size: 0.78rem; color: var(--ss-muted)" data-approval-hint>
                     Check the box to enable.

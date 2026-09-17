@@ -7,12 +7,16 @@ import Toast from "../components/Toast.astro";
 import { emailMatches, isAdminEmail, sessionEmail } from "../lib/auth";
 import { listClients } from "../lib/storage";
 import { takeFlash } from "../lib/flash";
+import { listingSitesEnabled } from "../lib/stripe";
 
 const email = sessionEmail(Astro.request) ?? "";
 const admin = isAdminEmail(email);
 const clients = (await listClients()).filter((client) => admin || emailMatches(email, client.emails));
 const flash = takeFlash(Astro.cookies);
 const single = clients.length === 1 ? clients[0] : undefined;
+// Listing websites ship dark: the card is always visible, clickable only once the
+// server flag is on and the client is set up for it.
+const sitesLive = listingSitesEnabled();
 ---
 
 <AppLayout title="Portal | Supersonic Realtor Hub" className="hub-body">
@@ -133,10 +137,74 @@ const single = clients.length === 1 ? clients[0] : undefined;
               </span>
             </a>
 
+            <a class="hub-option" href={`/c/${client.slug}/?type=market`}>
+              <span class="hub-option-top">
+                <span class="hub-option-num">03</span>
+                <span class="hub-option-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <path d="M4 19h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                    <path d="M6 15l4-4.5 3 3 5-6.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M15 7h3v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </span>
+              </span>
+              <span class="hub-option-title">Seller Market Update</span>
+              <span class="hub-option-text">
+                When a seller asks why it isn&rsquo;t selling: this month&rsquo;s market statistics next to your listing&rsquo;s exposure, in one branded PDF.
+              </span>
+              <span class="hub-option-cta">
+                Create a market update
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+            </a>
+
+            {sitesLive && client.zoho_account_id && client.portfolio_host ? (
+              <a class="hub-option" href={`/c/${client.slug}/site`}>
+                <span class="hub-option-top">
+                  <span class="hub-option-num">04</span>
+                  <span class="hub-option-icon" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                      <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8" />
+                      <path d="M3 9h18M8 13h5m-5 3h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                    </svg>
+                  </span>
+                </span>
+                <span class="hub-option-title">Order a Listing Website</span>
+                <span class="hub-option-text">
+                  A page for one listing or a whole development, on your portfolio at {client.portfolio_host}. $599, hosting included for a year.
+                </span>
+                <span class="hub-option-cta">
+                  Order a website
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </span>
+              </a>
+            ) : (
+              <div class="hub-option is-unavailable" aria-disabled="true">
+                <span class="hub-option-top">
+                  <span class="hub-option-num">04</span>
+                  <span class="hub-option-icon" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                      <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8" />
+                      <path d="M3 9h18M8 13h5m-5 3h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                    </svg>
+                  </span>
+                </span>
+                <span class="hub-option-title">Order a Listing Website</span>
+                <span class="hub-option-text">
+                  A page for one listing or a whole development, on your own portfolio site. Launching soon.
+                </span>
+                <span class="hub-option-cta">Coming soon</span>
+              </div>
+            )}
+
             {client.dashboard_url && (
               <a class="hub-option" href={client.dashboard_url}>
                 <span class="hub-option-top">
-                  <span class="hub-option-num">03</span>
+                  <span class="hub-option-num">05</span>
                   <span class="hub-option-icon" aria-hidden="true">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                       <rect x="3.5" y="3.5" width="7.5" height="9.5" rx="1" stroke="currentColor" stroke-width="1.8" />

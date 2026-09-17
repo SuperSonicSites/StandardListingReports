@@ -1,0 +1,35 @@
+---
+// The Listing Website Terms, public. The order form links here; the order stores
+// the version and the hash of this exact text at acceptance.
+import AppLayout from "../../layouts/AppLayout.astro";
+import { TERMS_VERSION } from "../../lib/site-orders";
+import { TERMS_EFFECTIVE, TERMS_SECTIONS, TERMS_TITLE, termsHash } from "../../lib/terms-listing-websites";
+
+export const prerender = false;
+const hash = termsHash();
+---
+
+<AppLayout title={`${TERMS_TITLE} | Supersonic Realtors`} className="client-form-body">
+  <main class="client-workspace" style="max-width: 760px">
+    <div class="co-hero reveal">
+      <p class="eyebrow">Supersonic Realtors</p>
+      <h1>{TERMS_TITLE}</h1>
+      <p>
+        Version {TERMS_VERSION}, effective {TERMS_EFFECTIVE}. Draft pending business and legal approval.
+      </p>
+    </div>
+    <article class="card co-section" style="line-height: 1.65">
+      {
+        TERMS_SECTIONS.map((section) => (
+          <section style="margin-bottom: 22px">
+            <h2 style="font-size: 1.05rem; margin: 0 0 8px">{section.heading}</h2>
+            {section.body.map((paragraph) => (
+              <p style="margin: 0 0 10px; color: var(--ss-text-soft)">{paragraph}</p>
+            ))}
+          </section>
+        ))
+      }
+      <p class="field-hint" style="margin-top: 24px; word-break: break-all">Text fingerprint (SHA-256): {hash}</p>
+    </article>
+  </main>
+</AppLayout>

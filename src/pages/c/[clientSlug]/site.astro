@@ -1,0 +1,358 @@
+---
+// Listing website order form: intake first, then Stripe Checkout. Posts JSON to
+// /api/site-order, which reserves the route, creates the draft and answers with
+// the Checkout URL. Nothing is filed anywhere until Stripe confirms payment.
+import AppLayout from "../../../layouts/AppLayout.astro";
+import SiteHeader from "../../../components/SiteHeader.astro";
+import ErrorCard from "../../../components/ErrorCard.astro";
+import { readClient } from "../../../lib/storage";
+import { FOLDER_NOTICE, LIMITS, PACKAGES, PRICE_LINE, TERMS_VERSION } from "../../../lib/site-orders";
+import { listingSitesEnabled } from "../../../lib/stripe";
+
+const clientSlug = Astro.params.clientSlug ?? "";
+let client;
+try {
+  client = await readClient(clientSlug);
+} catch {
+  Astro.response.status = 404;
+}
+// Ships dark: the server flag opens ordering; the client also needs its CRM account and portfolio host.
+const enabled = listingSitesEnabled();
+const connected = Boolean(client?.zoho_account_id && client?.portfolio_host && enabled);
+const host = client?.portfolio_host ?? "portfolio.example.com";
+---
+
+<AppLayout title={client ? `Order a listing website | ${client.name}` : "Client not found | Supersonic"} className="client-form-body">
+  {
+    client ? (
+      <>
+        <SiteHeader context={client.name} contextAccent={client.brand_accent} />
+        <main class="client-workspace">
+          <div class="co-hero reveal">
+            <a class="back-link" href="/portal">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              Back to portal
+            </a>
+            <p class="eyebrow">Listing websites</p>
+            <h1>Order a Listing Website</h1>
+            <p>
+              One page about a listing, or a project page about a development, on
+              your portfolio at <strong>{host}</strong>. Tell us about it, pay, and
+              we build it. {PRICE_LINE}
+            </p>
+          </div>
+
+          <div data-order-entry>
+            {!connected && (
+              <div class="notice" role="status" style="margin-top: 16px">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 9v4m0 4h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>
+                  {enabled ? (
+                    <>
+                      Listing websites aren&rsquo;t set up for {client.name} yet, so orders
+                      can&rsquo;t be placed from here. Email{" "}
+                      <a href="mailto:hello@supersonicsites.com">hello@supersonicsites.com</a>{" "}
+                      and we&rsquo;ll set it up.
+                    </>
+                  ) : (
+                    <>
+                      Listing websites are coming soon, so orders can&rsquo;t be placed just yet. Email{" "}
+                      <a href="mailto:hello@supersonicsites.com">hello@supersonicsites.com</a>{" "}
+                      if you&rsquo;d like to be first in line.
+                    </>
+                  )}
+                </span>
+              </div>
+            )}
+
+            <div id="order-summary" class="card err-summary" role="alert" hidden style="margin: 16px 0 0">
+              <h2 id="order-summary-h" tabindex="-1" />
+              <ul data-summary-list />
+            </div>
+
+            <form id="order-form" novalidate data-client-slug={client.slug} data-portfolio-host={host} data-connected={String(connected)}>
+              {/* ===== 1. Package and property ===== */}
+              <section class="card co-section">
+                <div class="numbered-head">
+                  <span class="num">1</span>
+                  <div class="head-text">
+                    <h2>What are we building?</h2>
+                    <p>A single listing page, or a project page with several listings on it.</p>
+                  </div>
+                </div>
+                <div class="section-fields">
+                  <div class="two-up">
+                    <div class="field">
+                      <label class="field-label" for="o-package">Package <span class="req">*</span></label>
+                      <select id="o-package" name="package" data-field="package" aria-describedby="o-err-package">
+                        {PACKAGES.map((p) => <option value={p.value}>{p.label}</option>)}
+                      </select>
+                      <p class="err-note" id="o-err-package" data-err-for="package" hidden />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="o-type">Property type</label>
+                      <input id="o-type" name="property_type" maxlength="60" placeholder="Condo, house, townhome, development" data-field="property_type" aria-describedby="o-err-property_type" />
+                      <p class="err-note" id="o-err-property_type" data-err-for="property_type" hidden />
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="o-address">Property or development address <span class="req">*</span></label>
+                    <input id="o-address" name="property_address" maxlength={LIMITS.text} autocomplete="off" required data-field="property_address" aria-describedby="o-err-property_address" />
+                    <p class="err-note" id="o-err-property_address" data-err-for="property_address" hidden />
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="o-route">Page address <span class="req">*</span></label>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+                      <span class="field-hint" style="margin: 0; font-family: ui-monospace, monospace">{host}/</span>
+                      <input id="o-route" name="route" maxlength={LIMITS.route} autocomplete="off" data-field="route" aria-describedby="o-route-help o-err-route" style="flex: 1; min-width: 200px; font-family: ui-monospace, monospace" />
+                    </div>
+                    <p class="field-hint" id="o-route-help">Filled from the address. Letters, numbers and hyphens. This is where the page will live once it&rsquo;s approved.</p>
+                    <p class="err-note" id="o-err-route" data-err-for="route" hidden />
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="o-source">Listing or development link</label>
+                    <input id="o-source" name="source_url" type="url" inputmode="url" maxlength={LIMITS.url} placeholder="https://" data-field="source_url" aria-describedby="o-err-source_url" />
+                    <p class="field-hint">Optional. A public page about it (your website, the developer&rsquo;s site).</p>
+                    <p class="err-note" id="o-err-source_url" data-err-for="source_url" hidden />
+                  </div>
+                </div>
+              </section>
+
+              {/* ===== 2. Listings ===== */}
+              <section class="card co-section">
+                <div class="numbered-head">
+                  <span class="num">2</span>
+                  <div class="head-text">
+                    <h2>The listings</h2>
+                    <p data-listings-help>One row for a single listing. For a project, one row per home or per unit type.</p>
+                  </div>
+                </div>
+                <p class="err-note" data-err-for="listings" hidden style="margin-bottom: 10px" />
+                <div data-listing-rows />
+                <button type="button" class="button ghost sm" data-add-listing style="margin-top: 8px">+ Add another listing</button>
+              </section>
+
+              {/* ===== 3. Photos and media ===== */}
+              <section class="card co-section">
+                <div class="numbered-head">
+                  <span class="num">3</span>
+                  <div class="head-text">
+                    <h2>Photos and media</h2>
+                    <p>{FOLDER_NOTICE}</p>
+                  </div>
+                </div>
+                <div class="section-fields">
+                  <div class="field">
+                    <label class="field-label" for="o-photos">Photo folder link (Dropbox or Google Drive) <span class="req">*</span></label>
+                    <input id="o-photos" name="photos_url" type="url" inputmode="url" maxlength={LIMITS.url} placeholder="https://www.dropbox.com/..." required data-field="photos_url" aria-describedby="o-err-photos_url" />
+                    <p class="err-note" id="o-err-photos_url" data-err-for="photos_url" hidden />
+                  </div>
+                  <div class="two-up">
+                    <div class="field">
+                      <label class="field-label" for="o-video">Video link</label>
+                      <input id="o-video" name="video_url" type="url" inputmode="url" maxlength={LIMITS.url} placeholder="https://" data-field="video_url" aria-describedby="o-err-video_url" />
+                      <p class="err-note" id="o-err-video_url" data-err-for="video_url" hidden />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="o-hero">Hero photo</label>
+                      <input id="o-hero" name="hero_preference" maxlength="200" placeholder="The lake view photo, or leave it to us" data-field="hero_preference" aria-describedby="o-err-hero_preference" />
+                      <p class="err-note" id="o-err-hero_preference" data-err-for="hero_preference" hidden />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* ===== 4. Agent ===== */}
+              <section class="card co-section">
+                <div class="numbered-head">
+                  <span class="num">4</span>
+                  <div class="head-text">
+                    <h2>Agent on the page</h2>
+                    <p>Shown in the contact block. Leads from the page&rsquo;s form go to your team&rsquo;s usual inbox.</p>
+                  </div>
+                </div>
+                <div class="section-fields">
+                  <div class="field">
+                    <label class="field-label" for="o-agent-name">Agent name <span class="req">*</span></label>
+                    <input id="o-agent-name" name="agent_name" maxlength={LIMITS.short} required data-field="agent_name" aria-describedby="o-err-agent_name" />
+                    <p class="err-note" id="o-err-agent_name" data-err-for="agent_name" hidden />
+                  </div>
+                  <div class="two-up">
+                    <div class="field">
+                      <label class="field-label" for="o-agent-email">Agent email <span class="req">*</span></label>
+                      <input id="o-agent-email" name="agent_email" type="email" inputmode="email" maxlength="254" required data-field="agent_email" aria-describedby="o-err-agent_email" />
+                      <p class="err-note" id="o-err-agent_email" data-err-for="agent_email" hidden />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="o-agent-phone">Agent phone <span class="req">*</span></label>
+                      <input id="o-agent-phone" name="agent_phone" type="tel" inputmode="tel" maxlength="30" required data-field="agent_phone" aria-describedby="o-err-agent_phone" />
+                      <p class="err-note" id="o-err-agent_phone" data-err-for="agent_phone" hidden />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* ===== 5. Notes ===== */}
+              <section class="card co-section">
+                <div class="numbered-head">
+                  <span class="num">5</span>
+                  <div class="head-text">
+                    <h2>Selling points and notes</h2>
+                    <p>Optional. What should the page lead with? Anything we should know?</p>
+                  </div>
+                </div>
+                <div class="section-fields">
+                  <div class="field">
+                    <label class="field-label" for="o-points">Selling points</label>
+                    <textarea id="o-points" name="selling_points" rows="3" maxlength={LIMITS.points} placeholder="Corner unit, lake view, two parking stalls" data-field="selling_points" aria-describedby="o-err-selling_points" style="min-height: 72px" />
+                    <p class="err-note" id="o-err-selling_points" data-err-for="selling_points" hidden />
+                  </div>
+                  <div class="two-up">
+                    <div class="field">
+                      <label class="field-label" for="o-notes">Notes</label>
+                      <textarea id="o-notes" name="client_notes" rows="3" maxlength={LIMITS.notes} data-field="client_notes" aria-describedby="o-err-client_notes" style="min-height: 72px" />
+                      <p class="err-note" id="o-err-client_notes" data-err-for="client_notes" hidden />
+                    </div>
+                    <div class="field">
+                      <label class="field-label" for="o-date">Target date</label>
+                      <input id="o-date" name="target_date" type="date" data-field="target_date" aria-describedby="o-err-target_date" />
+                      <p class="field-hint">Optional. We aim to publish within seven calendar days once we have everything.</p>
+                      <p class="err-note" id="o-err-target_date" data-err-for="target_date" hidden />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* ===== 6. Terms and payment ===== */}
+              <section class="card co-section">
+                <div class="numbered-head">
+                  <span class="num">6</span>
+                  <div class="head-text">
+                    <h2>Price and terms</h2>
+                    <p>{PRICE_LINE} Edits are free. No refund once the page is published; a full refund if we don&rsquo;t produce it.</p>
+                  </div>
+                </div>
+                <div class="field">
+                  <label style="display: flex; gap: 10px; align-items: flex-start; cursor: pointer">
+                    <input type="checkbox" name="terms_accepted" data-field="terms_accepted" aria-describedby="o-err-terms_accepted" style="margin-top: 4px" />
+                    <span>
+                      I accept the{" "}
+                      <a href="/terms/listing-websites" target="_blank" rel="noopener">Listing Website Terms</a>{" "}
+                      (version {TERMS_VERSION}) on behalf of {client.name}, and I am authorized to make this purchase.
+                    </span>
+                  </label>
+                  <p class="err-note" id="o-err-terms_accepted" data-err-for="terms_accepted" hidden />
+                </div>
+              </section>
+
+              <div class="card co-submit">
+                <p data-order-status aria-live="polite" style="margin: 0; max-width: 520px; font-size: 0.84rem; color: var(--ss-text-soft); line-height: 1.5">
+                  Fields marked <span class="req" style="color: var(--ss-danger)">*</span> are required. Payment happens on Stripe&rsquo;s secure page; we never see your card.
+                </p>
+                <div class="co-submit-right">
+                  <button class="button primary" type="submit" data-order-submit disabled={!connected} style="min-width: 200px">
+                    Continue to payment
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <template data-listing-template>
+            <fieldset class="card co-section" data-listing-row style="margin-top: 12px; padding: 18px 20px">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px">
+                <legend class="field-label" style="margin: 0"><span data-row-title>Listing</span></legend>
+                <button type="button" class="button ghost sm" data-remove-listing>Remove</button>
+              </div>
+              <div class="section-fields" style="margin-top: 10px">
+                <div class="field">
+                  <label class="field-label">REALTOR.ca share link</label>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                    <input type="url" inputmode="url" maxlength={LIMITS.url} placeholder="https://member.realtor.ca/Reports/ListingDestination/..." data-row-field="realtor_stats_url" style="flex: 1; min-width: 240px" />
+                    <button type="button" class="button secondary sm" data-fetch-listing>Fetch details</button>
+                  </div>
+                  <p class="field-hint">Optional. Signed in to REALTOR.ca, use Share Listing, send the link to yourself, paste it here. We fill the MLS number and address from it.</p>
+                  <p class="err-note" data-row-err="realtor_stats_url" hidden />
+                  <p class="notice" data-row-notice hidden style="margin-top: 8px" />
+                </div>
+                <div class="two-up">
+                  <div class="field">
+                    <label class="field-label">Unit or plan name <span class="req" data-req-project hidden>*</span></label>
+                    <input maxlength={LIMITS.short} placeholder="#201, or Plan C6" data-row-field="unit_name" />
+                    <p class="err-note" data-row-err="unit_name" hidden />
+                  </div>
+                  <div class="field">
+                    <label class="field-label">MLS number</label>
+                    <input maxlength="20" data-row-field="mls_number" />
+                    <p class="err-note" data-row-err="mls_number" hidden />
+                  </div>
+                </div>
+                <div class="two-up">
+                  <div class="field">
+                    <label class="field-label">Price (CAD) <span class="req">*</span></label>
+                    <input inputmode="decimal" placeholder="749900" data-row-field="price" />
+                    <p class="err-note" data-row-err="price" hidden />
+                  </div>
+                  <div class="field">
+                    <label class="field-label">Plan name</label>
+                    <input maxlength="40" placeholder="C6" data-row-field="plan_name" />
+                    <p class="err-note" data-row-err="plan_name" hidden />
+                  </div>
+                </div>
+                <div class="two-up">
+                  <div class="field">
+                    <label class="field-label">Beds</label>
+                    <input inputmode="numeric" maxlength="3" data-row-field="beds" />
+                    <p class="err-note" data-row-err="beds" hidden />
+                  </div>
+                  <div class="field">
+                    <label class="field-label">Baths</label>
+                    <input inputmode="decimal" maxlength="5" placeholder="2.5" data-row-field="baths" />
+                    <p class="err-note" data-row-err="baths" hidden />
+                  </div>
+                </div>
+                <div class="two-up">
+                  <div class="field">
+                    <label class="field-label">Area (sq ft)</label>
+                    <input inputmode="numeric" maxlength="7" data-row-field="area" />
+                    <p class="err-note" data-row-err="area" hidden />
+                  </div>
+                  <div class="field">
+                    <label class="field-label">Floor plan link</label>
+                    <input type="url" inputmode="url" maxlength={LIMITS.url} placeholder="https://" data-row-field="floor_plan_link" />
+                    <p class="err-note" data-row-err="floor_plan_link" hidden />
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="field-label">Photo subfolder for this listing</label>
+                  <input type="url" inputmode="url" maxlength={LIMITS.url} placeholder="https://www.dropbox.com/..." data-row-field="photos_subfolder" />
+                  <p class="field-hint">Optional. Only if this listing&rsquo;s photos sit in their own folder.</p>
+                  <p class="err-note" data-row-err="photos_subfolder" hidden />
+                </div>
+              </div>
+            </fieldset>
+          </template>
+        </main>
+
+        <script>
+          import { initSiteOrderForm } from "../../../scripts/site-order-form";
+          initSiteOrderForm();
+        </script>
+      </>
+    ) : (
+      <>
+        <SiteHeader />
+        <ErrorCard
+          eyebrow="Missing client"
+          title="Client not found"
+          reason={`No client profile exists for "${clientSlug}". The link may be out of date.`}
+          actions={[{ label: "Back to the portal", href: "/portal", variant: "primary" }]}
+        />
+      </>
+    )
+  }
+</AppLayout>

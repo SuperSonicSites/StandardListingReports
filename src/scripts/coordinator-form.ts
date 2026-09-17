@@ -5,6 +5,8 @@
 // validation, sticky approval gate) is layered on top. All form field `name`
 // attributes and the snapshot shape are unchanged.
 
+import { initMarketForm } from "./market-form";
+
 type Candidate = {
   permalink: string;
   caption: string;
@@ -175,6 +177,8 @@ export function initCoordinatorForm() {
   }
   const hasNotice = (key: string) =>
     !!document.querySelector(`[data-notice-anchor="${key}"] [data-fetch-notice]`);
+  // Seller Market Update mode only (the market section exists in the DOM); null otherwise.
+  const marketForm = initMarketForm(form, setNotice);
 
   // ---- Post images (picker thumbnail + review thumbnail) ----
   function setPostImage(net: string, url: string) {
@@ -528,7 +532,10 @@ export function initCoordinatorForm() {
       listing_url: field("listing_url")?.value ?? "",
       facebook_post_url: field("facebook_post_url")?.value ?? "",
       instagram_post_url: field("instagram_post_url")?.value ?? "",
-      realtor_admin_url: url
+      realtor_admin_url: url,
+      // Market mode: also fetch the client's monthly market statistics.
+      include_market: Boolean(marketForm),
+      property_type: field("property_type")?.value ?? "single_family"
     };
 
     let data: any = null;
@@ -585,6 +592,7 @@ export function initCoordinatorForm() {
         data.instagram.source,
         data.instagram.warnings?.[0] ?? null
       );
+      marketForm?.applyPull(data.market ?? null);
 
       outcome = (data.warnings ?? []).length > 0 ? "warnings" : "pulled";
     } else {
@@ -615,6 +623,7 @@ export function initCoordinatorForm() {
       );
       if (periodFallback) periodFallback.hidden = false;
       if (periodPill) periodPill.hidden = true;
+      marketForm?.applyPull(null);
     }
 
     stopModal(() => {
@@ -802,7 +811,7 @@ export function initCoordinatorForm() {
   });
   window.addEventListener("pageshow", () => {
     if (submitButton) {
-      submitButton.textContent = "Create Report";
+      submitButton.textContent = submitButton.dataset.label ?? "Create Report";
       syncApproval();
     }
   });

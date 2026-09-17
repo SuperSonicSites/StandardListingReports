@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import type { APIRoute } from "astro";
 import { isAdmin, isValidAccessEntry, normalizeEmail } from "../../lib/auth";
 import { clientExists, deleteClient, readClient, slugify, writeClient } from "../../lib/storage";
+import { isMarketKey } from "../../lib/market";
 import type { ClientProfile } from "../../lib/types";
 import { brandedErrorPage } from "../../lib/error-page";
 import { redirectWithFlash } from "../../lib/flash";
@@ -107,6 +108,17 @@ export const POST: APIRoute = async ({ request }) => {
     return errorPage(400, "Zoho CRM Account ID must be the Account's record ID — the long number from its Zoho CRM page address.");
   }
 
+  // Listing websites: the portfolio host is a bare hostname (never a scheme or path,
+  // it is spliced into addresses the app shows) and the Stripe Customer is a cus_ id.
+  const portfolioHost = field(form, "portfolio_host").toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  if (portfolioHost && !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/.test(portfolioHost)) {
+    return errorPage(400, "Portfolio host must be a hostname such as portfolio.acmerealty.com (no https:// and no path).");
+  }
+  const stripeCustomerId = field(form, "stripe_customer_id");
+  if (stripeCustomerId && !/^cus_[A-Za-z0-9]{8,}$/.test(stripeCustomerId)) {
+    return errorPage(400, "Stripe Customer ID must look like cus_… (copy it from the customer's page in Stripe).");
+  }
+
   // The client's analytics dashboard — the portal shows a "Dashboard" card when set.
   const dashboardUrl = field(form, "dashboard_url");
   if (dashboardUrl && !isHttpUrl(dashboardUrl)) {
@@ -161,6 +173,13 @@ export const POST: APIRoute = async ({ request }) => {
     return errorPage(400, "Website URL must be a valid http(s) link (e.g. https://acmerealty.com).");
   }
 
+  // Seller Market Update: which board's monthly statistics this client's updates pull.
+  const marketRaw = field(form, "market");
+  if (marketRaw && !isMarketKey(marketRaw)) {
+    return errorPage(400, "Market statistics region must be one of the listed markets.");
+  }
+  const market = isMarketKey(marketRaw) ? marketRaw : undefined;
+
   const client: ClientProfile = {
     slug,
     name,
@@ -173,11 +192,15 @@ export const POST: APIRoute = async ({ request }) => {
     brokerage_contact: field(form, "brokerage_contact"),
     emails,
     ...(zohoAccountId ? { zoho_account_id: zohoAccountId } : {}),
+    ...(portfolioHost ? { portfolio_host: portfolioHost } : {}),
+    // A blank field on edit keeps the id the app created on the client's first order.
+    ...(stripeCustomerId || existing?.stripe_customer_id ? { stripe_customer_id: stripeCustomerId || existing?.stripe_customer_id } : {}),
     ...(dashboardUrl ? { dashboard_url: dashboardUrl } : {}),
     ...(metaPageId ? { meta_page_id: metaPageId } : {}),
     ...(metaInstagramId ? { meta_instagram_id: metaInstagramId } : {}),
     ...(rybbitSiteId ? { rybbit_site_id: rybbitSiteId } : {}),
-    ...(websiteUrl ? { website_url: websiteUrl } : {})
+    ...(websiteUrl ? { website_url: websiteUrl } : {}),
+    ...(market ? { market } : {})
   };
 
   await writeClient(client);

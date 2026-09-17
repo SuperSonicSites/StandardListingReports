@@ -6,8 +6,9 @@ import { readClient, readSnapshot } from "./lib/storage";
 // The sign-in flow and the deploy healthcheck stay reachable; the body-parsing
 // API routes authorize themselves after extracting the client slug from their
 // payload (the middleware cannot read the body without consuming it).
-const OPEN = /^\/(login|login\/sent|auth\/verify|api\/login|api\/logout|api\/health)$/;
-const SELF_GUARDED = /^\/api\/(pull|snapshot|client|listing-ad)$/;
+// /api/stripe-webhook is gated by its signature, /terms/* is public reading.
+const OPEN = /^\/(login|login\/sent|auth\/verify|api\/login|api\/logout|api\/health|api\/stripe-webhook|terms\/listing-websites)$/;
+const SELF_GUARDED = /^\/api\/(pull|snapshot|client|listing-ad|site-order|listing-details|order-admin)$/;
 
 function wantsHtml(request: Request) {
   return request.method === "GET" && (request.headers.get("accept") ?? "").includes("text/html");

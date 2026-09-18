@@ -77,6 +77,8 @@ export const EMPTY_MARKET_VALUES: MarketValues = {
 export type MarketContext = { region_label: string; reporting_month: string; type_label: string; local_label?: string };
 export type PropertyContext = { days_on_market: number; realtor_views: number; showings: number | null };
 export type ExposureBenchmark = { views_per_day: number; benchmark_views_per_day: number; sample_size: number };
+// The cover's "Where your property stands": one headline, then the reason in two or three plain sentences.
+export type Verdict = { headline: string; detail: string };
 
 // Thresholds (PRD "Interpretation rules").
 // Year-over-year changes read in three bands so the words never fight the number:
@@ -91,6 +93,8 @@ export const MIN_DAYS_FOR_EXPOSURE = 7;
 // Exposure against our archive: within 10% of typical reads as "typical".
 export const EXPOSURE_ABOVE_RATIO = 1.1;
 export const EXPOSURE_BELOW_RATIO = 0.9;
+// Two weeks online with no showing booked is a signal worth leading with.
+export const NO_SHOWINGS_DAYS = 14;
 
 const numberFormat = new Intl.NumberFormat("en-CA");
 const fmt = (value: number) => numberFormat.format(value);
@@ -163,6 +167,7 @@ export function interpretMarket(v: MarketValues, ctx: MarketContext): string[] {
   const lastMonth = `last ${monthName(ctx.reporting_month)}`;
   const where = ctx.region_label;
   const what = ctx.type_label;
+  const moi = v.months_of_inventory;
 
   // Local inventory leads: those are the homes buyers compare this one against.
   if (v.local_active !== null && ctx.local_label) {
@@ -193,21 +198,26 @@ export function interpretMarket(v: MarketValues, ctx: MarketContext): string[] {
 
   if (v.active_inventory !== null) {
     const b = band(v.inventory_yoy_pct);
+    // The year-over-year move and the pace of sales can point in opposite directions; say
+    // both in one breath so "fewer competing" never sits next to "buyer's market" unexplained.
     const meaning =
       b === "same"
         ? " The amount of competition is unchanged."
         : b === "down" || b === "far-down"
-          ? " Fewer properties are competing for buyers."
+          ? moi !== null && moi >= MOI_BUYERS_MARKET
+            ? " That is fewer than last year, but still more than buyers are taking up."
+            : " Fewer properties are competing for buyers."
           : b === "up" || b === "far-up"
-            ? " More properties are competing for buyers."
+            ? moi !== null && moi <= MOI_SELLERS_MARKET
+              ? " That is more than last year, but buyers are still taking them up quickly."
+              : " More properties are competing for buyers."
             : "";
     out.push(
       `${fmt(v.active_inventory)} ${what} were for sale at the end of ${month}${change(v.inventory_yoy_pct, "fewer", "more", `than ${lastMonth}`)}.${meaning}`
     );
   }
 
-  if (v.months_of_inventory !== null) {
-    const moi = v.months_of_inventory;
+  if (moi !== null) {
     // The rule itself, so the seller learns it; the Bottom line below says what it means.
     const reading =
       moi >= MOI_BUYERS_MARKET
@@ -241,8 +251,7 @@ export function interpretMarket(v: MarketValues, ctx: MarketContext): string[] {
     );
   }
 
-  if (v.months_of_inventory !== null) {
-    const moi = v.months_of_inventory;
+  if (moi !== null) {
     out.push(
       moi >= MOI_BUYERS_MARKET
         ? "Bottom line: buyers have the upper hand right now. They can compare many properties, take their time, and walk away from any that don't measure up."
@@ -263,7 +272,7 @@ function exposureLevel(exposure: ExposureBenchmark | null): ExposureLevel | null
   return ratio >= EXPOSURE_ABOVE_RATIO ? "above" : ratio <= EXPOSURE_BELOW_RATIO ? "below" : "typical";
 }
 
-/** Sentences about this home against that market, ending with what it means for the seller. */
+/** Sentences about this home against that market (the listing sheet's list). The cover's verdict says what they mean. */
 export function interpretProperty(
   v: MarketValues,
   ctx: MarketContext,
@@ -327,71 +336,99 @@ export function interpretProperty(
     );
   }
 
-  // What this means for the seller: exposure and time on market, read together.
-  if (level && days !== null) {
-    if (level === "below") {
-      out.push("What this means for you: until more buyers see the property, nothing else can be judged. Exposure comes first.");
-    } else if (longerThanMost) {
-      out.push(
-        "What this means for you: plenty of buyers have looked, yet the property has been available longer than most that sold. When that happens, buyers are choosing other properties they see as better value. Price and presentation are what they weigh."
-      );
-    } else {
-      out.push(
-        `What this means for you: exposure is strong and it is early. Most properties that sold took about ${fmt(days)} days, so the coming weeks will tell.`
-      );
-    }
-  }
-
   return out;
 }
 
-const joinList = (items: string[]) =>
-  items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
-
-export type ChannelTotals = { website_views: number; social_views: number; site_total_views: number };
-
 /**
- * The cover "Summary" of a market update: short sentences that digest the sheets below
- * (the market figures, then the property's own numbers), built only from values the
- * coordinator reviewed. Empty parts are left out, never guessed.
+ * Where the property stands, for the cover (the seller asking "why hasn't it sold yet?"). Leads with the most
+ * telling signal: too few buyers seeing the property, then buyers looking online but not
+ * booking visits, then visits without an offer, then time on market against the average
+ * sale, then the pace of the market when the board publishes no days to sell. Built from
+ * the same reviewed numbers as the sheets. Never calls the price wrong and never
+ * recommends a price change: "Price and presentation are what they weigh." is the ceiling.
  */
-export function summarizeMarketUpdate(
+export function sellerVerdict(
   v: MarketValues,
   ctx: MarketContext,
-  property: PropertyContext & ChannelTotals,
-  exposure: ExposureBenchmark | null = null
-): string[] {
-  const out: string[] = [];
+  property: PropertyContext,
+  exposure: ExposureBenchmark | null
+): Verdict {
   const month = monthLabel(ctx.reporting_month);
-  const lastMonth = `last ${monthName(ctx.reporting_month)}`;
+  const dom = property.days_on_market;
+  const days = v.days_to_sell;
+  const moi = v.months_of_inventory;
+  const showings = property.showings;
+  const level = dom >= MIN_DAYS_FOR_EXPOSURE && property.realtor_views > 0 ? exposureLevel(exposure) : null;
+  const perDay = dom > 0 ? Math.round(property.realtor_views / dom) : 0;
+  const seen = level === "above" || level === "typical";
+  const weigh = "Price and presentation are what they weigh.";
+  const plural = (n: number, word: string) => `${fmt(n)} ${word}${n === 1 ? "" : "s"}`;
 
-  if (v.local_active !== null && ctx.local_label) {
-    out.push(`${fmt(v.local_active)} ${ctx.type_label} are for sale in ${ctx.local_label} right now${change(v.local_active_yoy_pct)}.`);
+  if (level === "below" && exposure) {
+    return {
+      headline: "Not enough buyers are seeing your property yet.",
+      detail: `It is getting about ${fmt(perDay)} views a day on REALTOR.ca, below the typical ${fmt(Math.round(exposure.benchmark_views_per_day))}. Until more buyers see it, nothing else can be judged, so reaching more buyers comes first.`
+    };
   }
 
-  const market: string[] = [];
-  if (v.sales !== null) market.push(`In ${month}, ${fmt(v.sales)} ${ctx.type_label} sold in ${ctx.region_label}${change(v.sales_yoy_pct)}.`);
-  const supply: string[] = [];
-  if (v.active_inventory !== null) supply.push(`${fmt(v.active_inventory)} were for sale at month end${change(v.inventory_yoy_pct, "fewer", "more", `than ${lastMonth}`)}`);
-  if (v.months_of_inventory !== null) supply.push(`at that pace it would take ${v.months_of_inventory} months to sell them all`);
-  if (supply.length > 0) market.push(`${supply.join(", and ")}.`);
-  if (v.days_to_sell !== null) market.push(`The average sale took ${fmt(v.days_to_sell)} days${change(v.days_to_sell_yoy_pct, "shorter", "longer")}.`);
-  if (market.length > 0) out.push(market.join(" "));
-
-  const channels: string[] = [];
-  if (property.realtor_views > 0) channels.push(`${fmt(property.realtor_views)} REALTOR.ca views`);
-  if (property.website_views > 0) channels.push(`${fmt(property.website_views)} website views`);
-  if (property.social_views > 0) channels.push(`${fmt(property.social_views)} social media views`);
-  let home = property.days_on_market > 0 ? `Your property has been on the market for ${fmt(property.days_on_market)} days` : "Your property";
-  if (channels.length > 0) home += ` and has drawn ${joinList(channels)}`;
-  if (property.showings !== null && property.showings > 0) {
-    home += `, with ${fmt(property.showings)} showing${property.showings === 1 ? "" : "s"}`;
+  if (showings === 0 && dom >= NO_SHOWINGS_DAYS) {
+    return {
+      headline: "Buyers are looking online, but no one has booked a showing.",
+      detail: `In ${fmt(dom)} days it has drawn${perDay > 0 ? ` about ${fmt(perDay)} views a day on REALTOR.ca` : " views online"}, but no buyer has asked to see it in person. Buyers are comparing it with other listings and visiting those first. ${weigh}`
+    };
   }
-  home += ".";
-  const level = property.days_on_market >= MIN_DAYS_FOR_EXPOSURE && property.realtor_views > 0 ? exposureLevel(exposure) : null;
-  if (level === "above") home += " That is more exposure than most listings get.";
-  if (level === "below") home += " That is less exposure than most listings get.";
-  if (level === "typical") home += " That is typical exposure for a listing.";
-  out.push(home);
-  return out;
+
+  if (days !== null && dom > days) {
+    const when = `Properties that sold in ${month} took ${fmt(days)} days on average; yours has been listed for ${fmt(dom)}${dom >= days * 2 ? ", about twice as long" : ""}.`;
+    if (showings !== null && showings > 0) {
+      return {
+        headline: "Buyers are visiting, but no one has made an offer yet.",
+        detail: `${plural(showings, "showing")} so far show real interest. ${when} When visits don't turn into offers, buyers are choosing other properties they see as better value. ${weigh}`
+      };
+    }
+    return {
+      headline: seen ? "Buyers are seeing it, but it is taking longer than most." : "It is taking longer than most properties that sold.",
+      detail: `${when} ${seen ? "Plenty of buyers have looked, so they are" : "Buyers are"} choosing other properties they see as better value. ${weigh}`
+    };
+  }
+
+  if (days !== null) {
+    return {
+      headline: "It is still early. Your property is on track.",
+      detail: `Properties that sold in ${month} took ${fmt(days)} days on average; yours has been listed for ${fmt(dom)}.${
+        seen ? " Buyers are seeing it as much as most listings." : ""
+      }${showings !== null && showings > 0 ? ` Buyers have booked ${plural(showings, "showing")} already.` : ""} The coming weeks will tell.`
+    };
+  }
+
+  // No days to sell published (VIREB, Yukon): the pace of the market is the context.
+  const listed = dom > 0 ? ` Your property has been listed for ${fmt(dom)} days.` : "";
+  const where = ctx.region_label;
+  if (moi !== null && moi >= MOI_BUYERS_MARKET) {
+    return {
+      headline: "It is a slow market, and buyers have plenty of choice.",
+      detail: `At the current pace it would take ${moi} months to sell every property listed in ${where}, so properties are taking longer to sell.${listed}${
+        seen ? " Buyers are seeing yours as much as most listings." : ""
+      } With this much choice, buyers compare carefully. ${weigh}`
+    };
+  }
+  if (moi !== null && moi <= MOI_SELLERS_MARKET) {
+    return {
+      headline: "Buyers are active in your market.",
+      detail: `At the current pace it would take ${moi} months to sell every property listed in ${where}, so properties are selling steadily.${listed}${
+        seen ? " Buyers are seeing yours as much as most listings." : ""
+      }`
+    };
+  }
+  if (moi !== null) {
+    return {
+      headline: "The market is balanced.",
+      detail: `At the current pace it would take ${moi} months to sell every property listed in ${where}. Properties that match what buyers expect sell at a steady pace.${listed}`
+    };
+  }
+
+  return {
+    headline: "Here is where things stand.",
+    detail: `Your property has been listed for ${fmt(dom)} days${property.realtor_views > 0 ? ` and has drawn ${fmt(property.realtor_views)} views on REALTOR.ca` : ""}. The pages that follow show where the interest is coming from.`
+  };
 }

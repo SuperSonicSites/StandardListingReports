@@ -1,4 +1,4 @@
-import type { ExposureBenchmark, MarketValues, PropertyType, RecordType } from "./market-rules";
+import type { ExposureBenchmark, MarketValues, PropertyType, RecordType, Verdict } from "./market-rules";
 
 export type ClientProfile = {
   slug: string;
@@ -123,6 +123,9 @@ export type ReportSnapshot = {
     // neither key and render as listing reports.
     kind?: "listing" | "market";
     property_type?: PropertyType;
+    // Market update cover: where the property stands, written by the rules (frozen at
+    // creation; older market updates compute it at render).
+    verdict?: Verdict;
   };
   website: {
     source: MetricSource;

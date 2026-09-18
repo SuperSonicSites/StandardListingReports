@@ -55,7 +55,7 @@ const propertyType = prefill?.report.property_type ?? "single_family";
             <h1>{marketMode ? "Create Seller Market Update" : "Create Listing Report"}</h1>
             <p>
               {marketMode
-                ? "Paste your REALTOR.ca share link and pull. We fetch the listing's numbers and this month's market statistics for your area, then open your update."
+                ? "For the seller asking why it hasn't sold yet. Paste your REALTOR.ca share link and pull. The update opens with where the property stands, backed by the listing's numbers and this month's market."
                 : "Paste your REALTOR.ca share link and pull. We find the listing, the matching posts, and the numbers, then open your report."}
             </p>
             <p class="field-hint" style="margin-top: 10px">
@@ -139,7 +139,6 @@ const propertyType = prefill?.report.property_type ?? "single_family";
                   </p>
                 </div>
               )}
-
               <div class="pull-strip">
                 <div class="pull-status" aria-live="polite">
                   <span class="pull-dot" data-pull-dot aria-hidden="true" />
@@ -541,7 +540,12 @@ const propertyType = prefill?.report.property_type ?? "single_family";
                     </div>
                   </div>
                   <div class="market-preview" style="margin-top: 16px">
-                    <h3>What this means <span class="field-hint" style="font-weight: 400">— preview, written by fixed rules from the numbers above</span></h3>
+                    <h3>Where your property stands <span class="field-hint" style="font-weight: 400">— the first thing your seller reads, written by fixed rules from these numbers</span></h3>
+                    <p style="margin: 0 0 12px">
+                      <strong data-verdict-headline />
+                      <span data-verdict-detail />
+                    </p>
+                    <h3>What this means</h3>
                     <ul data-interpretation-market />
                     <h3>Your listing in this market</h3>
                     <ul data-interpretation-property />

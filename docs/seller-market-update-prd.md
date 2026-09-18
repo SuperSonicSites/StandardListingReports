@@ -23,6 +23,14 @@ The coordinator never researches or types market statistics. Typing is the fallb
 
 ## Report content
 
+Order (owner, 18 September 2026): where the property stands first, then the listing, then the market, then compliance. The update is mostly sent when a seller asks "why hasn't it sold yet?", so the positioning leads and the statistics back it up. One click: the agent types nothing (owner decision, 18 September 2026 — a draft with agent-written feedback and next-step boxes was rejected as asking too much).
+
+### Cover: where your property stands
+
+- One verdict headline and two or three plain sentences under the label "Where your property stands", written by `sellerVerdict()` from the same reviewed numbers and frozen as `report.verdict` (market updates made before it existed compute it at render).
+- Three numbers behind it: days on market against the average sale; how much buyers see it (REALTOR.ca views a day against our archive once it holds 30 qualifying reports, otherwise total views); showings when entered, otherwise the market's months of inventory.
+- The listing photo fills the rest of the page.
+
 ### 1. Market conditions (one sheet)
 
 Only the metrics the market actually publishes. Missing values are omitted, never guessed.
@@ -121,7 +129,7 @@ Market sentences, in order:
 - Local inventory (where a board exposes it): the count of homes of this type for sale in the local area right now, then "Those are the properties buyers compare yours against."
 - Sales: the count and change, then "Buyer demand is steady / has softened / is stronger."
 - **Small-market guardrail:** under 30 sales in the month, the sentence gives the count and says the percentages swing a lot with this few sales, and draws no demand conclusion.
-- Homes for sale at month end: the count and change against the same month last year, then "Fewer / More properties are competing for buyers."
+- Homes for sale at month end: the count and change against the same month last year, then "Fewer / More properties are competing for buyers." When the count fell but it is still a buyer's market, one sentence says both: "That is fewer than last year, but still more than buyers are taking up." (and the mirror case in a seller's market).
 - Months of inventory, said as "at August's pace of sales it would take 8.6 months to sell every property listed", then the rule: over six months is a buyer's market; under four a seller's market; between is balanced. The thresholds are spelled out so the seller learns the rule; the Bottom line says what it means.
 - New listings, only when they moved by 5 percent or more: the count and change, then "so fewer / more new competitors are arriving."
 - Days to sell: "Properties that sold in August had been on the market for 60 days on average", with the change, then whether buyers are taking longer or deciding faster than last year.
@@ -133,7 +141,7 @@ Property sentences, in order:
 - Days on market against the average sale: "still early" when under it; "longer than most properties that sold" when over it; "about twice as long" at double. Against months of inventory when the board publishes no days to sell.
 - Exposure: REALTOR.ca views per day compared with the median of Supersonic's own archive, **only when the archive holds at least 30 qualifying reports**; whole numbers, sample size stated. Above typical ends "Exposure is not the problem." Below typical ends "Exposure is the first thing to fix." Without a benchmark the sentence states the home's own views per day and nothing more.
 - Showings, when entered, including "No showings have taken place yet" for an explicit zero.
-- **What this means for you**, only when both an exposure verdict and days to sell exist: strong exposure but longer than most sales reads "buyers are choosing other properties they see as better value. Price and presentation are what they weigh."; strong exposure and early reads "the coming weeks will tell"; weak exposure reads "exposure comes first".
+- The cover's **short answer** (`sellerVerdict`) says what these mean and picks the most telling signal, in order: too few buyers seeing it (below the archive's typical); looking online but no showing booked after 14 days; showings but no offer, and longer than the average sale; longer than the average sale; still early; and, where the board publishes no days to sell, the pace of the market. "Price and presentation are what they weigh." is the ceiling. (The listing sheet's list states the facts only.)
 
 The rules never call the home overpriced and never recommend a price change. Only sentences supported by available data are produced.
 

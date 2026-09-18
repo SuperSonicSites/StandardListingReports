@@ -4256,6 +4256,55 @@ a.hub-option:focus-visible {
   line-height: 1.5;
 }
 
+/* Market update cover: where the property stands, then the numbers behind it; the photo
+   fills whatever height is left, as on the listing cover. */
+.report-answer-card {
+  display: grid;
+  gap: 8px;
+  border-left: 4px solid var(--client-accent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--client-accent) 12%, #ffffff);
+  padding: 18px 20px;
+}
+
+.report-answer-card .report-outline-label {
+  color: var(--client-primary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.report-answer-card h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.5rem;
+  font-weight: 780;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.report-answer-card p {
+  margin: 0;
+  color: var(--report-charcoal);
+  font-size: 0.96rem;
+  line-height: 1.55;
+}
+
+.report-widget-row.report-widget-row-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.report-proof-row .report-widget {
+  min-height: 0;
+  gap: 12px;
+}
+
+.report-proof-row .report-widget strong {
+  font-size: 1.5rem;
+}
+
 .market-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

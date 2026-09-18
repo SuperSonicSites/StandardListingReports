@@ -2,7 +2,16 @@
 import AppLayout from "../../layouts/AppLayout.astro";
 import SupersonicBrand from "../../components/SupersonicBrand.astro";
 import { formatDate, formatDateRange, formatNumber } from "../../lib/format";
-import { monthLabel, summarizeMarketUpdate } from "../../lib/market-rules";
+import {
+  EMPTY_MARKET_VALUES,
+  MIN_BENCHMARK_SAMPLE,
+  MIN_DAYS_FOR_EXPOSURE,
+  MOI_BUYERS_MARKET,
+  MOI_SELLERS_MARKET,
+  monthLabel,
+  sellerVerdict,
+  TYPE_LABELS
+} from "../../lib/market-rules";
 import { readSnapshot } from "../../lib/storage";
 
 const snapshotId = Astro.params.snapshotId ?? "";
@@ -111,9 +120,9 @@ const Icon = ({ name, size = 18 }: IconProps) =>
 // --- Seller Market Update: the market sheet (only when the snapshot carries market figures).
 const market = snapshot?.market;
 const isMarketUpdate = snapshot?.report.kind === "market";
-// Sheet numbers are handed out in render order: the market sheet leads when present, and
-// a market update has no social post sheet (the stats keep the social views; the posts
-// themselves are noise for a "why isn't it selling" conversation).
+// Sheet numbers are handed out in render order. A market update reads answer (cover) ->
+// your listing -> the market -> compliance, and has no social post sheet (the stats keep
+// the social views; the posts themselves are noise for a "why isn't it selling" conversation).
 let sheetCount = 0;
 const nextSheet = () => String(++sheetCount).padStart(2, "0");
 const yoyText = (value: number | null) =>
@@ -167,26 +176,70 @@ const marketTiles: MarketTile[] = market
       .filter((tile): tile is MarketTile => Boolean(tile))
       .slice(0, 6)
   : [];
-// The cover summary digests the sheets below; computed from the frozen figures at render time.
-const marketSummary =
-  market && snapshot
-    ? summarizeMarketUpdate(
-        market,
-        {
-          region_label: market.region_label,
-          reporting_month: market.reporting_month,
-          type_label: market.type_label,
-          local_label: market.local_label
-        },
-        {
-          days_on_market: snapshot.manual.days_on_market,
-          realtor_views: snapshot.manual.realtor_listing_views,
-          showings: showShowings ? snapshot.manual.showings : null,
-          website_views: snapshot.website.listing_views,
-          social_views: socialViews,
-          site_total_views: siteTotalViews
-        }
-      )
+
+// --- Market update cover: where the property stands (for the seller asking "why hasn't it
+// sold yet?"), then the three numbers behind it, then the photo. The verdict is frozen at
+// creation; market updates made before it existed compute it here from their frozen numbers.
+const daysOnMarket = snapshot?.manual.days_on_market ?? 0;
+const verdict =
+  snapshot && isMarketUpdate
+    ? (snapshot.report.verdict ??
+      sellerVerdict(
+        market ?? EMPTY_MARKET_VALUES,
+        market ?? { region_label: "your area", reporting_month: "", type_label: TYPE_LABELS[snapshot.report.property_type ?? "single_family"] },
+        { days_on_market: daysOnMarket, realtor_views: snapshot.manual.realtor_listing_views, showings: showShowings ? snapshot.manual.showings : null },
+        market?.exposure ?? null
+      ))
+    : null;
+const exposure = market?.exposure ?? null;
+const hasBenchmark = Boolean(
+  exposure && exposure.sample_size >= MIN_BENCHMARK_SAMPLE && exposure.benchmark_views_per_day > 0 && daysOnMarket >= MIN_DAYS_FOR_EXPOSURE
+);
+const monthsOfInventory = market ? market.months_of_inventory : null;
+const averageSaleDays = market ? market.days_to_sell : null;
+const proofTiles: MarketTile[] =
+  snapshot && isMarketUpdate
+    ? (
+        [
+          {
+            label: "On the market",
+            value: `${formatNumber(daysOnMarket)} days`,
+            sub:
+              averageSaleDays !== null
+                ? `The average sale took ${formatNumber(averageSaleDays)} days`
+                : monthsOfInventory !== null
+                  ? `${monthsOfInventory} months to sell every listing`
+                  : "since the first day on market",
+            icon: "clock"
+          },
+          hasBenchmark && exposure
+            ? {
+                label: "Seen by buyers",
+                value: `${formatNumber(Math.round(exposure.views_per_day))} a day`,
+                sub: `REALTOR.ca views · typical is ${formatNumber(Math.round(exposure.benchmark_views_per_day))}`,
+                icon: "eye"
+              }
+            : { label: "Seen by buyers", value: formatNumber(totalViews), sub: "views on REALTOR.ca, the website and social media", icon: "eye" },
+          showShowings
+            ? {
+                label: "Showings",
+                value: formatNumber(snapshot.manual.showings),
+                sub: snapshot.manual.showings === 0 ? "no in-person visits yet" : "in-person visits so far",
+                icon: "people"
+              }
+            : monthsOfInventory !== null && {
+                label: "The market",
+                value: `${monthsOfInventory} months`,
+                sub:
+                  monthsOfInventory >= MOI_BUYERS_MARKET
+                    ? "to sell every listing: a buyer's market"
+                    : monthsOfInventory <= MOI_SELLERS_MARKET
+                      ? "to sell every listing: a seller's market"
+                      : "to sell every listing: a balanced market",
+                icon: "calendar"
+              }
+        ] as (MarketTile | false)[]
+      ).filter((tile): tile is MarketTile => Boolean(tile))
     : [];
 ---
 
@@ -242,112 +295,97 @@ const marketSummary =
             <p class="report-eyebrow-label">{isMarketUpdate ? "Seller Market Update" : "Listing Report"}</p>
           </div>
 
-          <header class="report-cover-header">
-            <div class="report-cover-title">
-              <h1>{snapshot.report.address}</h1>
-            </div>
-            <div class="report-period-pill">
-              <Fragment set:html={Icon({ name: "calendar", size: 16 })} />
-              <div class="report-period-text">
-                <span class="report-period-label">Report period</span>
-                <span class="report-period-value">{dateRange}</span>
-              </div>
-            </div>
-          </header>
-
-          {propertyImage && (
-            <figure class="report-property-photo">
-              <img src={propertyImage} alt={`${snapshot.report.address} — listing photo`} />
-            </figure>
-          )}
-
-          <section class="report-detail-row">
-            <div class="report-summary-card">
-              <span class="report-outline-label">Summary</span>
-              {market ? (
-                marketSummary.map((sentence) => <p>{sentence}</p>)
-              ) : (
-                <p>
-                  In this report you will find all the stats about the {snapshot.report.address} listing,
-                  including how many times it was viewed across the web, REALTOR.ca, and social
-                  media{showShowings ? ", along with showings," : ""} and how long it has been on the market.
-                </p>
-              )}
-              {siteTotalViews > 0 && !market && (
-                <p>
-                  Over the same period, {/^the\s/i.test(snapshot.client.name) ? "" : "the "}{snapshot.client.name} website attracted{" "}
-                  {formatNumber(siteTotalViews)} page views — a built-in audience of active buyers your
-                  listing is positioned in front of from day one.
-                </p>
-              )}
-            </div>
-          </section>
-        </section>
-
-        {market && (
-          <section class="report-sheet report-market-sheet">
-            <header class="report-section-heading">
-              <span>{nextSheet()}</span>
-              <div>
-                <p>Market conditions</p>
-                <h2>
-                  {market.local_label ? `${market.local_label} · ${market.region_label}` : market.region_label}, {monthLabel(market.reporting_month)}
-                </h2>
-              </div>
-            </header>
-
-            <section
-              class:list={["report-widget-row", marketTiles.length <= 4 ? "report-widget-row-4" : "report-widget-row-3"]}
-              aria-label="Market statistics"
-            >
-              {marketTiles.map((tile) => (
-                <article class="report-widget">
-                  <span class="report-widget-icon"><Fragment set:html={Icon({ name: tile.icon })} /></span>
-                  <div class="report-widget-body">
-                    <span>{tile.label}</span>
-                    <strong style={tile.value.length > 8 ? "font-size: 1.3rem" : undefined}>{tile.value}</strong>
-                    {tile.sub && <em class="report-widget-sub">{tile.sub}</em>}
+          {verdict ? (
+            <>
+              <header class="report-cover-header">
+                <div class="report-cover-title">
+                  <h1>{snapshot.report.address}</h1>
+                </div>
+                <div class="report-period-pill">
+                  <Fragment set:html={Icon({ name: "calendar", size: 16 })} />
+                  <div class="report-period-text">
+                    <span class="report-period-label">Report period</span>
+                    <span class="report-period-value">{dateRange}</span>
                   </div>
-                </article>
-              ))}
-            </section>
+                </div>
+              </header>
 
-            <section class="report-summary-card" aria-label="What this means">
-              <span class="report-outline-label">What this means</span>
-              <ul class="report-market-list">
-                {market.interpretation.market.map((sentence) => (
-                  <li>{sentence}</li>
+              <section class="report-answer-card" aria-label="Where your property stands">
+                <span class="report-outline-label">Where your property stands</span>
+                <h2>{verdict.headline}</h2>
+                <p>{verdict.detail}</p>
+              </section>
+
+              <section
+                class:list={["report-widget-row", "report-proof-row", proofTiles.length === 3 ? "report-widget-row-3" : "report-widget-row-2"]}
+                aria-label="The numbers behind it"
+              >
+                {proofTiles.map((tile) => (
+                  <article class="report-widget">
+                    <span class="report-widget-icon"><Fragment set:html={Icon({ name: tile.icon })} /></span>
+                    <div class="report-widget-body">
+                      <span>{tile.label}</span>
+                      <strong>{tile.value}</strong>
+                      <em class="report-widget-sub">{tile.sub}</em>
+                    </div>
+                  </article>
                 ))}
-              </ul>
-            </section>
+              </section>
 
-            <section class="report-summary-card" aria-label="Your listing in this market">
-              <span class="report-outline-label">Your listing in this market</span>
-              <ul class="report-market-list">
-                {market.interpretation.property.map((sentence) => (
-                  <li>{sentence}</li>
-                ))}
-              </ul>
-            </section>
+              {propertyImage && (
+                <figure class="report-property-photo">
+                  <img src={propertyImage} alt={`${snapshot.report.address} — listing photo`} />
+                </figure>
+              )}
+            </>
+          ) : (
+            <>
+              <header class="report-cover-header">
+                <div class="report-cover-title">
+                  <h1>{snapshot.report.address}</h1>
+                </div>
+                <div class="report-period-pill">
+                  <Fragment set:html={Icon({ name: "calendar", size: 16 })} />
+                  <div class="report-period-text">
+                    <span class="report-period-label">Report period</span>
+                    <span class="report-period-value">{dateRange}</span>
+                  </div>
+                </div>
+              </header>
 
-            <p class="report-source-line">
-              Source: {market.board_label}, {monthLabel(market.reporting_month)} statistics for {market.type_label} in {market.region_label}.
-              {market.retrieved_at ? ` Retrieved ${formatDate(market.retrieved_at.slice(0, 10))}.` : ""}
-              {market.local_label && market.local_active !== null
-                ? ` Listings for sale in ${market.local_label}: the board's public listings site, as of the same date.`
-                : ""}
-              {market.source === "manual" ? " Some figures were entered or adjusted by the coordinator." : ""}
-              {market.months_of_inventory !== null ? " Months of inventory is active listings divided by the month's sales." : ""}
-            </p>
-          </section>
-        )}
+              {propertyImage && (
+                <figure class="report-property-photo">
+                  <img src={propertyImage} alt={`${snapshot.report.address} — listing photo`} />
+                </figure>
+              )}
+
+              <section class="report-detail-row">
+                <div class="report-summary-card">
+                  <span class="report-outline-label">Summary</span>
+                  <p>
+                    In this report you will find all the stats about the {snapshot.report.address} listing,
+                    including how many times it was viewed across the web, REALTOR.ca, and social
+                    media{showShowings ? ", along with showings," : ""} and how long it has been on the market.
+                  </p>
+                  {siteTotalViews > 0 && (
+                    <p>
+                      Over the same period, {/^the\s/i.test(snapshot.client.name) ? "" : "the "}{snapshot.client.name} website attracted{" "}
+                      {formatNumber(siteTotalViews)} page views — a built-in audience of active buyers your
+                      listing is positioned in front of from day one.
+                    </p>
+                  )}
+                </div>
+              </section>
+            </>
+          )}
+        </section>
 
         <section class="report-sheet report-performance-sheet">
           <header class="report-section-heading">
             <span>{nextSheet()}</span>
             <div>
               <p>Listing performance</p>
-              <h2>Activity summary</h2>
+              <h2>{isMarketUpdate ? "Your listing" : "Activity summary"}</h2>
             </div>
           </header>
 
@@ -394,6 +432,17 @@ const marketSummary =
             )}
           </section>
 
+          {market && market.interpretation.property.length > 0 && (
+            <section class="report-summary-card" aria-label="Your listing in this market">
+              <span class="report-outline-label">Your listing in this market</span>
+              <ul class="report-market-list">
+                {market.interpretation.property.map((sentence) => (
+                  <li>{sentence}</li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           <section class="report-table-card" aria-label="Marketing source breakdown">
             <div class="report-table-row report-table-head">
               <span class="report-table-icon" aria-hidden="true"></span>
@@ -432,6 +481,55 @@ const marketSummary =
             </article>
           </section>
         </section>
+
+        {market && (
+          <section class="report-sheet report-market-sheet">
+            <header class="report-section-heading">
+              <span>{nextSheet()}</span>
+              <div>
+                <p>Market conditions</p>
+                <h2>
+                  {market.local_label ? `${market.local_label} · ${market.region_label}` : market.region_label}, {monthLabel(market.reporting_month)}
+                </h2>
+              </div>
+            </header>
+
+            <section
+              class:list={["report-widget-row", marketTiles.length <= 4 ? "report-widget-row-4" : "report-widget-row-3"]}
+              aria-label="Market statistics"
+            >
+              {marketTiles.map((tile) => (
+                <article class="report-widget">
+                  <span class="report-widget-icon"><Fragment set:html={Icon({ name: tile.icon })} /></span>
+                  <div class="report-widget-body">
+                    <span>{tile.label}</span>
+                    <strong style={tile.value.length > 8 ? "font-size: 1.3rem" : undefined}>{tile.value}</strong>
+                    {tile.sub && <em class="report-widget-sub">{tile.sub}</em>}
+                  </div>
+                </article>
+              ))}
+            </section>
+
+            <section class="report-summary-card" aria-label="What this means">
+              <span class="report-outline-label">What this means</span>
+              <ul class="report-market-list">
+                {market.interpretation.market.map((sentence) => (
+                  <li>{sentence}</li>
+                ))}
+              </ul>
+            </section>
+
+            <p class="report-source-line">
+              Source: {market.board_label}, {monthLabel(market.reporting_month)} statistics for {market.type_label} in {market.region_label}.
+              {market.retrieved_at ? ` Retrieved ${formatDate(market.retrieved_at.slice(0, 10))}.` : ""}
+              {market.local_label && market.local_active !== null
+                ? ` Listings for sale in ${market.local_label}: the board's public listings site, as of the same date.`
+                : ""}
+              {market.source === "manual" ? " Some figures were entered or adjusted by the coordinator." : ""}
+              {market.months_of_inventory !== null ? " Months of inventory is active listings divided by the month's sales." : ""}
+            </p>
+          </section>
+        )}
 
         {!isMarketUpdate && (
         <section class="report-sheet report-social-sheet">

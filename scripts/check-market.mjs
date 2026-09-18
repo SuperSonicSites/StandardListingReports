@@ -163,6 +163,17 @@ assert.equal(market.monthsBetween("2026-08", "2026-05"), 3);
     "Bottom line: buyers have the upper hand right now. They can compare many properties, take their time, and walk away from any that don't measure up."
   ]);
 
+  // Fewer for sale than last year, yet still a buyer's market: said in one breath, no mixed signal.
+  assert.equal(
+    rules.interpretMarket({ ...values, inventory_yoy_pct: -17.7 }, ctx)[1],
+    "1,219 single-family homes were for sale at the end of August 2026, 17.7% fewer than last August. That is fewer than last year, but still more than buyers are taking up."
+  );
+  assert.match(
+    rules.interpretMarket({ ...values, inventory_yoy_pct: -17.7, months_of_inventory: 5 }, ctx)[1],
+    / Fewer properties are competing for buyers\.$/,
+    "outside a buyer's market, fewer listings simply means less competition"
+  );
+
   // The words never fight the number: under 5% reads "about the same"; larger moves are stated as the figure.
   assert.match(rules.interpretMarket({ ...values, sales_yoy_pct: -4 }, ctx)[0], /about the same as a year ago\. Buyer demand is steady\.$/);
   assert.match(rules.interpretMarket({ ...values, sales_yoy_pct: 22 }, ctx)[0], /22% more than a year ago\. Buyer demand is stronger\.$/);
@@ -193,7 +204,7 @@ assert.equal(market.monthsBetween("2026-08", "2026-05"), 3);
   // Nothing published => nothing said.
   assert.equal(rules.interpretMarket(rules.EMPTY_MARKET_VALUES, ctx).length, 0);
 
-  // The home against the market, without an exposure benchmark.
+  // The home against the market, without an exposure benchmark (the listing sheet's facts).
   const property = { days_on_market: 90, realtor_views: 900, showings: 3 };
   const p = rules.interpretProperty(values, ctx, property, null);
   assert.deepEqual(p, [
@@ -213,43 +224,58 @@ assert.equal(market.monthsBetween("2026-08", "2026-05"), 3);
   assert.equal(rules.interpretProperty(values, ctx, { ...property, showings: 0 }, null)[2], "No showings have taken place yet.");
   assert.equal(rules.interpretProperty(values, ctx, { ...property, showings: 1 }, null)[2], "1 showing has taken place so far.");
 
-  // Exposure against our archive, only once the sample is big enough — then the verdict for the seller.
+  // Exposure against our archive, only once the sample is big enough.
   const bench = { views_per_day: 10, benchmark_views_per_day: 5, sample_size: rules.MIN_BENCHMARK_SAMPLE };
   const above = rules.interpretProperty(values, ctx, property, bench);
   assert.equal(
     above[1],
     "Buyers are seeing your property more than most: about 10 views a day on REALTOR.ca, against a typical 5 a day across the 30 listings we have reported on. Exposure is not the problem."
   );
-  assert.equal(
-    above[3],
-    "What this means for you: plenty of buyers have looked, yet the property has been available longer than most that sold. When that happens, buyers are choosing other properties they see as better value. Price and presentation are what they weigh."
-  );
-  const early = rules.interpretProperty(values, ctx, { ...property, days_on_market: 30 }, bench);
-  assert.equal(early[3], "What this means for you: exposure is strong and it is early. Most properties that sold took about 60 days, so the coming weeks will tell.");
+  assert.equal(above.length, 3, "the listing sheet states facts; the cover's short answer says what they mean");
   assert.match(rules.interpretProperty(values, ctx, property, { ...bench, benchmark_views_per_day: 10 })[1], /^Your property is getting typical exposure: about 10 views a day/);
   const below = rules.interpretProperty(values, ctx, property, { ...bench, benchmark_views_per_day: 20 });
   assert.match(below[1], /^Fewer buyers than usual are seeing your property.*Exposure is the first thing to fix\.$/);
-  assert.match(below[3], /^What this means for you: until more buyers see the property/);
   const tooFew = rules.interpretProperty(values, ctx, property, { ...bench, sample_size: rules.MIN_BENCHMARK_SAMPLE - 1 });
   assert.equal(tooFew[1], "Your property has drawn 900 views on REALTOR.ca over 90 days, about 10 a day.");
-  assert.equal(tooFew.length, 3, "no verdict without a defensible benchmark");
 
-  // Cover summary: a digest of the sheets, market first, then the property's own numbers.
-  const summary = rules.summarizeMarketUpdate(values, ctx, { ...property, showings: null, website_views: 52, social_views: 920, site_total_views: 8746 });
-  assert.deepEqual(summary, [
-    "In August 2026, 142 single-family homes sold in Central Okanagan, 12.3% fewer than a year ago. 1,219 were for sale at month end, 15% more than last August, and at that pace it would take 8.6 months to sell them all. The average sale took 60 days, 11% longer than a year ago.",
-    "Your property has been on the market for 90 days and has drawn 900 REALTOR.ca views, 52 website views, and 920 social media views."
-  ]);
-  assert.match(
-    rules.summarizeMarketUpdate(values, ctx, { ...property, showings: null, website_views: 52, social_views: 920, site_total_views: 0 }, bench)[1],
-    /That is more exposure than most listings get\.$/
+  // The cover's short answer: the most telling signal first.
+  const typical = { ...bench, benchmark_views_per_day: 10 };
+  const verdict = (overrides, exposure = null, v = values) => rules.sellerVerdict(v, ctx, { ...property, ...overrides }, exposure);
+  const verdicts = {
+    early: verdict({ days_on_market: 28, realtor_views: 280, showings: null }, typical),
+    late: verdict({ showings: null }, typical),
+    visits: verdict({}, typical),
+    noShowings: verdict({ showings: 0 }, typical),
+    below: verdict({}, { ...bench, benchmark_views_per_day: 20 }),
+    slow: verdict({ showings: null }, null, { ...values, days_to_sell: null }),
+    tight: verdict({ showings: null }, null, { ...rules.EMPTY_MARKET_VALUES, months_of_inventory: 3.8 }),
+    nothing: verdict({ showings: null }, null, rules.EMPTY_MARKET_VALUES)
+  };
+  assert.deepEqual(verdicts.early, {
+    headline: "It is still early. Your property is on track.",
+    detail: "Properties that sold in August 2026 took 60 days on average; yours has been listed for 28. Buyers are seeing it as much as most listings. The coming weeks will tell."
+  });
+  assert.deepEqual(verdicts.late, {
+    headline: "Buyers are seeing it, but it is taking longer than most.",
+    detail:
+      "Properties that sold in August 2026 took 60 days on average; yours has been listed for 90. Plenty of buyers have looked, so they are choosing other properties they see as better value. Price and presentation are what they weigh."
+  });
+  assert.equal(verdicts.visits.headline, "Buyers are visiting, but no one has made an offer yet.");
+  assert.match(verdicts.visits.detail, /^3 showings so far show real interest\./);
+  assert.equal(verdicts.noShowings.headline, "Buyers are looking online, but no one has booked a showing.");
+  assert.match(verdicts.noShowings.detail, /^In 90 days it has drawn about 10 views a day on REALTOR\.ca, but no buyer has asked to see it in person\./);
+  assert.equal(verdicts.below.headline, "Not enough buyers are seeing your property yet.");
+  assert.match(verdicts.below.detail, /below the typical 20\./);
+  assert.equal(verdicts.slow.headline, "It is a slow market, and buyers have plenty of choice.");
+  assert.match(verdicts.slow.detail, /^At the current pace it would take 8\.6 months to sell every property listed in Central Okanagan/);
+  assert.equal(verdicts.tight.headline, "Buyers are active in your market.");
+  assert.equal(verdicts.nothing.headline, "Here is where things stand.");
+  assert.equal(
+    verdict({ days_on_market: 5, realtor_views: 50, showings: 0 }, typical).headline,
+    "It is still early. Your property is on track.",
+    "no showings in the first two weeks is not yet a signal"
   );
-  const sparse = rules.summarizeMarketUpdate(
-    { ...rules.EMPTY_MARKET_VALUES, sales: 56 },
-    { ...ctx, region_label: "Yukon", type_label: "all residential properties" },
-    { days_on_market: 0, realtor_views: 0, showings: null, website_views: 0, social_views: 0, site_total_views: 0 }
-  );
-  assert.deepEqual(sparse, ["In August 2026, 56 all residential properties sold in Yukon.", "Your property."]);
+  assert.match(verdict({ days_on_market: 130, showings: null }, typical).detail, /yours has been listed for 130, about twice as long\./);
 
   // Local inventory leads every list when the board exposes it.
   const localCtx = { region_label: "Vancouver Island", reporting_month: "2026-08", type_label: "townhouses", local_label: "Tofino-Ucluelet" };
@@ -260,14 +286,13 @@ assert.equal(market.monthsBetween("2026-08", "2026-05"), 3);
   assert.match(rules.interpretMarket({ ...localValues, local_active_yoy_pct: 28.6 }, localCtx)[0], /^9 townhouses are for sale in Tofino-Ucluelet right now, 28.6% more than a year ago\./);
   const lp = rules.interpretProperty(localValues, localCtx, { days_on_market: 15, realtor_views: 432, showings: null }, null);
   assert.equal(lp[0], "Buyers shopping for townhouses in Tofino-Ucluelet right now have 9 to choose from.");
-  const ls = rules.summarizeMarketUpdate(localValues, localCtx, { days_on_market: 15, realtor_views: 432, showings: null, website_views: 0, social_views: 0, site_total_views: 0 });
-  assert.deepEqual(ls.slice(0, 2), ["9 townhouses are for sale in Tofino-Ucluelet right now.", "In August 2026, 79 townhouses sold in Vancouver Island, 11% more than a year ago."]);
   // Without a local label the local figure is silent, even if a value sneaks in.
   assert.doesNotMatch(rules.interpretMarket(localValues, { ...localCtx, local_label: "" })[0], /right now/);
 
   // Never a price recommendation, in any branch.
-  const everything = [...m, ...small, ...p, ...above, ...early, ...below, ...summary, ...lm, ...lp, ...ls];
-  for (const sentence of everything) assert.doesNotMatch(sentence, /overpriced|reduce (the|your) price|price reduction|lower (the|your) price/i);
+  const verdictText = Object.values(verdicts).flatMap((v) => [v.headline, v.detail]);
+  const everything = [...m, ...small, ...p, ...above, ...below, ...lm, ...lp, ...verdictText];
+  for (const sentence of everything) assert.doesNotMatch(sentence, /overpriced|reduce (the|your) price|price reduction|lower (the|your) price|drop (the|your) price/i);
 
   assert.equal(rules.computeMonthsOfInventory(1219, 142), 8.6);
   assert.equal(rules.computeMonthsOfInventory(10, 0), null);
@@ -275,4 +300,4 @@ assert.equal(market.monthsBetween("2026-08", "2026-05"), 3);
   assert.equal(rules.monthLabel("2026-08"), "August 2026");
 }
 
-console.log("check:market OK — 3 board parsers, the dashboard fragment, percent edge cases, and the rules all pass.");
+console.log("check:market OK — 3 board parsers, the dashboard fragment, percent edge cases, the rules and the cover verdicts all pass.");

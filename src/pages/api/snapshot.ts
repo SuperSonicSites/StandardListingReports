@@ -13,9 +13,11 @@ import {
   MARKET_VALUE_KEYS,
   MIN_DAYS_FOR_EXPOSURE,
   PROPERTY_TYPES,
+  sellerVerdict,
   TYPE_LABELS,
   type MarketValues,
-  type PropertyType
+  type PropertyType,
+  type Verdict
 } from "../../lib/market-rules";
 
 export const prerender = false;
@@ -244,7 +246,19 @@ export const POST: APIRoute = async ({ request }) => {
     ? (propertyTypeRaw as PropertyType)
     : "single_family";
   let market: MarketBlock | undefined;
+  let verdict: Verdict | undefined;
   if (kind === "market") {
+    const property = {
+      days_on_market: numbers.days_on_market!,
+      realtor_views: numbers.realtor_listing_views!,
+      showings: field(form, "showings") === "" ? null : numbers.showings!
+    };
+    // Exposure against our own archive; the rules only quote it once the sample is big enough.
+    const benchmark = await exposureBenchmark().catch(() => null);
+    const exposure =
+      benchmark && property.days_on_market >= MIN_DAYS_FOR_EXPOSURE && property.realtor_views > 0
+        ? { views_per_day: Math.round((property.realtor_views / property.days_on_market) * 10) / 10, ...benchmark }
+        : null;
     const values: MarketValues = { ...EMPTY_MARKET_VALUES };
     const badMarket: string[] = [];
     for (const key of MARKET_VALUE_KEYS) {
@@ -278,17 +292,6 @@ export const POST: APIRoute = async ({ request }) => {
         type_label: field(form, "market_type_label") || TYPE_LABELS[propertyType],
         local_label: field(form, "market_local_label")
       };
-      const property = {
-        days_on_market: numbers.days_on_market!,
-        realtor_views: numbers.realtor_listing_views!,
-        showings: field(form, "showings") === "" ? null : numbers.showings!
-      };
-      // Exposure against our own archive; the rules only quote it once the sample is big enough.
-      const benchmark = await exposureBenchmark().catch(() => null);
-      const exposure =
-        benchmark && property.days_on_market >= MIN_DAYS_FOR_EXPOSURE && property.realtor_views > 0
-          ? { views_per_day: Math.round((property.realtor_views / property.days_on_market) * 10) / 10, ...benchmark }
-          : null;
       const sourceUrl = field(form, "market_source_url");
       market = {
         ...values,
@@ -306,6 +309,14 @@ export const POST: APIRoute = async ({ request }) => {
         exposure
       };
     }
+    // The cover's "Where your property stands", frozen like every other sentence. Without market figures it
+    // still reads the property's own numbers (exposure, showings).
+    verdict = sellerVerdict(
+      values,
+      market ?? { region_label: field(form, "market_region_label") || "your area", reporting_month: "", type_label: TYPE_LABELS[propertyType] },
+      property,
+      exposure
+    );
   }
 
   const notes = field(form, "notes").slice(0, MAX_NOTES_CHARS);
@@ -363,7 +374,7 @@ export const POST: APIRoute = async ({ request }) => {
       show_showings: field(form, "showings") !== "",
       show_notes: notes !== "",
       kind,
-      ...(kind === "market" ? { property_type: propertyType } : {})
+      ...(kind === "market" ? { property_type: propertyType, ...(verdict ? { verdict } : {}) } : {})
     },
     website: {
       source: sourceField(form, "website_source"),

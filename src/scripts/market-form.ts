@@ -16,6 +16,8 @@ import {
 } from "../lib/market-rules";
 
 type PulledRecord = MarketValues & { type: RecordType; type_label: string; price_label: string };
+// The view counts the report adds up into its total (the cover's "It is still early" quotes it).
+const VIEW_FIELDS = ["website_views", "realtor_listing_views", "facebook_views", "instagram_views"];
 export type PulledMarket = {
   configured: boolean;
   source: "board_stats" | "manual";
@@ -90,7 +92,12 @@ export function initMarketForm(form: HTMLFormElement, setNotice: (key: string, m
       const raw = (field(name)?.value ?? "").trim();
       return raw === "" ? null : Number(raw);
     };
-    const property = { days_on_market: num("days_on_market") ?? 0, realtor_views: num("realtor_listing_views") ?? 0, showings: num("showings") };
+    const property = {
+      days_on_market: num("days_on_market") ?? 0,
+      realtor_views: num("realtor_listing_views") ?? 0,
+      showings: num("showings"),
+      total_views: VIEW_FIELDS.reduce((sum, name) => sum + (num(name) ?? 0), 0)
+    };
     renderList(listMarket, interpretMarket(values, ctx));
     renderList(listProperty, interpretProperty(values, ctx, property, null));
     // The exposure comparison is added at creation (it needs the archive), so the preview
@@ -159,7 +166,7 @@ export function initMarketForm(form: HTMLFormElement, setNotice: (key: string, m
       refreshPreview();
     });
   });
-  ["days_on_market", "realtor_listing_views", "showings", "market_reporting_month"].forEach((name) => {
+  ["days_on_market", "showings", "market_reporting_month", ...VIEW_FIELDS].forEach((name) => {
     field(name)?.addEventListener("input", refreshPreview);
   });
 

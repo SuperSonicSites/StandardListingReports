@@ -68,8 +68,9 @@ export type MarketMonth = {
 export type MarketAttempt = { at: string; ok: boolean; error: string; month?: string };
 
 // REALTOR.ca views per day on market for every qualifying report, so the exposure
-// benchmark never has to reopen the (image-carrying) snapshot files.
-export type ExposureLedger = { entries: { id: string; views_per_day: number }[] };
+// benchmark never has to reopen the (image-carrying) snapshot files. `client` + `listing`
+// (MLS® number, else address) let the benchmark count each listing once, per market.
+export type ExposureLedger = { entries: { id: string; views_per_day: number; client: string; listing: string }[] };
 
 // Frozen into a snapshot: the reviewed market figures, their provenance, and the
 // rule-generated interpretation computed at creation time.

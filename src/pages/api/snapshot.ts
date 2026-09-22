@@ -4,14 +4,14 @@ import { canAccessClient } from "../../lib/auth";
 import { createSnapshotId, readClient, readSnapshot, writeSnapshot } from "../../lib/storage";
 import type { MarketBlock, MetricSource, ReportSnapshot } from "../../lib/types";
 import { brandedErrorPage } from "../../lib/error-page";
-import { exposureBenchmark, recordExposure } from "../../lib/market";
+import { exposureBenchmark, listingKey, recordExposure } from "../../lib/market";
 import {
   computeMonthsOfInventory,
+  EARLY_DAYS,
   EMPTY_MARKET_VALUES,
   interpretMarket,
   interpretProperty,
   MARKET_VALUE_KEYS,
-  MIN_DAYS_FOR_EXPOSURE,
   PROPERTY_TYPES,
   sellerVerdict,
   TYPE_LABELS,
@@ -251,14 +251,19 @@ export const POST: APIRoute = async ({ request }) => {
     const property = {
       days_on_market: numbers.days_on_market!,
       realtor_views: numbers.realtor_listing_views!,
-      showings: field(form, "showings") === "" ? null : numbers.showings!
+      showings: field(form, "showings") === "" ? null : numbers.showings!,
+      // Every channel combined, as the report's total readout adds it up.
+      total_views: numbers.website_views! + numbers.realtor_listing_views! + numbers.facebook_views! + numbers.instagram_views!
     };
-    // Exposure against our own archive; the rules only quote it once the sample is big enough.
-    const benchmark = await exposureBenchmark().catch(() => null);
-    const exposure =
-      benchmark && property.days_on_market >= MIN_DAYS_FOR_EXPOSURE && property.realtor_views > 0
-        ? { views_per_day: Math.round((property.realtor_views / property.days_on_market) * 10) / 10, ...benchmark }
+    // Exposure against the other listings in this client's market, only after the first
+    // month; the rules only quote it once the sample is big enough.
+    const benchmark =
+      property.days_on_market >= EARLY_DAYS && property.realtor_views > 0
+        ? await exposureBenchmark(client.market, client.slug, listingKey({ mls_number: mlsNumber, address })).catch(() => null)
         : null;
+    const exposure = benchmark
+      ? { views_per_day: Math.round((property.realtor_views / property.days_on_market) * 10) / 10, ...benchmark }
+      : null;
     const values: MarketValues = { ...EMPTY_MARKET_VALUES };
     const badMarket: string[] = [];
     for (const key of MARKET_VALUE_KEYS) {

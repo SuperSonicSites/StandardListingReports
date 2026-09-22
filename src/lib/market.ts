@@ -12,6 +12,7 @@
 // the numbers (every market value is an editable field), and check:market shows what broke.
 import {
   computeMonthsOfInventory,
+  EARLY_DAYS,
   monthLabel,
   percentChange,
   TYPE_LABELS,
@@ -20,6 +21,7 @@ import {
   type RecordType
 } from "./market-rules";
 import {
+  listClients,
   listMarketMonths,
   listSnapshotIds,
   readExposureLedger,
@@ -699,25 +701,41 @@ export async function marketStatus() {
 
 // ---------------------------------------------------------------------------------
 // Exposure benchmark: REALTOR.ca views per day on market, median over our own archive.
+// Like with like (owner, 22 September 2026): each listing counts once (its latest report),
+// only listings in the same market, each measured after its first month on the market.
 // Kept in a small ledger so a report never has to open every snapshot (they embed images).
 // ---------------------------------------------------------------------------------
+
+type LedgerEntry = ExposureLedger["entries"][number];
+type Benchmark = { benchmark_views_per_day: number; sample_size: number };
+
+/** The listing a report is about: its MLS® number, else its address. */
+export function listingKey(report: { mls_number?: string; address: string }): string {
+  return (report.mls_number || report.address).trim().toLowerCase();
+}
 
 export function exposureOf(snapshot: Pick<ReportSnapshot, "manual" | "website">): number | null {
   const views = snapshot.manual?.realtor_listing_views ?? 0;
   const days = snapshot.manual?.days_on_market ?? 0;
-  if (views <= 0 || days < 7 || snapshot.website?.source === "mock") return null;
+  if (views <= 0 || days < EARLY_DAYS || snapshot.website?.source === "mock") return null;
   return Math.round((views / days) * 10) / 10;
+}
+
+function ledgerEntry(id: string, snapshot: ReportSnapshot): LedgerEntry | null {
+  const views_per_day = exposureOf(snapshot);
+  return views_per_day === null ? null : { id, views_per_day, client: snapshot.client.slug ?? "", listing: listingKey(snapshot.report) };
 }
 
 async function loadLedger(): Promise<ExposureLedger> {
   const ledger = await readExposureLedger();
-  if (ledger) return ledger;
-  // First use: build from the snapshots already on disk, once.
-  const entries: ExposureLedger["entries"] = [];
+  // A ledger written before 22 September 2026 has no client/listing on its entries.
+  if (ledger && ledger.entries.every((entry) => entry.client !== undefined)) return ledger;
+  // First use (or that old ledger): build from the snapshots already on disk, once.
+  const entries: LedgerEntry[] = [];
   for (const id of await listSnapshotIds()) {
     try {
-      const views_per_day = exposureOf(await readSnapshot(id));
-      if (views_per_day !== null) entries.push({ id, views_per_day });
+      const entry = ledgerEntry(id, await readSnapshot(id));
+      if (entry) entries.push(entry);
     } catch {
       // a corrupt snapshot is not a reason to lose the benchmark
     }
@@ -727,20 +745,38 @@ async function loadLedger(): Promise<ExposureLedger> {
   return built;
 }
 
-export async function exposureBenchmark(): Promise<{ benchmark_views_per_day: number; sample_size: number } | null> {
-  const ledger = await loadLedger();
-  const values = ledger.entries.map((entry) => entry.views_per_day).sort((a, b) => a - b);
+/**
+ * Median views a day over the listings of `clients`, each counted once (its latest report),
+ * leaving out `exclude` (the "client|listing" being reported on). Pure, for check:market.
+ */
+export function benchmarkFrom(entries: LedgerEntry[], clients: Set<string>, exclude = ""): Benchmark | null {
+  const latest = new Map<string, LedgerEntry>();
+  for (const entry of entries) {
+    const key = `${entry.client}|${entry.listing}`;
+    if (!clients.has(entry.client) || key === exclude) continue;
+    const seen = latest.get(key);
+    // Ids are rpt-<13-digit ms timestamp>-<hex>, so a larger id is a later report.
+    if (!seen || entry.id > seen.id) latest.set(key, entry);
+  }
+  const values = [...latest.values()].map((entry) => entry.views_per_day).sort((a, b) => a - b);
   if (values.length === 0) return null;
   const mid = Math.floor(values.length / 2);
   const median = values.length % 2 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
   return { benchmark_views_per_day: Math.round(median * 10) / 10, sample_size: values.length };
 }
 
+/** The benchmark for one listing: the other listings of every client in the same market. */
+export async function exposureBenchmark(market: MarketKey | undefined, clientSlug: string, listing: string): Promise<Benchmark | null> {
+  if (!market) return null;
+  const clients = new Set((await listClients()).filter((client) => client.market === market).map((client) => client.slug));
+  return benchmarkFrom((await loadLedger()).entries, clients, `${clientSlug}|${listing}`);
+}
+
 export async function recordExposure(id: string, snapshot: ReportSnapshot): Promise<void> {
-  const views_per_day = exposureOf(snapshot);
-  if (views_per_day === null) return;
+  const entry = ledgerEntry(id, snapshot);
+  if (!entry) return;
   const ledger = await loadLedger();
-  if (ledger.entries.some((entry) => entry.id === id)) return;
-  ledger.entries.push({ id, views_per_day });
+  if (ledger.entries.some((existing) => existing.id === id)) return;
+  ledger.entries.push(entry);
   await writeExposureLedger(ledger);
 }

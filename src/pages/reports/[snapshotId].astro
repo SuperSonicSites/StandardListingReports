@@ -187,7 +187,7 @@ const verdict =
       sellerVerdict(
         market ?? EMPTY_MARKET_VALUES,
         market ?? { region_label: "your area", reporting_month: "", type_label: TYPE_LABELS[snapshot.report.property_type ?? "single_family"] },
-        { days_on_market: daysOnMarket, realtor_views: snapshot.manual.realtor_listing_views, showings: showShowings ? snapshot.manual.showings : null },
+        { days_on_market: daysOnMarket, realtor_views: snapshot.manual.realtor_listing_views, showings: showShowings ? snapshot.manual.showings : null, total_views: totalViews },
         market?.exposure ?? null
       ))
     : null;

@@ -4256,53 +4256,35 @@ a.hub-option:focus-visible {
   line-height: 1.5;
 }
 
-/* Market update cover: where the property stands, then the numbers behind it; the photo
-   fills whatever height is left, as on the listing cover. */
-.report-answer-card {
+/* Market update cover: the listing's numbers as plain bullets, then the photo, which fills
+   whatever height is left (as on the listing cover). No heading, no interpretation. */
+.report-cover-facts {
   display: grid;
-  gap: 8px;
-  border-left: 4px solid var(--client-accent);
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--client-accent) 12%, #ffffff);
-  padding: 18px 20px;
-}
-
-.report-answer-card .report-outline-label {
-  color: var(--client-primary);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.report-answer-card h2 {
+  gap: 10px;
   margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.report-cover-facts li {
+  position: relative;
+  padding-left: 22px;
   color: var(--ink);
-  font-size: 1.5rem;
-  font-weight: 780;
-  letter-spacing: -0.01em;
-  line-height: 1.15;
-  text-wrap: balance;
+  font-size: 1.08rem;
+  font-weight: 620;
+  letter-spacing: -0.005em;
+  line-height: 1.4;
 }
 
-.report-answer-card p {
-  margin: 0;
-  color: var(--report-charcoal);
-  font-size: 0.96rem;
-  line-height: 1.55;
-}
-
-.report-widget-row.report-widget-row-2 {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.report-proof-row .report-widget {
-  min-height: 0;
-  gap: 12px;
-}
-
-.report-proof-row .report-widget strong {
-  font-size: 1.5rem;
+.report-cover-facts li::before {
+  content: "";
+  position: absolute;
+  top: 0.48em;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--client-accent);
 }
 
 .market-grid {
@@ -4344,16 +4326,6 @@ a.hub-option:focus-visible {
   margin-left: -18px;
   color: var(--ss-muted);
   list-style: none;
-}
-
-/* Market update mode: social views stay, the post pickers, captions and images go. */
-.market-mode [data-social-picker],
-.market-mode .social-row textarea,
-.market-mode .social-row .counter,
-.market-mode .social-row .post-thumb,
-.market-mode .social-row .tile-label,
-.market-mode .social-row input[name$="_post_url"] {
-  display: none;
 }
 
 /* ---- One container width for every page shell (portal, forms, admin, header). ---- */

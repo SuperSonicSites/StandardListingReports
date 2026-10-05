@@ -205,7 +205,7 @@ assert.equal(market.monthsBetween("2026-08", "2026-05"), 3);
   assert.equal(rules.interpretMarket(rules.EMPTY_MARKET_VALUES, ctx).length, 0);
 
   // The home against the market, without an exposure benchmark (the listing sheet's facts).
-  const property = { days_on_market: 90, realtor_views: 900, showings: 3, total_views: 1500 };
+  const property = { days_on_market: 90, realtor_views: 900, showings: 3, website_views: 200, social_views: 400 };
   const p = rules.interpretProperty(values, ctx, property, null);
   assert.deepEqual(p, [
     "Your property has been on the market for 90 days, longer than the 60 days it took the average August 2026 sale. It has now been available longer than most properties that sold.",
@@ -247,62 +247,24 @@ assert.equal(market.monthsBetween("2026-08", "2026-05"), 3);
     "no comparison in the first month"
   );
 
-  // The cover's short answer: the most telling signal first.
-  const typical = { ...bench, benchmark_views_per_day: 10 };
-  const verdict = (overrides, exposure = null, v = values) => rules.sellerVerdict(v, ctx, { ...property, ...overrides }, exposure);
-  const verdicts = {
-    early: verdict({ days_on_market: 28, realtor_views: 280, showings: null, total_views: 400 }, typical),
-    earlyLowViews: verdict({ days_on_market: 20, realtor_views: 60, showings: null, total_views: 90 }, { ...bench, benchmark_views_per_day: 20 }),
-    onTrack: verdict({ days_on_market: 45, realtor_views: 450, showings: null }, typical),
-    late: verdict({ showings: null }, typical),
-    visits: verdict({}, typical),
-    noShowings: verdict({ showings: 0 }, typical),
-    below: verdict({}, { ...bench, benchmark_views_per_day: 20 }),
-    slow: verdict({ showings: null }, null, { ...values, days_to_sell: null }),
-    tight: verdict({ showings: null }, null, { ...rules.EMPTY_MARKET_VALUES, months_of_inventory: 3.8 }),
-    nothing: verdict({ showings: null }, null, rules.EMPTY_MARKET_VALUES)
-  };
-  // The first month is too soon to judge (owner, 22 September 2026).
-  assert.deepEqual(verdicts.early, {
-    headline: "It is still early.",
-    detail:
-      "Your property has been listed for 28 days and has drawn 400 views across REALTOR.ca, the website and social media. Properties that sold in August 2026 took 60 days on average. That is too soon to judge how buyers are responding. The coming weeks will tell."
-  });
-  assert.equal(verdicts.earlyLowViews.headline, "It is still early.", "no exposure verdict in the first month, even well below typical");
-  assert.deepEqual(verdicts.onTrack, {
-    headline: "It is still early. Your property is on track.",
-    detail: "Properties that sold in August 2026 took 60 days on average; yours has been listed for 45. Buyers are seeing it as much as most listings. The coming weeks will tell."
-  });
-  assert.equal(verdict({ days_on_market: 20, showings: 0 }).headline, "Buyers are looking online, but no one has booked a showing.", "two weeks without a showing still leads");
-  assert.equal(
-    verdict({ days_on_market: 25, showings: null }, null, { ...values, days_to_sell: 20 }).headline,
-    "It is taking longer than most properties that sold.",
-    "already past the average sale inside the first month"
-  );
-  assert.deepEqual(verdicts.late, {
-    headline: "Buyers are seeing it, but it is taking longer than most.",
-    detail:
-      "Properties that sold in August 2026 took 60 days on average; yours has been listed for 90. Plenty of buyers have looked, so they are choosing other properties they see as better value. Price and presentation are what they weigh."
-  });
-  assert.equal(verdicts.visits.headline, "Buyers are visiting, but no one has made an offer yet.");
-  assert.match(verdicts.visits.detail, /^3 showings so far show real interest\./);
-  assert.equal(verdicts.noShowings.headline, "Buyers are looking online, but no one has booked a showing.");
-  assert.match(verdicts.noShowings.detail, /^In 90 days it has drawn about 10 views a day on REALTOR\.ca, but no buyer has asked to see it in person\./);
-  assert.deepEqual(verdicts.below, {
-    headline: "Fewer buyers are opening your listing than similar ones.",
-    detail:
-      "It is getting about 10 views a day on REALTOR.ca, against a typical 20 for Central Okanagan listings we have reported on. Buyers decide what to open from the photos and the price, next to the other listings they see. Price and presentation are what they weigh."
-  });
-  assert.equal(verdicts.slow.headline, "It is a slow market, and buyers have plenty of choice.");
-  assert.match(verdicts.slow.detail, /^At the current pace it would take 8\.6 months to sell every property listed in Central Okanagan/);
-  assert.equal(verdicts.tight.headline, "Buyers are active in your market.");
-  assert.equal(verdicts.nothing.headline, "Here is where things stand.");
-  assert.equal(
-    verdict({ days_on_market: 5, realtor_views: 50, showings: 0 }, typical).headline,
-    "It is still early.",
-    "no showings in the first two weeks is not yet a signal"
-  );
-  assert.match(verdict({ days_on_market: 130, showings: null }, typical).detail, /yours has been listed for 130, about twice as long\./);
+  // The cover: this listing's own numbers as bullets, no interpretation (owner, 28 September 2026).
+  const facts = (overrides) => rules.coverFacts({ ...property, ...overrides });
+  assert.deepEqual(facts({ days_on_market: 11, realtor_views: 422, showings: null, website_views: 53, social_views: 1200 }), [
+    "On the market 11 days",
+    "1,675 views: 422 on REALTOR.ca, 53 on the website, 1,200 on social media",
+    "38 REALTOR.ca views a day"
+  ]);
+  assert.equal(facts({ showings: 0 }).at(-1), "No showings yet");
+  assert.equal(facts({ showings: 1 }).at(-1), "1 showing so far");
+  assert.equal(facts({ showings: 3 }).at(-1), "3 showings so far");
+  assert.deepEqual(facts({ days_on_market: 1, realtor_views: 0, showings: null, website_views: 0, social_views: 0 }), ["On the market 1 day"], "one day, one bullet, no per-day rate");
+  assert.deepEqual(facts({ days_on_market: 30, realtor_views: 300, showings: null, website_views: 0, social_views: 0 }), [
+    "On the market 30 days",
+    "300 views on REALTOR.ca",
+    "10 REALTOR.ca views a day"
+  ], "one channel needs no breakdown");
+  assert.deepEqual(rules.coverFacts({ days_on_market: 0, realtor_views: 0, showings: null, website_views: 0, social_views: 0 }), [], "nothing to say yet");
+  const coverText = facts({ showings: 2 });
 
   // Local inventory leads every list when the board exposes it.
   const localCtx = { region_label: "Vancouver Island", reporting_month: "2026-08", type_label: "townhouses", local_label: "Tofino-Ucluelet" };
@@ -311,37 +273,35 @@ assert.equal(market.monthsBetween("2026-08", "2026-05"), 3);
   assert.equal(lm[0], "9 townhouses are for sale in Tofino-Ucluelet right now. Those are the properties buyers compare yours against.");
   assert.equal(lm[1], "79 townhouses sold in Vancouver Island in August 2026, 11% more than a year ago. Buyer demand is stronger.");
   assert.match(rules.interpretMarket({ ...localValues, local_active_yoy_pct: 28.6 }, localCtx)[0], /^9 townhouses are for sale in Tofino-Ucluelet right now, 28.6% more than a year ago\./);
-  const lp = rules.interpretProperty(localValues, localCtx, { days_on_market: 15, realtor_views: 432, showings: null, total_views: 600 }, null);
+  const lp = rules.interpretProperty(localValues, localCtx, { days_on_market: 15, realtor_views: 432, showings: null, website_views: 100, social_views: 500 }, null);
   assert.equal(lp[0], "Buyers shopping for townhouses in Tofino-Ucluelet right now have 9 to choose from.");
   // Without a local label the local figure is silent, even if a value sneaks in.
   assert.doesNotMatch(rules.interpretMarket(localValues, { ...localCtx, local_label: "" })[0], /right now/);
   // A comparison names the local area its benchmark came from.
   assert.match(
-    rules.sellerVerdict(localValues, localCtx, { days_on_market: 40, realtor_views: 400, showings: null, total_views: 500 }, { ...bench, benchmark_views_per_day: 20 }).detail,
-    /against a typical 20 for Tofino-Ucluelet listings we have reported on\./
+    rules.interpretProperty(localValues, localCtx, { days_on_market: 40, realtor_views: 400, showings: null, website_views: 100, social_views: 0 }, { ...bench, benchmark_views_per_day: 20 })[2],
+    /across the 30 Tofino-Ucluelet listings we have reported on\.$/
   );
 
-  // The report that prompted the first-month rule: 1802 Peninsula Rd, Ucluelet, 22 September 2026.
-  // Day 11, 38 REALTOR.ca views a day against a cross-market "typical 46" — it used to lead
-  // with "Not enough buyers are seeing your property yet."
+  // The real report behind both rules: 1802 Peninsula Rd, Ucluelet. On day 11 it used to lead
+  // with "Not enough buyers are seeing your property yet" against a cross-market "typical 46";
+  // now the cover states the numbers and the sheet makes no comparison.
   const peninsula = {
     values: { ...rules.EMPTY_MARKET_VALUES, sales: 298, sales_yoy_pct: -11, active_inventory: 1468, inventory_yoy_pct: 3.1, months_of_inventory: 4.9, price: 788100, local_active: 46 },
     ctx: { region_label: "Vancouver Island", reporting_month: "2026-08", type_label: "single-family homes", local_label: "Tofino-Ucluelet" },
-    property: { days_on_market: 11, realtor_views: 421, showings: null, total_views: 1674 },
+    property: { days_on_market: 11, realtor_views: 421, showings: null, website_views: 53, social_views: 1200 },
     exposure: { views_per_day: 38.3, benchmark_views_per_day: 46, sample_size: 46 }
   };
-  const real = rules.sellerVerdict(peninsula.values, peninsula.ctx, peninsula.property, peninsula.exposure);
-  assert.deepEqual(real, {
-    headline: "It is still early.",
-    detail:
-      "Your property has been listed for 11 days and has drawn 1,674 views across REALTOR.ca, the website and social media. That is too soon to judge how buyers are responding. The coming weeks will tell."
-  });
+  assert.deepEqual(rules.coverFacts(peninsula.property), [
+    "On the market 11 days",
+    "1,674 views: 421 on REALTOR.ca, 53 on the website, 1,200 on social media",
+    "38 REALTOR.ca views a day"
+  ]);
   const realProperty = rules.interpretProperty(peninsula.values, peninsula.ctx, peninsula.property, peninsula.exposure);
   assert.equal(realProperty[2], "Your property has drawn 421 views on REALTOR.ca over 11 days, about 38 a day.");
 
   // Never a price recommendation, in any branch.
-  const verdictText = [...Object.values(verdicts), real].flatMap((v) => [v.headline, v.detail]);
-  const everything = [...m, ...small, ...p, ...above, ...below, ...lm, ...lp, ...realProperty, ...verdictText];
+  const everything = [...m, ...small, ...p, ...above, ...below, ...lm, ...lp, ...realProperty, ...coverText];
   for (const sentence of everything) assert.doesNotMatch(sentence, /overpriced|reduce (the|your) price|price reduction|lower (the|your) price|drop (the|your) price/i);
 
   assert.equal(rules.computeMonthsOfInventory(1219, 142), 8.6);
@@ -368,4 +328,4 @@ assert.equal(market.monthsBetween("2026-08", "2026-05"), 3);
   assert.equal(market.exposureOf({ manual: { realtor_listing_views: 900, days_on_market: 30 }, website: { source: "rybbit_api" } }), 30);
 }
 
-console.log("check:market OK — 3 board parsers, the dashboard fragment, percent edge cases, the rules, the cover verdicts and the exposure benchmark all pass.");
+console.log("check:market OK — 3 board parsers, the dashboard fragment, percent edge cases, the rules, the cover bullets and the exposure benchmark all pass.");

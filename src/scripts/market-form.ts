@@ -9,15 +9,12 @@ import {
   interpretProperty,
   MARKET_VALUE_KEYS,
   monthLabel,
-  sellerVerdict,
   TYPE_LABELS,
   type MarketValues,
   type RecordType
 } from "../lib/market-rules";
 
 type PulledRecord = MarketValues & { type: RecordType; type_label: string; price_label: string };
-// The view counts the report adds up into its total (the cover's "It is still early" quotes it).
-const VIEW_FIELDS = ["website_views", "realtor_listing_views", "facebook_views", "instagram_views"];
 export type PulledMarket = {
   configured: boolean;
   source: "board_stats" | "manual";
@@ -44,8 +41,6 @@ export function initMarketForm(form: HTMLFormElement, setNotice: (key: string, m
   const typeSelect = field("property_type") as HTMLSelectElement | null;
   const listMarket = section.querySelector<HTMLElement>("[data-interpretation-market]");
   const listProperty = section.querySelector<HTMLElement>("[data-interpretation-property]");
-  const verdictHeadline = section.querySelector<HTMLElement>("[data-verdict-headline]");
-  const verdictDetail = section.querySelector<HTMLElement>("[data-verdict-detail]");
   const meta = section.querySelector<HTMLElement>("[data-market-meta]");
   const sourceLink = section.querySelector<HTMLAnchorElement>("[data-market-source-link]");
 
@@ -96,15 +91,13 @@ export function initMarketForm(form: HTMLFormElement, setNotice: (key: string, m
       days_on_market: num("days_on_market") ?? 0,
       realtor_views: num("realtor_listing_views") ?? 0,
       showings: num("showings"),
-      total_views: VIEW_FIELDS.reduce((sum, name) => sum + (num(name) ?? 0), 0)
+      website_views: num("website_views") ?? 0,
+      social_views: (num("facebook_views") ?? 0) + (num("instagram_views") ?? 0)
     };
     renderList(listMarket, interpretMarket(values, ctx));
+    // The exposure comparison is added at creation (it needs the archive), so a line about it
+    // can appear on the report that the preview doesn't show.
     renderList(listProperty, interpretProperty(values, ctx, property, null));
-    // The exposure comparison is added at creation (it needs the archive), so the preview
-    // headline can differ slightly from the final one.
-    const verdict = sellerVerdict(values, ctx, property, null);
-    if (verdictHeadline) verdictHeadline.textContent = verdict.headline;
-    if (verdictDetail) verdictDetail.textContent = verdict.detail;
   }
 
   function applyRecord() {
@@ -166,7 +159,7 @@ export function initMarketForm(form: HTMLFormElement, setNotice: (key: string, m
       refreshPreview();
     });
   });
-  ["days_on_market", "showings", "market_reporting_month", ...VIEW_FIELDS].forEach((name) => {
+  ["days_on_market", "realtor_listing_views", "showings", "market_reporting_month"].forEach((name) => {
     field(name)?.addEventListener("input", refreshPreview);
   });
 

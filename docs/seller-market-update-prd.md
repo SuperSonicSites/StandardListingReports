@@ -23,15 +23,27 @@ The coordinator never researches or types market statistics. Typing is the fallb
 
 ## Report content
 
-Order (owner, 18 September 2026): where the property stands first, then the listing, then the market, then compliance. The update is mostly sent when a seller asks "why hasn't it sold yet?", so the positioning leads and the statistics back it up. One click: the agent types nothing (owner decision, 18 September 2026 — a draft with agent-written feedback and next-step boxes was rejected as asking too much).
+Order (owner, 5 October 2026): the listing's numbers first, then the listing sheet, social, the market, and compliance. The listing's own performance and its posts read together; the board statistics close the report. One click: the agent types nothing (owner decision, 18 September 2026 — a draft with agent-written feedback and next-step boxes was rejected as asking too much).
 
-### Cover: where your property stands
+### Cover: the numbers, then the photo
 
-- One verdict headline and two or three plain sentences under the label "Where your property stands", written by `sellerVerdict()` from the same reviewed numbers and frozen as `report.verdict` (market updates made before it existed compute it at render).
-- Three numbers behind it: days on market against the average sale; how much buyers see it (REALTOR.ca views a day against other listings in the same market once the listing has been on the market 30 days and we have reported on 30 of them, otherwise total views); showings when entered, otherwise the market's months of inventory.
+Owner decision, 28 September 2026. The cover used to open with a verdict headline ("It is still early.") and a paragraph explaining it, over three widgets. Both are gone: a headline that judges the listing is the agent's call, not the report's.
+
+- No label and no heading. The address and the report period, then bullets, then the photo.
+- Bullets from `coverFacts()`, this listing's numbers only, in order: days on the market; total views broken down by channel (REALTOR.ca, the website, social media — only the channels that carried views, and no breakdown when only one did); REALTOR.ca views a day once it has been listed a week; showings when the coordinator entered them ("No showings yet" for zero).
+- Facts only, no interpretation. The market comparison lives on the sheets that follow.
+- Formatted at render from the frozen numbers, like the widgets they replace — nothing to migrate, and every earlier market update picks them up.
 - The listing photo fills the rest of the page.
 
-### 1. Market conditions (one sheet)
+### 1. Property performance (existing sheet)
+
+Reused from the listing report: days on market, REALTOR.ca views, website views, Facebook and Instagram views, showings, reporting period, cover photo.
+
+### 2. Social performance (one sheet)
+
+The listing report's social sheet, unchanged: both posts with image, caption and views. Owner decision, 28 September 2026, reversing 18 September (which kept social as view counts only). The form shows the same post pickers in both modes, and a market update's snapshot embeds the post images like any other report.
+
+### 3. Market conditions (one sheet)
 
 Only the metrics the market actually publishes. Missing values are omitted, never guessed.
 
@@ -44,13 +56,7 @@ Only the metrics the market actually publishes. Missing values are omitted, neve
 
 Every sheet names the board, the region, the property type, the reporting month, the source link and the retrieval date.
 
-### 2. Property performance (existing sheet)
-
-Reused from the listing report: days on market, REALTOR.ca views, website views, Facebook and Instagram views, showings, reporting period, cover photo.
-
-The market update carries the social view counts as numbers only. The listing report's social sheet (post images and captions) is not part of it, the form hides the post pickers in market mode, and the snapshot embeds no post images. Owner decision, 18 September 2026: the seller conversation needs the stats, not the posts.
-
-### 3. Interpretation (on the market sheet)
+### 4. Interpretation (on the market sheet)
 
 Two short lists of plain sentences, both produced by deterministic rules in code. No language model.
 
@@ -141,7 +147,7 @@ Property sentences, in order:
 - Days on market against the average sale: "still early" when under it; "longer than most properties that sold" when over it; "about twice as long" at double. Against months of inventory when the board publishes no days to sell.
 - Exposure: REALTOR.ca views per day compared with the median of Supersonic's own archive, like with like (owner, 22 September 2026): **only after the listing's first 30 days**, against **other listings in the same market** (the client profile's `market`), **each listing counted once** (its latest report, itself left out), and only reports made after a listing's first 30 days feed the median. Quoted only when at least 30 such listings exist; whole numbers, sample size and area stated ("across the 34 Central Okanagan listings we have reported on"). Above typical ends "Exposure is not the problem." Below typical says "Fewer buyers are opening your listing than similar ones" and stops there. Without a benchmark the sentence states the home's own views per day and nothing more.
 - Showings, when entered, including "No showings have taken place yet" for an explicit zero.
-- The cover's **short answer** (`sellerVerdict`) says what these mean and picks the most telling signal, in order: fewer buyers opening it than similar listings (after 30 days, with a fair benchmark); looking online but no showing booked after 14 days; showings but no offer, and longer than the average sale; longer than the average sale; **within the first 30 days, "It is still early."** with the listing's total views; still early and on track (within the average sale); and, where the board publishes no days to sell, the pace of the market. "Price and presentation are what they weigh." is the ceiling. (The listing sheet's list states the facts only.)
+- The cover says none of this: it lists the listing's own numbers (`coverFacts`) and nothing more (owner, 28 September 2026). The sheets carry every sentence that means something, and the agent holds the conversation.
 - Why (owner, 22 September 2026): a Ucluelet listing on day 11 led with "Not enough buyers are seeing your property yet … Exposure is the first thing to fix" against a "typical 46" that counted every report (repeats and tests included) across Kelowna, Ucluelet and Yukon. Too early, not comparable, and it told the seller the agent's marketing was failing. REALTOR.ca views are buyers opening the listing from their search results, so a low count points at what they see there: the photos and the price, next to the other listings. The report says that much and no more.
 
 The rules never call the home overpriced and never recommend a price change. Only sentences supported by available data are produced.

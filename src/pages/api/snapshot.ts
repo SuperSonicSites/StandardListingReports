@@ -13,11 +13,9 @@ import {
   interpretProperty,
   MARKET_VALUE_KEYS,
   PROPERTY_TYPES,
-  sellerVerdict,
   TYPE_LABELS,
   type MarketValues,
-  type PropertyType,
-  type Verdict
+  type PropertyType
 } from "../../lib/market-rules";
 
 export const prerender = false;
@@ -246,14 +244,13 @@ export const POST: APIRoute = async ({ request }) => {
     ? (propertyTypeRaw as PropertyType)
     : "single_family";
   let market: MarketBlock | undefined;
-  let verdict: Verdict | undefined;
   if (kind === "market") {
     const property = {
       days_on_market: numbers.days_on_market!,
       realtor_views: numbers.realtor_listing_views!,
       showings: field(form, "showings") === "" ? null : numbers.showings!,
-      // Every channel combined, as the report's total readout adds it up.
-      total_views: numbers.website_views! + numbers.realtor_listing_views! + numbers.facebook_views! + numbers.instagram_views!
+      website_views: numbers.website_views!,
+      social_views: numbers.facebook_views! + numbers.instagram_views!
     };
     // Exposure against the other listings in this client's market, only after the first
     // month; the rules only quote it once the sample is big enough.
@@ -314,14 +311,6 @@ export const POST: APIRoute = async ({ request }) => {
         exposure
       };
     }
-    // The cover's "Where your property stands", frozen like every other sentence. Without market figures it
-    // still reads the property's own numbers (exposure, showings).
-    verdict = sellerVerdict(
-      values,
-      market ?? { region_label: field(form, "market_region_label") || "your area", reporting_month: "", type_label: TYPE_LABELS[propertyType] },
-      property,
-      exposure
-    );
   }
 
   const notes = field(form, "notes").slice(0, MAX_NOTES_CHARS);
@@ -342,11 +331,12 @@ export const POST: APIRoute = async ({ request }) => {
     }
   }
 
-  // A market update shows social views as numbers only, so its snapshot carries no post images.
+  // Both report kinds carry the post images: the market update has its own social sheet
+  // (owner, 28 September 2026).
   const [logo, facebookMedia, instagramMedia, propertyImage] = await Promise.all([
     embedImage(client.logo_url, true),
-    kind === "market" ? "" : embedImage(field(form, "facebook_media_url")).then((v) => v || inherited.facebook),
-    kind === "market" ? "" : embedImage(field(form, "instagram_media_url")).then((v) => v || inherited.instagram),
+    embedImage(field(form, "facebook_media_url")).then((v) => v || inherited.facebook),
+    embedImage(field(form, "instagram_media_url")).then((v) => v || inherited.instagram),
     embedImage(field(form, "property_image_url")).then((v) => v || inherited.property)
   ]);
 
@@ -379,7 +369,7 @@ export const POST: APIRoute = async ({ request }) => {
       show_showings: field(form, "showings") !== "",
       show_notes: notes !== "",
       kind,
-      ...(kind === "market" ? { property_type: propertyType, ...(verdict ? { verdict } : {}) } : {})
+      ...(kind === "market" ? { property_type: propertyType } : {})
     },
     website: {
       source: sourceField(form, "website_source"),

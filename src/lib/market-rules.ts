@@ -75,11 +75,15 @@ export const EMPTY_MARKET_VALUES: MarketValues = {
 };
 
 export type MarketContext = { region_label: string; reporting_month: string; type_label: string; local_label?: string };
-// total_views: every channel combined (website + REALTOR.ca + social), the report's total readout.
-export type PropertyContext = { days_on_market: number; realtor_views: number; showings: number | null; total_views: number };
+// The view counts per channel, so the cover can add them up and name each one.
+export type PropertyContext = {
+  days_on_market: number;
+  realtor_views: number;
+  showings: number | null;
+  website_views: number;
+  social_views: number;
+};
 export type ExposureBenchmark = { views_per_day: number; benchmark_views_per_day: number; sample_size: number };
-// The cover's "Where your property stands": one headline, then the reason in two or three plain sentences.
-export type Verdict = { headline: string; detail: string };
 
 // Thresholds (PRD "Interpretation rules").
 // Year-over-year changes read in three bands so the words never fight the number:
@@ -91,19 +95,18 @@ export const MOI_BUYERS_MARKET = 6;
 export const MOI_SELLERS_MARKET = 4;
 export const MIN_BENCHMARK_SAMPLE = 30;
 export const MIN_DAYS_FOR_EXPOSURE = 7;
-// The first month is too soon to judge (owner, 22 September 2026): until then the cover says
-// "It is still early" and nothing compares the listing's exposure with other listings.
+// The first month is too soon to judge (owner, 22 September 2026): nothing compares the
+// listing's exposure with other listings before this many days on the market.
 export const EARLY_DAYS = 30;
 // Exposure against our archive: within 10% of typical reads as "typical".
 export const EXPOSURE_ABOVE_RATIO = 1.1;
 export const EXPOSURE_BELOW_RATIO = 0.9;
-// Two weeks online with no showing booked is a signal worth leading with.
-export const NO_SHOWINGS_DAYS = 14;
 
 const numberFormat = new Intl.NumberFormat("en-CA");
 const fmt = (value: number) => numberFormat.format(value);
 const pct = (value: number) => `${Math.abs(value).toFixed(1).replace(/\.0$/, "")}%`;
 const round1 = (value: number) => Math.round(value * 10) / 10;
+const plural = (count: number, word: string) => `${fmt(count)} ${word}${count === 1 ? "" : "s"}`;
 
 export const MONTH_NAMES = [
   "January",
@@ -346,110 +349,32 @@ export function interpretProperty(
 }
 
 /**
- * Where the property stands, for the cover (the seller asking "why hasn't it sold yet?"). Leads with the most
- * telling signal: fewer buyers opening it than similar listings (after the first month),
- * then buyers looking online but not booking visits, then visits without an offer, then
- * time on market against the average sale; inside the first month otherwise "It is still
- * early"; after it, the pace of the market when the board publishes no days to sell. Built
- * from the same reviewed numbers as the sheets. Never calls the price wrong and never
- * recommends a price change: "Price and presentation are what they weigh." is the ceiling.
+ * The market update cover: this listing's own numbers as plain bullets (owner, 28 September
+ * 2026 — the cover used to open with a verdict headline and a paragraph of reasoning, which
+ * read as a judgement). Facts only, no interpretation; the sheets that follow do the talking.
+ * Formatted from the same reviewed numbers, so nothing here can disagree with them.
  */
-export function sellerVerdict(
-  v: MarketValues,
-  ctx: MarketContext,
-  property: PropertyContext,
-  exposure: ExposureBenchmark | null
-): Verdict {
-  const month = monthLabel(ctx.reporting_month);
+export function coverFacts(property: PropertyContext): string[] {
+  const out: string[] = [];
   const dom = property.days_on_market;
-  const days = v.days_to_sell;
-  const moi = v.months_of_inventory;
-  const showings = property.showings;
-  // No comparison in the first month: too soon to judge.
-  const level = dom >= EARLY_DAYS && property.realtor_views > 0 ? exposureLevel(exposure) : null;
-  const perDay = dom > 0 ? Math.round(property.realtor_views / dom) : 0;
-  const seen = level === "above" || level === "typical";
-  const weigh = "Price and presentation are what they weigh.";
-  const plural = (n: number, word: string) => `${fmt(n)} ${word}${n === 1 ? "" : "s"}`;
+  const channels: [number, string][] = [
+    [property.realtor_views, "on REALTOR.ca"],
+    [property.website_views, "on the website"],
+    [property.social_views, "on social media"]
+  ];
+  const seen = channels.filter(([views]) => views > 0);
+  const total = channels.reduce((sum, [views]) => sum + views, 0);
 
-  // Views on REALTOR.ca are buyers opening the listing from their search results, so a low
-  // count points at what they see there, not at the marketing.
-  if (level === "below" && exposure) {
-    return {
-      headline: "Fewer buyers are opening your listing than similar ones.",
-      detail: `It is getting about ${fmt(perDay)} views a day on REALTOR.ca, against a typical ${fmt(Math.round(exposure.benchmark_views_per_day))} for ${ctx.local_label || ctx.region_label} listings we have reported on. Buyers decide what to open from the photos and the price, next to the other listings they see. ${weigh}`
-    };
+  if (dom > 0) out.push(`On the market ${plural(dom, "day")}`);
+  // Name every channel that carried views; with only one there is nothing to break down.
+  if (seen.length > 1) out.push(`${fmt(total)} views: ${seen.map(([views, where]) => `${fmt(views)} ${where}`).join(", ")}`);
+  else if (seen.length === 1) out.push(`${fmt(total)} views ${seen[0][1]}`);
+  // A per-day rate needs a few days to mean anything.
+  if (property.realtor_views > 0 && dom >= MIN_DAYS_FOR_EXPOSURE) {
+    out.push(`${fmt(Math.round(property.realtor_views / dom))} REALTOR.ca views a day`);
   }
-
-  if (showings === 0 && dom >= NO_SHOWINGS_DAYS) {
-    return {
-      headline: "Buyers are looking online, but no one has booked a showing.",
-      detail: `In ${fmt(dom)} days it has drawn${perDay > 0 ? ` about ${fmt(perDay)} views a day on REALTOR.ca` : " views online"}, but no buyer has asked to see it in person. Buyers are comparing it with other listings and visiting those first. ${weigh}`
-    };
+  if (property.showings !== null) {
+    out.push(property.showings === 0 ? "No showings yet" : `${plural(property.showings, "showing")} so far`);
   }
-
-  if (days !== null && dom > days) {
-    const when = `Properties that sold in ${month} took ${fmt(days)} days on average; yours has been listed for ${fmt(dom)}${dom >= days * 2 ? ", about twice as long" : ""}.`;
-    if (showings !== null && showings > 0) {
-      return {
-        headline: "Buyers are visiting, but no one has made an offer yet.",
-        detail: `${plural(showings, "showing")} so far show real interest. ${when} When visits don't turn into offers, buyers are choosing other properties they see as better value. ${weigh}`
-      };
-    }
-    return {
-      headline: seen ? "Buyers are seeing it, but it is taking longer than most." : "It is taking longer than most properties that sold.",
-      detail: `${when} ${seen ? "Plenty of buyers have looked, so they are" : "Buyers are"} choosing other properties they see as better value. ${weigh}`
-    };
-  }
-
-  // The first month (and still within the average sale, where the board publishes one).
-  if (dom < EARLY_DAYS) {
-    const views = property.total_views > 0 ? ` and has drawn ${fmt(property.total_views)} views across REALTOR.ca, the website and social media` : "";
-    const pace = days !== null ? ` Properties that sold in ${month} took ${fmt(days)} days on average.` : "";
-    const booked = showings !== null && showings > 0 ? ` Buyers have booked ${plural(showings, "showing")} already.` : "";
-    return {
-      headline: "It is still early.",
-      detail: `Your property has been listed for ${plural(dom, "day")}${views}.${pace}${booked} That is too soon to judge how buyers are responding. The coming weeks will tell.`
-    };
-  }
-
-  if (days !== null) {
-    return {
-      headline: "It is still early. Your property is on track.",
-      detail: `Properties that sold in ${month} took ${fmt(days)} days on average; yours has been listed for ${fmt(dom)}.${
-        seen ? " Buyers are seeing it as much as most listings." : ""
-      }${showings !== null && showings > 0 ? ` Buyers have booked ${plural(showings, "showing")} already.` : ""} The coming weeks will tell.`
-    };
-  }
-
-  // No days to sell published (VIREB, Yukon): the pace of the market is the context.
-  const listed = dom > 0 ? ` Your property has been listed for ${fmt(dom)} days.` : "";
-  const where = ctx.region_label;
-  if (moi !== null && moi >= MOI_BUYERS_MARKET) {
-    return {
-      headline: "It is a slow market, and buyers have plenty of choice.",
-      detail: `At the current pace it would take ${moi} months to sell every property listed in ${where}, so properties are taking longer to sell.${listed}${
-        seen ? " Buyers are seeing yours as much as most listings." : ""
-      } With this much choice, buyers compare carefully. ${weigh}`
-    };
-  }
-  if (moi !== null && moi <= MOI_SELLERS_MARKET) {
-    return {
-      headline: "Buyers are active in your market.",
-      detail: `At the current pace it would take ${moi} months to sell every property listed in ${where}, so properties are selling steadily.${listed}${
-        seen ? " Buyers are seeing yours as much as most listings." : ""
-      }`
-    };
-  }
-  if (moi !== null) {
-    return {
-      headline: "The market is balanced.",
-      detail: `At the current pace it would take ${moi} months to sell every property listed in ${where}. Properties that match what buyers expect sell at a steady pace.${listed}`
-    };
-  }
-
-  return {
-    headline: "Here is where things stand.",
-    detail: `Your property has been listed for ${fmt(dom)} days${property.realtor_views > 0 ? ` and has drawn ${fmt(property.realtor_views)} views on REALTOR.ca` : ""}. The pages that follow show where the interest is coming from.`
-  };
+  return out;
 }

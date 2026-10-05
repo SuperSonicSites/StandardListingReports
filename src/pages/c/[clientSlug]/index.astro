@@ -71,7 +71,6 @@ const propertyType = prefill?.report.property_type ?? "single_family";
             id="report-form"
             method="post"
             action="/api/snapshot"
-            class={marketMode ? "market-mode" : undefined}
             data-prefilled={prefill ? "1" : undefined}
             novalidate
           >
@@ -380,11 +379,7 @@ const propertyType = prefill?.report.property_type ?? "single_family";
                         <span class="tooltip" data-tip="social" hidden />
                       </span>
                     </div>
-                    <p class="co-card-desc">
-                      {marketMode
-                        ? "Views of the listing's posts — the market update shows the numbers only, no post images or captions."
-                        : "Views for the featured posts. Captions land verbatim on the report."}
-                    </p>
+                    <p class="co-card-desc">Views for the featured posts. Captions land verbatim on the report.</p>
 
                     <div class="social-row" data-rail="facebook">
                       <div style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
@@ -540,11 +535,6 @@ const propertyType = prefill?.report.property_type ?? "single_family";
                     </div>
                   </div>
                   <div class="market-preview" style="margin-top: 16px">
-                    <h3>Where your property stands <span class="field-hint" style="font-weight: 400">— the first thing your seller reads, written by fixed rules from these numbers</span></h3>
-                    <p style="margin: 0 0 12px">
-                      <strong data-verdict-headline />
-                      <span data-verdict-detail />
-                    </p>
                     <h3>What this means</h3>
                     <ul data-interpretation-market />
                     <h3>Your listing in this market</h3>

@@ -38,6 +38,10 @@ const mv = (key: keyof MarketValues) => str(prefill?.market?.[key] ?? "");
 const marketMode = Astro.url.searchParams.get("type") === "market" || prefill?.report.kind === "market";
 const marketInfo = client?.market ? MARKETS[client.market] : null;
 const propertyType = prefill?.report.property_type ?? "single_family";
+// A listing report carries the market page too when the client has a market region
+// (owner, 9 October 2026), with a checkbox to leave it out.
+const showMarket = marketMode || Boolean(marketInfo);
+const marketLeftOut = !marketMode && Boolean(prefill) && !prefill?.market;
 ---
 
 <AppLayout
@@ -122,7 +126,7 @@ const propertyType = prefill?.report.property_type ?? "single_family";
                 </p>
               </div>
 
-              {marketMode && (
+              {showMarket && (
                 <div class="field">
                   <label class="field-label" for="ptype">Property type</label>
                   <select id="ptype" name="property_type">
@@ -379,6 +383,10 @@ const propertyType = prefill?.report.property_type ?? "single_family";
                       </span>
                     </div>
                     <p class="co-card-desc">Views for the featured posts. Captions land verbatim on the report.</p>
+                    <label style="display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 0.85rem; cursor: pointer">
+                      <input type="checkbox" name="no_social" value="yes" checked={prefill?.report.show_social === false} data-no-social />
+                      No social media posts for this listing — leave social out of the report
+                    </label>
 
                     <div class="social-row" data-rail="facebook">
                       <div style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
@@ -451,8 +459,8 @@ const propertyType = prefill?.report.property_type ?? "single_family";
                 </div>
               </section>
 
-              {/* Section 4 (market mode) — Market conditions */}
-              {marketMode && (
+              {/* Section 4 (market mode, or a client with a market region) — Market conditions */}
+              {showMarket && (
                 <section class="card co-section reveal" data-market-section data-notice-anchor="market">
                   <div class="numbered-head">
                     <span class="num">4</span>
@@ -465,6 +473,13 @@ const propertyType = prefill?.report.property_type ?? "single_family";
                       </p>
                     </div>
                   </div>
+                  {!marketMode && (
+                    <label style="display: flex; gap: 8px; align-items: center; margin: 0 0 14px; font-size: 0.85rem; cursor: pointer">
+                      <input type="checkbox" name="no_market" value="yes" checked={marketLeftOut} data-no-market />
+                      Leave the market page out of this report
+                    </label>
+                  )}
+                  <div data-market-body>
                   <input type="hidden" name="market_source" value={prefill?.market?.source ?? "manual"} />
                   <input type="hidden" name="market_source_url" value={prefill?.market?.source_url ?? ""} />
                   <input type="hidden" name="market_retrieved_at" value={prefill?.market?.retrieved_at ?? ""} />
@@ -536,22 +551,27 @@ const propertyType = prefill?.report.property_type ?? "single_family";
                   <div class="market-preview" style="margin-top: 16px">
                     <h3>What this means</h3>
                     <ul data-interpretation-market />
-                    <h3>Your listing in this market</h3>
-                    <ul data-interpretation-property />
-                    <p class="field-hint" style="margin: 4px 0 0">
-                      After 30 days on the market, the update also compares REALTOR.ca views with other listings we have reported on in the same market, once there are enough of them to be fair.
-                    </p>
+                    {marketMode && (
+                      <>
+                        <h3>Your listing in this market</h3>
+                        <ul data-interpretation-property />
+                        <p class="field-hint" style="margin: 4px 0 0">
+                          After 30 days on the market, the update also compares REALTOR.ca views with other listings we have reported on in the same market, once there are enough of them to be fair.
+                        </p>
+                      </>
+                    )}
                   </div>
                   <p class="field-hint" style="margin: 12px 0 0">
                     <a data-market-source-link href="#" target="_blank" rel="noopener" hidden>Open the board&rsquo;s statistics page</a>
                   </p>
+                  </div>
                 </section>
               )}
 
-              {/* Section 4 (5 in market mode) — Showings & notes */}
+              {/* Section 4 (5 with the market section) — Showings & notes */}
               <section class="card co-section reveal">
                 <div class="numbered-head">
-                  <span class="num">{marketMode ? "5" : "4"}</span>
+                  <span class="num">{showMarket ? "5" : "4"}</span>
                   <div class="head-text">
                     <h2>Showings &amp; notes</h2>
                     <p>Both optional — they appear on the report only when you fill them in.</p>

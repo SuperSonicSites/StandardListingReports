@@ -172,8 +172,11 @@ export const POST: APIRoute = async ({ request }) => {
   // today when the pull didn't set it. start_date must be present (pull-filled or manual).
   const endDate = field(form, "end_date") || todayIso();
   const mlsNumber = field(form, "mls_number");
-  const facebookPostUrl = field(form, "facebook_post_url");
-  const instagramPostUrl = field(form, "instagram_post_url");
+  // "No social media" checkbox: the posts and their views stay out of the report entirely.
+  const showSocial = field(form, "no_social") !== "yes";
+  const social = (name: string) => (showSocial ? field(form, name) : "");
+  const facebookPostUrl = social("facebook_post_url");
+  const instagramPostUrl = social("instagram_post_url");
   const realtorUrl = field(form, "realtor_admin_url");
 
   if (!address || !listingUrl) {
@@ -216,8 +219,8 @@ export const POST: APIRoute = async ({ request }) => {
 
   const numbers = {
     website_views: numberField(form, "website_views"),
-    facebook_views: numberField(form, "facebook_views"),
-    instagram_views: numberField(form, "instagram_views"),
+    facebook_views: showSocial ? numberField(form, "facebook_views") : 0,
+    instagram_views: showSocial ? numberField(form, "instagram_views") : 0,
     site_total_views: numberField(form, "site_total_views"),
     realtor_listing_views: numberField(form, "realtor_listing_views"),
     showings: numberField(form, "showings"),
@@ -244,7 +247,9 @@ export const POST: APIRoute = async ({ request }) => {
     ? (propertyTypeRaw as PropertyType)
     : "single_family";
   let market: MarketBlock | undefined;
-  if (kind === "market") {
+  // A listing report carries the market page too unless the coordinator left it out.
+  const includeMarket = kind === "market" || field(form, "no_market") !== "yes";
+  if (includeMarket) {
     const property = {
       days_on_market: numbers.days_on_market!,
       realtor_views: numbers.realtor_listing_views!,
@@ -335,8 +340,8 @@ export const POST: APIRoute = async ({ request }) => {
   // (owner, 28 September 2026).
   const [logo, facebookMedia, instagramMedia, propertyImage] = await Promise.all([
     embedImage(client.logo_url, true),
-    embedImage(field(form, "facebook_media_url")).then((v) => v || inherited.facebook),
-    embedImage(field(form, "instagram_media_url")).then((v) => v || inherited.instagram),
+    showSocial ? embedImage(field(form, "facebook_media_url")).then((v) => v || inherited.facebook) : "",
+    showSocial ? embedImage(field(form, "instagram_media_url")).then((v) => v || inherited.instagram) : "",
     embedImage(field(form, "property_image_url")).then((v) => v || inherited.property)
   ]);
 
@@ -368,8 +373,9 @@ export const POST: APIRoute = async ({ request }) => {
       // An explicit "0" showings is a real value and shows as 0.
       show_showings: field(form, "showings") !== "",
       show_notes: notes !== "",
+      show_social: showSocial,
       kind,
-      ...(kind === "market" ? { property_type: propertyType } : {})
+      ...(market ? { property_type: propertyType } : {})
     },
     website: {
       source: sourceField(form, "website_source"),
@@ -381,14 +387,14 @@ export const POST: APIRoute = async ({ request }) => {
       post_url: facebookPostUrl,
       // Only fall back to a generic caption when there IS a post; a missing post stays blank
       // so the report doesn't imply a post that doesn't exist.
-      caption: (field(form, "facebook_caption") || (facebookPostUrl ? "Facebook listing post" : "")).slice(0, MAX_CAPTION_CHARS),
+      caption: (social("facebook_caption") || (facebookPostUrl ? "Facebook listing post" : "")).slice(0, MAX_CAPTION_CHARS),
       media_url: facebookMedia,
       views: numbers.facebook_views!
     },
     instagram: {
       source: sourceField(form, "instagram_source"),
       post_url: instagramPostUrl,
-      caption: (field(form, "instagram_caption") || (instagramPostUrl ? "Instagram listing post" : "")).slice(0, MAX_CAPTION_CHARS),
+      caption: (social("instagram_caption") || (instagramPostUrl ? "Instagram listing post" : "")).slice(0, MAX_CAPTION_CHARS),
       media_url: instagramMedia,
       views: numbers.instagram_views!
     },

@@ -92,7 +92,7 @@ export function initMarketForm(form: HTMLFormElement, setNotice: (key: string, m
       realtor_views: num("realtor_listing_views") ?? 0,
       showings: num("showings"),
       website_views: num("website_views") ?? 0,
-      social_views: (num("facebook_views") ?? 0) + (num("instagram_views") ?? 0)
+      social_views: form.querySelector<HTMLInputElement>("[data-no-social]")?.checked ? 0 : (num("facebook_views") ?? 0) + (num("instagram_views") ?? 0)
     };
     renderList(listMarket, interpretMarket(values, ctx));
     // The exposure comparison is added at creation (it needs the archive), so a line about it

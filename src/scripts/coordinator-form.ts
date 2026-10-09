@@ -542,7 +542,7 @@ export function initCoordinatorForm() {
       instagram_post_url: field("instagram_post_url")?.value ?? "",
       realtor_admin_url: url,
       // Market mode: also fetch the client's monthly market statistics.
-      include_market: Boolean(marketForm),
+      include_market: Boolean(marketForm) && !noMarket?.checked,
       property_type: field("property_type")?.value ?? "single_family"
     };
 
@@ -639,18 +639,8 @@ export function initCoordinatorForm() {
       pullCard?.classList.add("is-pulled");
       revealAfterPull();
       refreshStates();
+      // No scroll and no focus jump: the page stays where the coordinator pasted the link.
       setStrip(outcome);
-      requestAnimationFrame(() => {
-        if (reviewBlock) {
-          window.scrollTo({
-            top: reviewBlock.getBoundingClientRect().top + window.scrollY - 76,
-            behavior: "smooth"
-          });
-        }
-        const focusId = outcome === "failed" ? "period-start-focus" : "addr";
-        if (outcome === "failed") periodStartInput?.focus({ preventScroll: true });
-        else document.getElementById(focusId)?.focus({ preventScroll: true });
-      });
     });
   }
 
@@ -666,6 +656,26 @@ export function initCoordinatorForm() {
     const btn = document.querySelector("[data-pull-trigger]") as HTMLButtonElement | null;
     if (btn && statusText?.textContent?.startsWith("That doesn’t look")) setStrip("ready");
   });
+
+  // ---- "No social media" checkbox: hide the post rows; the server leaves social out. ----
+  const noSocial = form.querySelector<HTMLInputElement>("[data-no-social]");
+  const syncNoSocial = () => {
+    document
+      .querySelectorAll<HTMLElement>('[data-rail="facebook"], [data-rail="instagram"]')
+      .forEach((row) => (row.hidden = !!noSocial?.checked));
+    marketForm?.refreshPreview();
+  };
+  noSocial?.addEventListener("change", syncNoSocial);
+  syncNoSocial();
+
+  // ---- Listing report "leave the market page out" checkbox: hide the market inputs. ----
+  const noMarket = form.querySelector<HTMLInputElement>("[data-no-market]");
+  const marketBody = form.querySelector<HTMLElement>("[data-market-body]");
+  const syncNoMarket = () => {
+    if (marketBody) marketBody.hidden = !!noMarket?.checked;
+  };
+  noMarket?.addEventListener("change", syncNoMarket);
+  syncNoMarket();
 
   // ---- Tooltips ----
   function closeTips() {
@@ -766,7 +776,7 @@ export function initCoordinatorForm() {
     );
     ["facebook_post_url", "instagram_post_url"].forEach((key) => {
       const val = v(key);
-      if (val && !/^https?:\/\//i.test(val))
+      if (val && !noSocial?.checked && !/^https?:\/\//i.test(val))
         errs[key] = "This doesn’t look like a valid link — it should start with https://.";
     });
     return errs;

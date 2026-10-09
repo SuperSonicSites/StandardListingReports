@@ -56,7 +56,7 @@ const title = client ? `Order ${orderId} | ${client.name}` : "Order not found | 
               </svg>
               Back to portal
             </a>
-            <p class="eyebrow">Listing website</p>
+            <p class="eyebrow">Property Showcase</p>
             <h1>{order.intake.property_address}</h1>
             <p style="font-family: ui-monospace, monospace">{order.page_url}</p>
           </div>
@@ -69,13 +69,13 @@ const title = client ? `Order ${orderId} | ${client.name}` : "Order not found | 
                 </svg>
               </div>
               <p class="eyebrow" style="color: var(--ss-success-ink); margin-bottom: 8px">Paid, in the queue</p>
-              <h2 style="margin: 0 0 10px; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; color: var(--ss-ink)">Your listing website is ordered.</h2>
+              <h2 style="margin: 0 0 10px; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; color: var(--ss-ink)">Your Property Showcase is ordered.</h2>
               <p style="max-width: 500px; margin: 0 auto; color: var(--ss-text-soft); line-height: 1.6">
-                We build the page from your details and your photo folder. You get a review link by email, and the page goes live on your portfolio once you approve it. We aim to publish within seven calendar days once we have everything we need.
+                We build the page from your details and your photo folder. You get a review link by email, and the page goes live on your website once you approve it. We aim to publish within seven calendar days once we have everything we need.
               </p>
               <p class="field-hint" style="margin-top: 12px">Reference: {order.id}</p>
               <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 22px">
-                <a class="button primary" href={`/c/${client.slug}/site`}>Order another listing website</a>
+                <a class="button primary" href={`/c/${client.slug}/site`}>Order another Property Showcase</a>
                 <a class="button ghost" href="/portal">Back to portal</a>
               </div>
             </section>
@@ -108,7 +108,7 @@ const title = client ? `Order ${orderId} | ${client.name}` : "Order not found | 
               <p class="eyebrow">{order.state === "expired" ? "Expired" : "Cancelled"}</p>
               <h2 style="margin: 0 0 8px">{order.state === "expired" ? "This order was never paid and has expired." : "This order was cancelled."}</h2>
               <p style="color: var(--ss-text-soft); line-height: 1.6">You can place a new order any time.</p>
-              <a class="button primary" href={`/c/${client.slug}/site`}>Order a listing website</a>
+              <a class="button primary" href={`/c/${client.slug}/site`}>Order a Property Showcase</a>
             </section>
           )}
         </main>

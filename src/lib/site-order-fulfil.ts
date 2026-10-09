@@ -193,9 +193,9 @@ function orderEmail(order: SiteOrder, _client: ClientProfile) {
   const greeting = order.intake.agent_name ? `Hi ${order.intake.agent_name},` : "Hi there,";
   const paragraphs = [
     greeting,
-    `We've got your order! Our team is now crafting your listing website for ${address}. 💥`,
+    `We've got your order! Our team is now crafting your Property Showcase for ${address}. 💥`,
     `Your page will live at:\n${order.page_url}`,
-    `Here is how it goes from here:\n1. We build the page from your details and your photo folder.\n2. You get a private review link by email, with a feedback button for changes.\n3. You approve, and we launch it on your portfolio. We aim to publish within 7 days once we have everything.`,
+    `Here is how it goes from here:\n1. We build the page from your details and your photo folder.\n2. You get a private review link by email, with a feedback button for changes.\n3. You approve, and we launch it on your website. We aim to publish within 7 days once we have everything.`,
     `Billing: $599 today for the page. Hosting is $99 per year, and your first year is on us, so the first hosting charge is one year from today. Taxes as shown on your Stripe receipt.`,
     `PS: Your order reference is ${order.id}. The terms you accepted (v${order.agreement.terms_version}) are here -> ${terms}`,
     `If you have any questions in the meantime, please let us know.`,
@@ -211,7 +211,7 @@ ${paragraphs
   })
   .join("\n")}
 </body></html>`;
-  return { subject: `Your listing website for ${address} is in production! 💥`, text, html };
+  return { subject: `Your Property Showcase for ${address} is in production! 💥`, text, html };
 }
 
 function recipients(order: SiteOrder, client: ClientProfile) {

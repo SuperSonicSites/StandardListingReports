@@ -96,7 +96,7 @@ export async function resolvePrices(force = false) {
   const body = await call<{ data: Price[] }>("GET", "/v1/prices", { active: true, lookup_keys: [LOOKUP_KEYS.production, LOOKUP_KEYS.hosting], limit: 10 });
   const production = body.data.find((p) => p.lookup_key === LOOKUP_KEYS.production);
   const hosting = body.data.find((p) => p.lookup_key === LOOKUP_KEYS.hosting);
-  if (!production || !hosting) throw new StripeError(0, "prices_missing", "Listing website prices are not set up in Stripe (lookup keys).");
+  if (!production || !hosting) throw new StripeError(0, "prices_missing", "Property Showcase prices are not set up in Stripe (lookup keys).");
   priceCache = { at: Date.now(), prices: { production, hosting } };
   return priceCache.prices;
 }

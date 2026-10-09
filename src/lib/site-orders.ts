@@ -11,7 +11,7 @@ export const PACKAGES: { value: SiteOrderPackage; label: string }[] = [
 export const LIMITS = { text: 255, short: 100, url: 450, notes: 2000, points: 600, route: 60, listings: 40 };
 // Paths the portfolio site uses for itself; never sellable as a micro-site route.
 export const PROTECTED_ROUTES = ["thank-you", "privacy", "sitemap.xml", "robots.txt", "sold", "index", "assets", "api", "admin", "portfolio"];
-export const TERMS_VERSION = "2026.09.1";
+export const TERMS_VERSION = "2026.10.1";
 export const PRICE_LINE = "$599 today, then $99 per year starting one year after purchase, plus applicable tax.";
 export const FOLDER_NOTICE =
   "Only complete this order when your photo folder is final and shared. Production starts from the folder as it is when we open it.";
@@ -143,7 +143,7 @@ export function validateSiteOrder(input: SiteOrderInput): SiteOrderErrors {
     if (row.floor_plan_link && !isHttpUrl(row.floor_plan_link)) errors[at("floor_plan_link")] = "Paste the full floor plan link, starting with https://.";
   });
 
-  if (!input.terms_accepted) errors.terms_accepted = "Please accept the Listing Website Terms to continue.";
+  if (!input.terms_accepted) errors.terms_accepted = "Please accept the Property Showcase Terms to continue.";
   return errors;
 }
 

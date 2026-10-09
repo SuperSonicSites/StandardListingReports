@@ -63,11 +63,11 @@ export const POST: APIRoute = async ({ request }) => {
     return json(403, { ok: false, code: "forbidden", error: `This account can’t order for that team. If it should, email ${SUPPORT}.` });
   }
   if (!client.zoho_account_id || !client.portfolio_host) {
-    return json(409, { ok: false, code: "not_connected", error: `Listing websites aren’t set up for ${client.name} yet. Email ${SUPPORT} and we’ll set it up.` });
+    return json(409, { ok: false, code: "not_connected", error: `Property Showcases aren’t set up for ${client.name} yet. Email ${SUPPORT} and we’ll set it up.` });
   }
   if (!listingSitesEnabled()) {
     console.error("[site-order] listing websites are not enabled (LISTING_SITES_ENABLED=1 with Stripe configured).");
-    return json(503, { ok: false, code: "payments_unavailable", error: `Listing websites are coming soon. Email ${SUPPORT} if you'd like to be first in line.` });
+    return json(503, { ok: false, code: "payments_unavailable", error: `Property Showcases are coming soon. Email ${SUPPORT} if you'd like to be first in line.` });
   }
   const slug = client.slug;
 

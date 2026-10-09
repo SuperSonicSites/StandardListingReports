@@ -22,7 +22,7 @@ const connected = Boolean(client?.zoho_account_id && client?.portfolio_host && e
 const host = client?.portfolio_host ?? "portfolio.example.com";
 ---
 
-<AppLayout title={client ? `Order a listing website | ${client.name}` : "Client not found | Supersonic"} className="client-form-body">
+<AppLayout title={client ? `Order a Property Showcase | ${client.name}` : "Client not found | Supersonic"} className="client-form-body">
   {
     client ? (
       <>
@@ -35,11 +35,11 @@ const host = client?.portfolio_host ?? "portfolio.example.com";
               </svg>
               Back to portal
             </a>
-            <p class="eyebrow">Listing websites</p>
-            <h1>Order a Listing Website</h1>
+            <p class="eyebrow">Property Showcases</p>
+            <h1>Order a Property Showcase</h1>
             <p>
               One page about a listing, or a project page about a development, on
-              your portfolio at <strong>{host}</strong>. Tell us about it, pay, and
+              your website at <strong>{host}</strong>. Tell us about it, pay, and
               we build it. {PRICE_LINE}
             </p>
           </div>
@@ -53,14 +53,14 @@ const host = client?.portfolio_host ?? "portfolio.example.com";
                 <span>
                   {enabled ? (
                     <>
-                      Listing websites aren&rsquo;t set up for {client.name} yet, so orders
+                      Property Showcases aren&rsquo;t set up for {client.name} yet, so orders
                       can&rsquo;t be placed from here. Email{" "}
                       <a href="mailto:hello@supersonicsites.com">hello@supersonicsites.com</a>{" "}
                       and we&rsquo;ll set it up.
                     </>
                   ) : (
                     <>
-                      Listing websites are coming soon, so orders can&rsquo;t be placed just yet. Email{" "}
+                      Property Showcases are coming soon, so orders can&rsquo;t be placed just yet. Email{" "}
                       <a href="mailto:hello@supersonicsites.com">hello@supersonicsites.com</a>{" "}
                       if you&rsquo;d like to be first in line.
                     </>
@@ -241,7 +241,7 @@ const host = client?.portfolio_host ?? "portfolio.example.com";
                     <input type="checkbox" name="terms_accepted" data-field="terms_accepted" aria-describedby="o-err-terms_accepted" style="margin-top: 4px" />
                     <span>
                       I accept the{" "}
-                      <a href="/terms/listing-websites" target="_blank" rel="noopener">Listing Website Terms</a>{" "}
+                      <a href="/terms/listing-websites" target="_blank" rel="noopener">Property Showcase Terms</a>{" "}
                       (version {TERMS_VERSION}) on behalf of {client.name}, and I am authorized to make this purchase.
                     </span>
                   </label>

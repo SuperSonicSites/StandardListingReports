@@ -1,4 +1,4 @@
-// The Listing Website Terms, versioned. The order stores TERMS_VERSION plus the
+// The Property Showcase Terms (formerly Listing Website Terms), versioned. The order stores TERMS_VERSION plus the
 // SHA-256 of this exact text at acceptance, and both travel in the Stripe
 // session metadata, so what a client accepted can always be reconstructed.
 // Change the text -> bump TERMS_VERSION in site-orders.ts. DRAFT: business and
@@ -6,8 +6,8 @@
 import { createHash } from "node:crypto";
 import { TERMS_VERSION } from "./site-orders";
 
-export const TERMS_TITLE = "Listing Website Terms";
-export const TERMS_EFFECTIVE = "2026-09-16";
+export const TERMS_TITLE = "Property Showcase Terms";
+export const TERMS_EFFECTIVE = "2026-10-09";
 
 export const TERMS_SECTIONS: { heading: string; body: string[] }[] = [
   {
@@ -19,7 +19,7 @@ export const TERMS_SECTIONS: { heading: string; body: string[] }[] = [
   {
     heading: "What you are buying",
     body: [
-      "One listing micro-site: a page about one listing, or a project page about a development with its listings inside, published on your portfolio site at portfolio.<your domain>/<page address>. The page includes the content described on the order form, a contact form that delivers to the email addresses you give us, and a card on your portfolio gallery.",
+      "One Property Showcase: a page about one listing, or a project page about a development with its listings inside, published on your website or portfolio site at the page address shown on your order. The page includes the content described on the order form, a contact form that delivers to the email addresses you give us, and, where you have a portfolio gallery, a card on it.",
       "Large developments are grouped by unit type at our discretion. The number of listings on a project page does not change the price."
     ]
   },
@@ -27,14 +27,14 @@ export const TERMS_SECTIONS: { heading: string; body: string[] }[] = [
     heading: "Price and hosting",
     body: [
       "Production costs $599 CAD, charged at checkout. Hosting costs $99 CAD per year. The first year of hosting is included in the production price; the first hosting charge is one year after purchase, and yearly after that, on the card on file. Taxes are added at checkout as required by law.",
-      "Hosting renews automatically until you cancel. To cancel a micro-site's hosting, email hello@supersonicsites.com; it ends at the end of the paid year and the page is taken down."
+      "Hosting renews automatically until you cancel. To cancel a Property Showcase's hosting, email hello@supersonicsites.com; it ends at the end of the paid year and the page is taken down."
     ]
   },
   {
     heading: "Delivery",
     body: [
       "We aim to publish within seven calendar days, counted from the day we have your payment, your acceptance of these terms and your complete material (a final, shared photo folder and the details on the order form). This is a target, not a guarantee.",
-      "Before we publish, you receive a review link. The review page is unlisted but reachable by anyone who has its address. The page appears on your portfolio only after you approve it by email."
+      "Before we publish, you receive a review link. The review page is unlisted but reachable by anyone who has its address. The page goes live only after you approve it by email."
     ]
   },
   {
@@ -46,7 +46,7 @@ export const TERMS_SECTIONS: { heading: string; body: string[] }[] = [
   },
   {
     heading: "Refunds",
-    body: ["If we do not produce the website, you get a full refund. Once the page is published, there is no refund."]
+    body: ["If we do not produce the page, you get a full refund. Once the page is published, there is no refund."]
   },
   {
     heading: "Your material",
@@ -58,7 +58,7 @@ export const TERMS_SECTIONS: { heading: string; body: string[] }[] = [
   {
     heading: "Sold listings and end of hosting",
     body: [
-      "When a listing sells, tell us and we mark it SOLD; the page stays up while hosting is active. When hosting ends, the page is removed and its address redirects to your portfolio. Material we hold for the page is deleted 90 days later."
+      "When a listing sells, tell us and we mark it SOLD; the page stays up while hosting is active. When hosting ends, the page is removed and its address redirects to your website or portfolio home page. Material we hold for the page is deleted 90 days later."
     ]
   },
   {

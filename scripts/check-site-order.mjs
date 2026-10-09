@@ -205,7 +205,7 @@ await check("a valid order reserves the route, creates the Customer once and ans
   assert.equal(saved.purchaser_email, "coordinator@example.com");
   assert.equal(saved.intake.agent_email, "jane@stonesisters.com");
   assert.equal(saved.intake.listings[0].price, "749900");
-  assert.equal(saved.agreement.terms_version, "2026.09.1");
+  assert.equal(saved.agreement.terms_version, "2026.10.1");
   assert.match(saved.agreement.terms_hash, /^[0-9a-f]{64}$/);
   const s = stripe.sessions[sessionId];
   assert.equal(s.params.mode, "subscription");

@@ -38,10 +38,14 @@ const mv = (key: keyof MarketValues) => str(prefill?.market?.[key] ?? "");
 const marketMode = Astro.url.searchParams.get("type") === "market" || prefill?.report.kind === "market";
 const marketInfo = client?.market ? MARKETS[client.market] : null;
 const propertyType = prefill?.report.property_type ?? "single_family";
-// A listing report carries the market page too when the client has a market region
-// (owner, 9 October 2026), with a checkbox to leave it out.
-const showMarket = marketMode || Boolean(marketInfo);
-const marketLeftOut = !marketMode && Boolean(prefill) && !prefill?.market;
+// Every report can carry the market page (owner, 9 October 2026). Report parts are picked
+// in section 1: on by default (market only when the client has a market region to pull
+// from), and "Adjust numbers" restores what that report had.
+const partsOn = {
+  website: prefill?.report.show_website !== false,
+  social: prefill?.report.show_social !== false,
+  market: marketMode || (prefill ? Boolean(prefill.market) : Boolean(marketInfo))
+};
 ---
 
 <AppLayout
@@ -126,8 +130,33 @@ const marketLeftOut = !marketMode && Boolean(prefill) && !prefill?.market;
                 </p>
               </div>
 
-              {showMarket && (
-                <div class="field">
+              <fieldset class="field" style="border: 0; padding: 0; margin: 18px 0 16px; min-width: 0">
+                <legend class="field-label" style="padding: 0; margin-bottom: 8px">Include in this report</legend>
+                {/* Always sent, so the server can tell "nothing ticked" from an older form. */}
+                <input type="hidden" name="parts" value="listing" />
+                <div style="display: flex; flex-wrap: wrap; gap: 8px 22px">
+                  <label style="display: flex; gap: 8px; align-items: center; cursor: pointer">
+                    <input type="checkbox" name="parts" value="website" checked={partsOn.website} data-part-toggle="website" />
+                    Website data
+                  </label>
+                  <label style="display: flex; gap: 8px; align-items: center; cursor: pointer">
+                    <input type="checkbox" name="parts" value="social" checked={partsOn.social} data-part-toggle="social" />
+                    Social media
+                  </label>
+                  {/* A Seller Market Update is built on the market data, so it stays ticked there. */}
+                  <label style="display: flex; gap: 8px; align-items: center; cursor: pointer">
+                    <input type="checkbox" name="parts" value="market" checked={partsOn.market} disabled={marketMode} data-part-toggle="market" />
+                    Market data
+                  </label>
+                </div>
+                <p class="field-hint">
+                  Untick anything this listing doesn&rsquo;t have. It leaves this form and the report.
+                  {marketMode && " Market data is always part of a Seller Market Update."}
+                  {!marketMode && !marketInfo && " This client has no market region yet: tick Market data to type the board figures by hand."}
+                </p>
+              </fieldset>
+
+              <div class="field" data-part="market">
                   <label class="field-label" for="ptype">Property type</label>
                   <select id="ptype" name="property_type">
                     {PROPERTY_TYPES.map((type) => (
@@ -139,8 +168,7 @@ const marketLeftOut = !marketMode && Boolean(prefill) && !prefill?.market;
                   <p class="field-hint">
                     Picks which market figures apply. Set it before you pull if this isn&rsquo;t a single-family home.
                   </p>
-                </div>
-              )}
+              </div>
               <div class="pull-strip">
                 <div class="pull-status" aria-live="polite">
                   <span class="pull-dot" data-pull-dot aria-hidden="true" />
@@ -163,7 +191,7 @@ const marketLeftOut = !marketMode && Boolean(prefill) && !prefill?.market;
               </div>
 
               {/* Post pickers — revealed after the pull. */}
-              <div data-social-picker hidden>
+              <div data-social-picker data-part="social" hidden>
                 <div
                   class="reveal"
                   style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px"
@@ -288,7 +316,7 @@ const marketLeftOut = !marketMode && Boolean(prefill) && !prefill?.market;
                     </div>
                   </div>
 
-                  <div class="field" data-notice-anchor="listing">
+                  <div class="field" data-notice-anchor="listing" data-part="website">
                     <label class="field-label" for="listing-url">
                       Website URL <span class="req">*</span>
                       <span class="info-wrap" data-info="listing" hidden>
@@ -313,7 +341,7 @@ const marketLeftOut = !marketMode && Boolean(prefill) && !prefill?.market;
                 </div>
                 <div class="perf-stack">
                   {/* Website */}
-                  <div class="rail-card" data-rail="website" data-fold="website" data-notice-anchor="website" style="box-shadow: none">
+                  <div class="rail-card" data-rail="website" data-fold="website" data-notice-anchor="website" data-part="website" style="box-shadow: none">
                     <div class="perf-metric-row">
                       <div style="min-width: 180px">
                         <div class="co-card-title">
@@ -374,7 +402,7 @@ const marketLeftOut = !marketMode && Boolean(prefill) && !prefill?.market;
                   </div>
 
                   {/* Social */}
-                  <div class="rail-card" data-fold="social" data-notice-anchor="social" style="border-left-color: var(--ss-border); box-shadow: none">
+                  <div class="rail-card" data-fold="social" data-notice-anchor="social" data-part="social" style="border-left-color: var(--ss-border); box-shadow: none">
                     <div class="co-card-title">
                       <h3>Social performance</h3>
                       <span class="info-wrap" data-info="social" hidden>
@@ -383,10 +411,6 @@ const marketLeftOut = !marketMode && Boolean(prefill) && !prefill?.market;
                       </span>
                     </div>
                     <p class="co-card-desc">Views for the featured posts. Captions land verbatim on the report.</p>
-                    <label style="display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 0.85rem; cursor: pointer">
-                      <input type="checkbox" name="no_social" value="yes" checked={prefill?.report.show_social === false} data-no-social />
-                      No social media posts for this listing — leave social out of the report
-                    </label>
 
                     <div class="social-row" data-rail="facebook">
                       <div style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
@@ -459,9 +483,8 @@ const marketLeftOut = !marketMode && Boolean(prefill) && !prefill?.market;
                 </div>
               </section>
 
-              {/* Section 4 (market mode, or a client with a market region) — Market conditions */}
-              {showMarket && (
-                <section class="card co-section reveal" data-market-section data-notice-anchor="market">
+              {/* Section 4 — Market conditions (hidden when Market data is unticked) */}
+                <section class="card co-section reveal" data-market-section data-notice-anchor="market" data-part="market">
                   <div class="numbered-head">
                     <span class="num">4</span>
                     <div class="head-text">
@@ -473,13 +496,6 @@ const marketLeftOut = !marketMode && Boolean(prefill) && !prefill?.market;
                       </p>
                     </div>
                   </div>
-                  {!marketMode && (
-                    <label style="display: flex; gap: 8px; align-items: center; margin: 0 0 14px; font-size: 0.85rem; cursor: pointer">
-                      <input type="checkbox" name="no_market" value="yes" checked={marketLeftOut} data-no-market />
-                      Leave the market page out of this report
-                    </label>
-                  )}
-                  <div data-market-body>
                   <input type="hidden" name="market_source" value={prefill?.market?.source ?? "manual"} />
                   <input type="hidden" name="market_source_url" value={prefill?.market?.source_url ?? ""} />
                   <input type="hidden" name="market_retrieved_at" value={prefill?.market?.retrieved_at ?? ""} />
@@ -564,14 +580,12 @@ const marketLeftOut = !marketMode && Boolean(prefill) && !prefill?.market;
                   <p class="field-hint" style="margin: 12px 0 0">
                     <a data-market-source-link href="#" target="_blank" rel="noopener" hidden>Open the board&rsquo;s statistics page</a>
                   </p>
-                  </div>
                 </section>
-              )}
 
               {/* Section 4 (5 with the market section) — Showings & notes */}
               <section class="card co-section reveal">
                 <div class="numbered-head">
-                  <span class="num">{showMarket ? "5" : "4"}</span>
+                  <span class="num" data-showings-num>{partsOn.market ? "5" : "4"}</span>
                   <div class="head-text">
                     <h2>Showings &amp; notes</h2>
                     <p>Both optional — they appear on the report only when you fill them in.</p>

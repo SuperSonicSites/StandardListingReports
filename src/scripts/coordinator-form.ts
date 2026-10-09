@@ -159,6 +159,9 @@ export function initCoordinatorForm() {
     const el = field(name);
     if (el) el.value = String(value ?? 0);
   };
+  // A part with no checkbox (market in a market update) is always on.
+  const partOn = (part: string) =>
+    form.querySelector<HTMLInputElement>(`[data-part-toggle="${part}"]`)?.checked ?? true;
   const mapState = (source: string) =>
     source === "mock" ? "demo" : source === "manual" ? "manual" : "pulled";
 
@@ -542,7 +545,7 @@ export function initCoordinatorForm() {
       instagram_post_url: field("instagram_post_url")?.value ?? "",
       realtor_admin_url: url,
       // Market mode: also fetch the client's monthly market statistics.
-      include_market: Boolean(marketForm) && !noMarket?.checked,
+      include_market: Boolean(marketForm) && partOn("market"),
       property_type: field("property_type")?.value ?? "single_family"
     };
 
@@ -602,7 +605,14 @@ export function initCoordinatorForm() {
       );
       marketForm?.applyPull(data.market ?? null);
 
-      outcome = (data.warnings ?? []).length > 0 ? "warnings" : "pulled";
+      // Warnings count only for the parts going into the report.
+      const partWarnings = [
+        ...(realtor.warnings ?? []),
+        ...(partOn("website") ? [...data.website.warnings, data.website.listing_warning] : []),
+        ...(partOn("social") ? [...data.facebook.warnings, ...data.instagram.warnings] : []),
+        ...(partOn("market") ? data.market?.warnings ?? [] : [])
+      ].filter(Boolean);
+      outcome = partWarnings.length > 0 ? "warnings" : "pulled";
     } else {
       // Total failure: everything stays editable.
       ["website", "facebook", "instagram"].forEach((key) => {
@@ -657,25 +667,19 @@ export function initCoordinatorForm() {
     if (btn && statusText?.textContent?.startsWith("That doesn’t look")) setStrip("ready");
   });
 
-  // ---- "No social media" checkbox: hide the post rows; the server leaves social out. ----
-  const noSocial = form.querySelector<HTMLInputElement>("[data-no-social]");
-  const syncNoSocial = () => {
-    document
-      .querySelectorAll<HTMLElement>('[data-rail="facebook"], [data-rail="instagram"]')
-      .forEach((row) => (row.hidden = !!noSocial?.checked));
+  // ---- "Include in this report" (section 1): an unticked part leaves the form and the
+  // report. data-part-off hides without touching `hidden`, which the pull reveal owns.
+  const showingsNum = document.querySelector<HTMLElement>("[data-showings-num]");
+  function syncParts() {
+    document.querySelectorAll<HTMLElement>("[data-part]").forEach((el) => {
+      el.toggleAttribute("data-part-off", !partOn(el.dataset.part!));
+    });
+    const marketShown = !!form!.querySelector("[data-market-section]") && partOn("market");
+    if (showingsNum) showingsNum.textContent = marketShown ? "5" : "4";
     marketForm?.refreshPreview();
-  };
-  noSocial?.addEventListener("change", syncNoSocial);
-  syncNoSocial();
-
-  // ---- Listing report "leave the market page out" checkbox: hide the market inputs. ----
-  const noMarket = form.querySelector<HTMLInputElement>("[data-no-market]");
-  const marketBody = form.querySelector<HTMLElement>("[data-market-body]");
-  const syncNoMarket = () => {
-    if (marketBody) marketBody.hidden = !!noMarket?.checked;
-  };
-  noMarket?.addEventListener("change", syncNoMarket);
-  syncNoMarket();
+  }
+  form.querySelectorAll("[data-part-toggle]").forEach((cb) => cb.addEventListener("change", syncParts));
+  syncParts();
 
   // ---- Tooltips ----
   function closeTips() {
@@ -764,7 +768,7 @@ export function initCoordinatorForm() {
     if (!v("address"))
       errs.address = "Enter the listing address — it appears on the report cover.";
     const url = v("listing_url");
-    if (!url || !/^https?:\/\//i.test(url))
+    if (partOn("website") && (!url || !/^https?:\/\//i.test(url)))
       errs.listing_url = "Add the listing’s website link (starting with https://).";
     // Showings is optional (blank = omitted from the report) — validate only when present.
     ["showings", "website_views", "realtor_listing_views", "days_on_market", "facebook_views", "instagram_views"].forEach(
@@ -776,7 +780,7 @@ export function initCoordinatorForm() {
     );
     ["facebook_post_url", "instagram_post_url"].forEach((key) => {
       const val = v(key);
-      if (val && !noSocial?.checked && !/^https?:\/\//i.test(val))
+      if (val && partOn("social") && !/^https?:\/\//i.test(val))
         errs[key] = "This doesn’t look like a valid link — it should start with https://.";
     });
     return errs;

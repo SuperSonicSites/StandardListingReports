@@ -87,12 +87,14 @@ export function initMarketForm(form: HTMLFormElement, setNotice: (key: string, m
       const raw = (field(name)?.value ?? "").trim();
       return raw === "" ? null : Number(raw);
     };
+    // An unticked report part counts as no views, exactly as /api/snapshot freezes it.
+    const off = (part: string) => form.querySelector<HTMLInputElement>(`[data-part-toggle="${part}"]`)?.checked === false;
     const property = {
       days_on_market: num("days_on_market") ?? 0,
       realtor_views: num("realtor_listing_views") ?? 0,
       showings: num("showings"),
-      website_views: num("website_views") ?? 0,
-      social_views: form.querySelector<HTMLInputElement>("[data-no-social]")?.checked ? 0 : (num("facebook_views") ?? 0) + (num("instagram_views") ?? 0)
+      website_views: off("website") ? 0 : num("website_views") ?? 0,
+      social_views: off("social") ? 0 : (num("facebook_views") ?? 0) + (num("instagram_views") ?? 0)
     };
     renderList(listMarket, interpretMarket(values, ctx));
     // The exposure comparison is added at creation (it needs the archive), so a line about it

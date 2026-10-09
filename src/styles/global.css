@@ -5,7 +5,8 @@
 /* The `hidden` attribute must win over author display rules (.field/
    .info-wrap/.cover-tile etc. all set display) — we only ever reveal by
    removing the attribute, never by CSS, so !important is safe here. */
-[hidden] {
+[hidden],
+[data-part-off] {
   display: none !important;
 }
 
@@ -2888,6 +2889,10 @@ textarea {
 }
 
 /* Column count follows the report's display toggles (e.g. showings hidden -> 3-up). */
+.report-widget-row.report-widget-row-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .report-widget-row.report-widget-row-3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -3453,6 +3458,7 @@ textarea {
   }
 
   .report-widget-row,
+  .report-widget-row.report-widget-row-2,
   .report-widget-row.report-widget-row-3,
   .report-widget-row.report-widget-row-4,
   .report-badge-row,

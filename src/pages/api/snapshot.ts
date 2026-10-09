@@ -165,21 +165,26 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   const backHref = `/c/${client.slug}/`;
+  // "Include in this report" (section 1). The form always sends parts=listing, so no parts
+  // at all means an older form: everything stays in. An unticked part leaves the report
+  // entirely — its links, captions, images and views are dropped, not hidden.
+  const parts = form.getAll("parts").map(String);
+  const partOn = (part: string) => parts.length === 0 || parts.includes(part);
+  const showSocial = partOn("social");
+  const showWebsite = partOn("website");
   const address = field(form, "address");
-  const listingUrl = field(form, "listing_url");
+  const listingUrl = showWebsite ? field(form, "listing_url") : "";
   const startDate = field(form, "start_date");
   // The reporting window is derived (first day on market -> today); end_date defaults to
   // today when the pull didn't set it. start_date must be present (pull-filled or manual).
   const endDate = field(form, "end_date") || todayIso();
   const mlsNumber = field(form, "mls_number");
-  // "No social media" checkbox: the posts and their views stay out of the report entirely.
-  const showSocial = field(form, "no_social") !== "yes";
   const social = (name: string) => (showSocial ? field(form, name) : "");
   const facebookPostUrl = social("facebook_post_url");
   const instagramPostUrl = social("instagram_post_url");
   const realtorUrl = field(form, "realtor_admin_url");
 
-  if (!address || !listingUrl) {
+  if (!address || (showWebsite && !listingUrl)) {
     return errorPage(400, "Address and listing URL are required.", backHref);
   }
 
@@ -199,10 +204,10 @@ export const POST: APIRoute = async ({ request }) => {
     return errorPage(400, "The start date must be on or before the end date.", backHref);
   }
 
-  // The website URL is always required; the social post URLs are optional (a listing may
-  // have no post yet — the report must still generate). Validate a social URL only when
-  // one is present.
-  if (!isHttpUrl(listingUrl)) {
+  // The website URL is required while website data is in the report; the social post URLs
+  // are optional (a listing may have no post yet — the report must still generate).
+  // Validate a social URL only when one is present.
+  if (showWebsite && !isHttpUrl(listingUrl)) {
     return errorPage(400, "Website URL must be a valid http(s) link.", backHref);
   }
   for (const [label, value] of [
@@ -218,10 +223,10 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   const numbers = {
-    website_views: numberField(form, "website_views"),
+    website_views: showWebsite ? numberField(form, "website_views") : 0,
     facebook_views: showSocial ? numberField(form, "facebook_views") : 0,
     instagram_views: showSocial ? numberField(form, "instagram_views") : 0,
-    site_total_views: numberField(form, "site_total_views"),
+    site_total_views: showWebsite ? numberField(form, "site_total_views") : 0,
     realtor_listing_views: numberField(form, "realtor_listing_views"),
     showings: numberField(form, "showings"),
     days_on_market: numberField(form, "days_on_market")
@@ -248,7 +253,7 @@ export const POST: APIRoute = async ({ request }) => {
     : "single_family";
   let market: MarketBlock | undefined;
   // A listing report carries the market page too unless the coordinator left it out.
-  const includeMarket = kind === "market" || field(form, "no_market") !== "yes";
+  const includeMarket = kind === "market" || partOn("market");
   if (includeMarket) {
     const property = {
       days_on_market: numbers.days_on_market!,
@@ -374,6 +379,7 @@ export const POST: APIRoute = async ({ request }) => {
       show_showings: field(form, "showings") !== "",
       show_notes: notes !== "",
       show_social: showSocial,
+      show_website: showWebsite,
       kind,
       ...(market ? { property_type: propertyType } : {})
     },

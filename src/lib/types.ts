@@ -123,6 +123,8 @@ export type ReportSnapshot = {
     // false = the coordinator removed social media (no posts for this listing): no social
     // sheet, no Meta row, social views count as 0. Older snapshots lack it and show social.
     show_social?: boolean;
+    // false = website data left out: no website widget/row, no listing link, views count as 0.
+    show_website?: boolean;
     // "market" = Seller Market Update (adds the market sheet). Older snapshots have
     // neither key and render as listing reports.
     kind?: "listing" | "market";

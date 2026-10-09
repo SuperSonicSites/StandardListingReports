@@ -26,6 +26,13 @@ const dateRange = snapshot ? formatDateRange(snapshot.report.start_date, snapsho
 const showShowings = snapshot?.report.show_showings ?? true;
 const showNotes = (snapshot?.report.show_notes ?? true) && Boolean(snapshot?.report.notes);
 const showSocial = snapshot?.report.show_social ?? true;
+const showWebsite = snapshot?.report.show_website ?? true;
+// The view channels this report covers, for the summary and readout sentences.
+const joinList = (items: string[]) =>
+  items.length <= 2 ? items.join(" and ") : `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
+const viewedWhere = [showWebsite && "the web", "REALTOR.ca", showSocial && "social media"].filter(Boolean) as string[];
+const viewSources = [showWebsite && "website", "REALTOR.ca", showSocial && "social"].filter(Boolean) as string[];
+const widgetCount = 2 + Number(showWebsite) + Number(showShowings);
 const propertyImage = snapshot?.report.property_image ?? "";
 // Headline readout: every channel combined — website + REALTOR.ca + social.
 const totalViews = snapshot
@@ -292,7 +299,7 @@ const coverBullets =
                   <span class="report-outline-label">Summary</span>
                   <p>
                     In this report you will find all the stats about the {snapshot.report.address} listing,
-                    including how many times it was viewed across the web{showSocial ? ", REALTOR.ca, and social media" : " and REALTOR.ca"}{showShowings ? ", along with showings," : ""} and how long it has been on the market.
+                    including how many times it was viewed {viewedWhere.length > 1 ? "across" : "on"} {joinList(viewedWhere)}{showShowings ? ", along with showings," : ""} and how long it has been on the market.
                   </p>
                   {siteTotalViews > 0 && (
                     <p>
@@ -324,16 +331,18 @@ const coverBullets =
           )}
 
           <section
-            class:list={["report-widget-row", showShowings ? "report-widget-row-4" : "report-widget-row-3"]}
+            class:list={["report-widget-row", `report-widget-row-${widgetCount}`]}
             aria-label="Listing activity metrics"
           >
-            <article class="report-widget">
-              <span class="report-widget-icon"><Fragment set:html={Icon({ name: "eye" })} /></span>
-              <div class="report-widget-body">
-                <span>Website</span>
-                <strong>{formatNumber(snapshot.website.listing_views)}</strong>
-              </div>
-            </article>
+            {showWebsite && (
+              <article class="report-widget">
+                <span class="report-widget-icon"><Fragment set:html={Icon({ name: "eye" })} /></span>
+                <div class="report-widget-body">
+                  <span>Website</span>
+                  <strong>{formatNumber(snapshot.website.listing_views)}</strong>
+                </div>
+              </article>
+            )}
             <article class="report-widget">
               <span class="report-widget-icon"><Fragment set:html={Icon({ name: "eye" })} /></span>
               <div class="report-widget-body">
@@ -377,12 +386,14 @@ const coverBullets =
               <span>Metric</span>
               <span>Value</span>
             </div>
-            <div class="report-table-row">
-              <span class="report-table-icon"><Fragment set:html={Icon({ name: "globe", size: 16 })} /></span>
-              <span>Website</span>
-              <span>Listing page views</span>
-              <strong>{formatNumber(snapshot.website.listing_views)}</strong>
-            </div>
+            {showWebsite && (
+              <div class="report-table-row">
+                <span class="report-table-icon"><Fragment set:html={Icon({ name: "globe", size: 16 })} /></span>
+                <span>Website</span>
+                <span>Listing page views</span>
+                <strong>{formatNumber(snapshot.website.listing_views)}</strong>
+              </div>
+            )}
             <div class="report-table-row">
               <span class="report-table-icon"><Fragment set:html={Icon({ name: "building", size: 16 })} /></span>
               <span>REALTOR.ca</span>
@@ -406,7 +417,7 @@ const coverBullets =
                 <strong>{formatNumber(totalViews)}</strong>
                 <span class="report-readout-trend"><Fragment set:html={Icon({ name: "trending-up", size: 20 })} /></span>
               </div>
-              <p>Combined website{showSocial ? ", REALTOR.ca, and social" : " and REALTOR.ca"} views for the reporting period.</p>
+              <p>{viewSources.length > 1 ? `Combined ${joinList(viewSources)}` : "REALTOR.ca"} views for the reporting period.</p>
             </article>
           </section>
         </section>
@@ -538,10 +549,12 @@ const coverBullets =
               <strong>Approved</strong>
             </div>
             <dl class="report-input-list">
-              <div>
-                <dt>Listing</dt>
-                <dd><a href={snapshot.report.listing_url}><Fragment set:html={Icon({ name: "external-link", size: 14 })} />{snapshot.report.listing_url}</a></dd>
-              </div>
+              {snapshot.report.listing_url && (
+                <div>
+                  <dt>Listing</dt>
+                  <dd><a href={snapshot.report.listing_url}><Fragment set:html={Icon({ name: "external-link", size: 14 })} />{snapshot.report.listing_url}</a></dd>
+                </div>
+              )}
               {showSocial && (<>
               <div>
                 <dt>Facebook post</dt>

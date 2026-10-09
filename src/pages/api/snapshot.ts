@@ -242,19 +242,19 @@ export const POST: APIRoute = async ({ request }) => {
     return errorPage(400, "Report data must be reviewed and approved before creation.", backHref);
   }
 
-  // Seller Market Update: the reviewed market figures plus the rule-generated
-  // interpretation, computed here from the submitted values (never trusted from the
-  // browser) and frozen with everything else. No figures at all => no market block,
-  // and the update still generates without the market sheet.
-  const kind = field(form, "report_kind") === "market" ? "market" : "listing";
+  // Market data: the reviewed market figures plus the rule-generated interpretation,
+  // computed here from the submitted values (never trusted from the browser) and frozen
+  // with everything else. No figures at all => no market block and no market sheet.
+  // The Seller Market Update is retired (owner, 9 October 2026): new reports are always
+  // listing reports; old market-update snapshots still render as they were.
+  const kind = "listing" as const;
   const propertyTypeRaw = field(form, "property_type");
   const propertyType: PropertyType = PROPERTY_TYPES.some((t) => t.value === propertyTypeRaw)
     ? (propertyTypeRaw as PropertyType)
     : "single_family";
   let market: MarketBlock | undefined;
-  // A listing report carries the market page too unless the coordinator left it out.
-  const includeMarket = kind === "market" || partOn("market");
-  if (includeMarket) {
+  // A listing report carries the market page unless the coordinator left it out.
+  if (partOn("market")) {
     const property = {
       days_on_market: numbers.days_on_market!,
       realtor_views: numbers.realtor_listing_views!,
@@ -341,8 +341,6 @@ export const POST: APIRoute = async ({ request }) => {
     }
   }
 
-  // Both report kinds carry the post images: the market update has its own social sheet
-  // (owner, 28 September 2026).
   const [logo, facebookMedia, instagramMedia, propertyImage] = await Promise.all([
     embedImage(client.logo_url, true),
     showSocial ? embedImage(field(form, "facebook_media_url")).then((v) => v || inherited.facebook) : "",

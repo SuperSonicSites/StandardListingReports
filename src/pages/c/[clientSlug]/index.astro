@@ -34,8 +34,8 @@ if (client && fromId) {
 const str = (value: unknown) => (value === null || value === undefined ? "" : String(value));
 const mv = (key: keyof MarketValues) => str(prefill?.market?.[key] ?? "");
 
-// Seller Market Update: the same form plus a property type and the market section.
-const marketMode = Astro.url.searchParams.get("type") === "market" || prefill?.report.kind === "market";
+// The Seller Market Update is retired (owner, 9 October 2026): every report is a listing
+// report, which carries the market page through the "Market data" part.
 const marketInfo = client?.market ? MARKETS[client.market] : null;
 const propertyType = prefill?.report.property_type ?? "single_family";
 // Every report can carry the market page (owner, 9 October 2026). Report parts are picked
@@ -44,12 +44,12 @@ const propertyType = prefill?.report.property_type ?? "single_family";
 const partsOn = {
   website: prefill?.report.show_website !== false,
   social: prefill?.report.show_social !== false,
-  market: marketMode || (prefill ? Boolean(prefill.market) : Boolean(marketInfo))
+  market: prefill ? Boolean(prefill.market) : Boolean(marketInfo)
 };
 ---
 
 <AppLayout
-  title={client ? `${marketMode ? "New market update" : "New report"} | ${client.name}` : "Client not found | Supersonic"}
+  title={client ? `New report | ${client.name}` : "Client not found | Supersonic"}
   className="client-form-body"
 >
   {
@@ -58,19 +58,10 @@ const partsOn = {
         <SiteHeader context={client.name} contextAccent={client.brand_accent} />
         <main class="client-workspace">
           <div class="co-hero reveal">
-            <p class="eyebrow">{marketMode ? "Seller Market Update" : "Listing report"}</p>
-            <h1>{marketMode ? "Create Seller Market Update" : "Create Listing Report"}</h1>
+            <p class="eyebrow">Listing report</p>
+            <h1>Create Listing Report</h1>
             <p>
-              {marketMode
-                ? "For the seller asking why it hasn't sold yet. Paste your REALTOR.ca share link and pull. The update opens with where the property stands, backed by the listing's numbers and this month's market."
-                : "Paste your REALTOR.ca share link and pull. We find the listing, the matching posts, and the numbers, then open your report."}
-            </p>
-            <p class="field-hint" style="margin-top: 10px">
-              {marketMode ? (
-                <a href={`/c/${client.slug}/`}>Just need the listing numbers? Create a standard listing report instead.</a>
-              ) : (
-                <a href={`/c/${client.slug}/?type=market`}>Seller asking why it isn&rsquo;t selling? Create a Seller Market Update instead.</a>
-              )}
+              Paste your REALTOR.ca share link and pull. We find the listing, the matching posts, and the numbers, then open your report.
             </p>
           </div>
 
@@ -82,7 +73,6 @@ const partsOn = {
             novalidate
           >
             <input type="hidden" name="client_slug" value={client.slug} />
-            <input type="hidden" name="report_kind" value={marketMode ? "market" : "listing"} />
             {/* Images can't travel through the form as data URIs; a prefilled form points at the
                 report they came from and /api/snapshot copies them (same client only). */}
             <input type="hidden" name="copy_media_from" value={prefill ? fromId : ""} />
@@ -143,16 +133,14 @@ const partsOn = {
                     <input type="checkbox" name="parts" value="social" checked={partsOn.social} data-part-toggle="social" />
                     Social media
                   </label>
-                  {/* A Seller Market Update is built on the market data, so it stays ticked there. */}
                   <label style="display: flex; gap: 8px; align-items: center; cursor: pointer">
-                    <input type="checkbox" name="parts" value="market" checked={partsOn.market} disabled={marketMode} data-part-toggle="market" />
+                    <input type="checkbox" name="parts" value="market" checked={partsOn.market} data-part-toggle="market" />
                     Market data
                   </label>
                 </div>
                 <p class="field-hint">
                   Untick anything this listing doesn&rsquo;t have. It leaves this form and the report.
-                  {marketMode && " Market data is always part of a Seller Market Update."}
-                  {!marketMode && !marketInfo && " This client has no market region yet: tick Market data to type the board figures by hand."}
+                  {!marketInfo && " This client has no market region yet: tick Market data to type the board figures by hand."}
                 </p>
               </fieldset>
 
@@ -567,15 +555,6 @@ const partsOn = {
                   <div class="market-preview" style="margin-top: 16px">
                     <h3>What this means</h3>
                     <ul data-interpretation-market />
-                    {marketMode && (
-                      <>
-                        <h3>Your listing in this market</h3>
-                        <ul data-interpretation-property />
-                        <p class="field-hint" style="margin: 4px 0 0">
-                          After 30 days on the market, the update also compares REALTOR.ca views with other listings we have reported on in the same market, once there are enough of them to be fair.
-                        </p>
-                      </>
-                    )}
                   </div>
                   <p class="field-hint" style="margin: 12px 0 0">
                     <a data-market-source-link href="#" target="_blank" rel="noopener" hidden>Open the board&rsquo;s statistics page</a>
@@ -621,8 +600,8 @@ const partsOn = {
                   </span>
                 </label>
                 <div class="co-submit-right">
-                  <button class="button primary" type="submit" data-submit-button data-label={marketMode ? "Create Market Update" : "Create Report"} disabled style="min-width: 172px">
-                    {marketMode ? "Create Market Update" : "Create Report"}
+                  <button class="button primary" type="submit" data-submit-button data-label="Create Report" disabled style="min-width: 172px">
+                    Create Report
                   </button>
                   <span style="font-size: 0.78rem; color: var(--ss-muted)" data-approval-hint>
                     Check the box to enable.

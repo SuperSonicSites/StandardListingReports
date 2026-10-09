@@ -188,7 +188,7 @@ export function initCoordinatorForm() {
   }
   const hasNotice = (key: string) =>
     !!document.querySelector(`[data-notice-anchor="${key}"] [data-fetch-notice]`);
-  // Seller Market Update mode only (the market section exists in the DOM); null otherwise.
+  // The market section (Market data part); null when the page has none.
   const marketForm = initMarketForm(form, setNotice);
 
   // ---- Post images (picker thumbnail + review thumbnail) ----

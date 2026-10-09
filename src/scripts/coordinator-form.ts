@@ -634,30 +634,7 @@ export function initCoordinatorForm() {
       marketForm?.applyPull(null);
     }
 
-    // Straight to the report: when the pull found everything the report needs, create
-    // it now — the report page is the review, and "Adjust numbers" on it brings the
-    // filled form back. The form stays as the fallback for anything the coordinator
-    // has to resolve by hand (a listing page that wasn't found, no dates, no market data).
-    const needsReview =
-      !data ||
-      !(field("address")?.value ?? "").trim() ||
-      !(field("listing_url")?.value ?? "").trim() ||
-      !(field("start_date")?.value ?? "") ||
-      (data.realtor?.source ?? "manual") === "manual" ||
-      (marketForm ? !data.market?.reporting_month : false);
-    if (!needsReview && Object.keys(validateSnapshot()).length === 0) {
-      timers.forEach((t) => clearTimeout(t));
-      if (stageEl) stageEl.textContent = "Creating your report…";
-      if (progressEl) progressEl.style.width = "100%";
-      if (approval) {
-        approval.checked = true;
-        syncApproval();
-      }
-      revealAfterPull();
-      form?.requestSubmit();
-      return;
-    }
-
+    // Every pull stops at the review: the coordinator checks the numbers and approves.
     stopModal(() => {
       pullCard?.classList.add("is-pulled");
       revealAfterPull();

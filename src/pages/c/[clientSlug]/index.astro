@@ -20,8 +20,7 @@ try {
 const flash = takeFlash(Astro.cookies);
 
 // "Adjust numbers" from a report: prefill every field from that snapshot (same client
-// only) and open the review section straight away. A clean pull creates the report
-// without a review step, so this is the way back to fix one value and regenerate.
+// only) and open the review section straight away, to fix one value and regenerate.
 const fromId = Astro.url.searchParams.get("from") ?? "";
 let prefill: ReportSnapshot | null = null;
 if (client && fromId) {

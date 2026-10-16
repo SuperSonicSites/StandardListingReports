@@ -120,6 +120,22 @@ const partsOn = {
                 </p>
               </div>
 
+              <div class="field">
+                  <label class="field-label" for="ptype">Property type</label>
+                  <select id="ptype" name="property_type">
+                    {PROPERTY_TYPES.map((type) => (
+                      <option value={type.value} selected={propertyType === type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                    {/* Boards publish no land figures, so land drops the Market data part. */}
+                    <option value="land">Vacant land / lot</option>
+                  </select>
+                  <p class="field-hint">
+                    Picks which market figures apply. Vacant land has no board figures, so it leaves out the market page.
+                  </p>
+              </div>
+
               <fieldset class="field" style="border: 0; padding: 0; margin: 18px 0 16px; min-width: 0">
                 <legend class="field-label" style="padding: 0; margin-bottom: 8px">Include in this report</legend>
                 {/* Always sent, so the server can tell "nothing ticked" from an older form. */}
@@ -133,7 +149,7 @@ const partsOn = {
                     <input type="checkbox" name="parts" value="social" checked={partsOn.social} data-part-toggle="social" />
                     Social media
                   </label>
-                  <label style="display: flex; gap: 8px; align-items: center; cursor: pointer">
+                  <label data-market-toggle-label style="display: flex; gap: 8px; align-items: center; cursor: pointer">
                     <input type="checkbox" name="parts" value="market" checked={partsOn.market} data-part-toggle="market" />
                     Market data
                   </label>
@@ -144,19 +160,6 @@ const partsOn = {
                 </p>
               </fieldset>
 
-              <div class="field" data-part="market">
-                  <label class="field-label" for="ptype">Property type</label>
-                  <select id="ptype" name="property_type">
-                    {PROPERTY_TYPES.map((type) => (
-                      <option value={type.value} selected={propertyType === type.value}>
-                        {type.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p class="field-hint">
-                    Picks which market figures apply. Set it before you pull if this isn&rsquo;t a single-family home.
-                  </p>
-              </div>
               <div class="pull-strip">
                 <div class="pull-status" aria-live="polite">
                   <span class="pull-dot" data-pull-dot aria-hidden="true" />

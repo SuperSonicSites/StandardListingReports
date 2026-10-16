@@ -679,7 +679,28 @@ export function initCoordinatorForm() {
     marketForm?.refreshPreview();
   }
   form.querySelectorAll("[data-part-toggle]").forEach((cb) => cb.addEventListener("change", syncParts));
-  syncParts();
+
+  // Vacant land: boards publish no land figures, so the Market data part goes away.
+  // Switching back restores the tick only if land took it.
+  const typeSelect = field("property_type") as HTMLSelectElement | null;
+  const marketToggle = form.querySelector<HTMLInputElement>('[data-part-toggle="market"]');
+  const marketLabel = form.querySelector<HTMLElement>("[data-market-toggle-label]");
+  let landUntickedMarket = false;
+  function syncLand() {
+    const land = typeSelect?.value === "land";
+    if (marketLabel) marketLabel.hidden = land;
+    if (!marketToggle) return;
+    if (land && marketToggle.checked) {
+      marketToggle.checked = false;
+      landUntickedMarket = true;
+    } else if (!land && landUntickedMarket) {
+      marketToggle.checked = true;
+      landUntickedMarket = false;
+    }
+    syncParts();
+  }
+  typeSelect?.addEventListener("change", syncLand);
+  syncLand();
 
   // ---- Tooltips ----
   function closeTips() {

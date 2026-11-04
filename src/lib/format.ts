@@ -16,7 +16,3 @@ export function formatDate(value: string) {
   if (Number.isNaN(date.getTime())) return value;
   return dateFormatter.format(date);
 }
-
-export function formatDateRange(start: string, end: string) {
-  return `${formatDate(start)} - ${formatDate(end)}`;
-}

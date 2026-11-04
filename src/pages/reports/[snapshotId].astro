@@ -1,7 +1,7 @@
 ---
 import AppLayout from "../../layouts/AppLayout.astro";
 import SupersonicBrand from "../../components/SupersonicBrand.astro";
-import { formatDate, formatDateRange, formatNumber } from "../../lib/format";
+import { formatDate, formatNumber } from "../../lib/format";
 import { coverFacts, monthLabel } from "../../lib/market-rules";
 import { readSnapshot } from "../../lib/storage";
 
@@ -21,7 +21,8 @@ try {
 }
 
 const socialViews = snapshot ? snapshot.facebook.views + snapshot.instagram.views : 0;
-const dateRange = snapshot ? formatDateRange(snapshot.report.start_date, snapshot.report.end_date) : "";
+// The cover shows the day the report was created (frozen in the snapshot), not the listing window.
+const reportDate = snapshot ? formatDate(snapshot.report.created_at.slice(0, 10)) : "";
 // Per-report display toggles; older snapshots predate them and default to shown.
 const showShowings = snapshot?.report.show_showings ?? true;
 const showNotes = (snapshot?.report.show_notes ?? true) && Boolean(snapshot?.report.notes);
@@ -253,8 +254,8 @@ const coverBullets =
                 <div class="report-period-pill">
                   <Fragment set:html={Icon({ name: "calendar", size: 16 })} />
                   <div class="report-period-text">
-                    <span class="report-period-label">Report period</span>
-                    <span class="report-period-value">{dateRange}</span>
+                    <span class="report-period-label">Report date</span>
+                    <span class="report-period-value">{reportDate}</span>
                   </div>
                 </div>
               </header>
@@ -282,8 +283,8 @@ const coverBullets =
                 <div class="report-period-pill">
                   <Fragment set:html={Icon({ name: "calendar", size: 16 })} />
                   <div class="report-period-text">
-                    <span class="report-period-label">Report period</span>
-                    <span class="report-period-value">{dateRange}</span>
+                    <span class="report-period-label">Report date</span>
+                    <span class="report-period-value">{reportDate}</span>
                   </div>
                 </div>
               </header>
